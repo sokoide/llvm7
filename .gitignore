@@ -5,8 +5,11 @@ build/
 *.o
 *.obj
 
+# LLM
+.claude
+
 # Executables
-playground
+playground_exe
 *.exe
 *.out
 
