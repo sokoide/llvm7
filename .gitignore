@@ -1,0 +1,39 @@
+# Build directory
+build/
+
+# Object files
+*.o
+*.obj
+
+# Executables
+playground
+*.exe
+*.out
+
+# LLVM intermediate files
+*.ll
+*.s
+*.bc
+
+# Dependency files
+*.d
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Core dumps
+core
+core.*
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
