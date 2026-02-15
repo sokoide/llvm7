@@ -21,6 +21,7 @@ struct Token {
 extern Token* token;
 
 extern Token* tokenize(char* p);
+extern void free_tokens(Token* head);
 extern bool consume(char op);
 extern void expect(char op);
 extern int expect_number();

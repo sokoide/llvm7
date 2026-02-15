@@ -40,7 +40,8 @@ Token* tokenize(char* p) {
             continue;
         }
 
-        if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' || *p == ')') {
+        if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' ||
+            *p == ')') {
             cur = new_token(TK_RESERVED, cur, p);
             p++;
             continue;
@@ -61,6 +62,20 @@ Token* tokenize(char* p) {
 
     new_token(TK_EOF, cur, p);
     return head.next;
+}
+
+/**
+ * Free a linked list of tokens
+ *
+ * @param[in] head Pointer to the head of the token linked list to free
+ */
+void free_tokens(Token* head) {
+    Token* curr = head;
+    while (curr != NULL) {
+        Token* next = curr->next;
+        free(curr);
+        curr = next;
+    }
 }
 
 /**

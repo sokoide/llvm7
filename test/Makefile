@@ -19,7 +19,7 @@ ALL_OBJS = $(PRODUCT_OBJS) $(TEST_OBJS)
 DEPS = $(ALL_OBJS:.o=.d)
 
 # Default target
-.PHONY: all test run clean
+.PHONY: all test run clean format
 all: $(TEST_TARGET)
 
 # Include generated dependency files
@@ -54,3 +54,7 @@ $(BUILD_DIR):
 # Clean
 clean:
 	rm -rf $(BUILD_DIR)/test_*.o $(BUILD_DIR)/test_runner $(BUILD_DIR)/*.d
+
+# Format
+format:
+	clang-format -i $(ALL_SRCS)

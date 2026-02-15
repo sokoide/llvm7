@@ -220,9 +220,12 @@ char* test_expr_complex_precedence() {
     mu_assert("Right value should be 4", node->rhs->val == 4);
     mu_assert("Left node kind should be ND_ADD", node->lhs->kind == ND_ADD);
     mu_assert("Left-left value should be 1", node->lhs->lhs->val == 1);
-    mu_assert("Left-right node kind should be ND_MUL", node->lhs->rhs->kind == ND_MUL);
-    mu_assert("Left-right-left value should be 2", node->lhs->rhs->lhs->val == 2);
-    mu_assert("Left-right-right value should be 3", node->lhs->rhs->rhs->val == 3);
+    mu_assert("Left-right node kind should be ND_MUL",
+              node->lhs->rhs->kind == ND_MUL);
+    mu_assert("Left-right-left value should be 2",
+              node->lhs->rhs->lhs->val == 2);
+    mu_assert("Left-right-right value should be 3",
+              node->lhs->rhs->rhs->val == 3);
 
     free(node->rhs);
     free(node->lhs->rhs->rhs);
