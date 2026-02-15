@@ -6,6 +6,11 @@
 // Test functions
 char* test_new_node_num();
 char* test_new_node();
+char* test_unary_num();
+char* test_unary_plus();
+char* test_unary_minus();
+char* test_unary_plus_num();
+char* test_unary_minus_mul();
 char* test_primary_num();
 char* test_primary_paren();
 char* test_mul_single_num();

@@ -6,7 +6,8 @@ build/
 *.obj
 
 # LLM
-.claude
+.claude/
+.serena/
 
 # Executables
 playground_exe

@@ -22,6 +22,11 @@ static char* run_all_tests() {
     mu_run_test(test_expect_number, "lexer: expect number");
     mu_run_test(test_new_node_num, "ast: new_node_num");
     mu_run_test(test_new_node, "ast: new_node");
+    mu_run_test(test_unary_num, "ast: unary num");
+    mu_run_test(test_unary_plus, "ast: unary plus");
+    mu_run_test(test_unary_minus, "ast: unary minus");
+    mu_run_test(test_unary_plus_num, "ast: unary plus num");
+    mu_run_test(test_unary_minus_mul, "ast: unary minus mul");
     mu_run_test(test_primary_num, "ast: primary number");
     mu_run_test(test_primary_paren, "ast: primary paren");
     mu_run_test(test_mul_single_num, "ast: mul single number");

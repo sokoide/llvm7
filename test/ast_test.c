@@ -11,7 +11,7 @@ char* test_new_node_num() {
     mu_assert("Node lhs should be NULL", node->lhs == NULL);
     mu_assert("Node rhs should be NULL", node->rhs == NULL);
 
-    free(node);
+    free_ast(node);
     return NULL;
 }
 
@@ -26,15 +26,99 @@ char* test_new_node() {
     mu_assert("Node lhs value should be 5", node->lhs->val == 5);
     mu_assert("Node rhs value should be 3", node->rhs->val == 3);
 
-    free(node);
-    free(lhs);
-    free(rhs);
+    free_ast(node);
+    return NULL;
+}
+
+char* test_unary_num() {
+    token = NULL;
+    Token* head = tokenize("42");
+    token = head;
+
+    Node* node = unary();
+
+    mu_assert("Node kind should be ND_NUM", node->kind == ND_NUM);
+    mu_assert("Node value should be 42", node->val == 42);
+
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
+    return NULL;
+}
+
+char* test_unary_plus() {
+    token = NULL;
+    Token* head = tokenize("+42");
+    token = head;
+
+    Node* node = unary();
+
+    mu_assert("Node kind should be ND_NUM", node->kind == ND_NUM);
+    mu_assert("Node value should be 42", node->val == 42);
+
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
+    return NULL;
+}
+
+char* test_unary_minus() {
+    token = NULL;
+    Token* head = tokenize("-5");
+    token = head;
+
+    Node* node = unary();
+
+    mu_assert("Node kind should be ND_SUB", node->kind == ND_SUB);
+    mu_assert("Left value should be 0", node->lhs->val == 0);
+    mu_assert("Right value should be 5", node->rhs->val == 5);
+
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
+    return NULL;
+}
+
+char* test_unary_plus_num() {
+    token = NULL;
+    Token* head = tokenize("+5+3");
+    token = head;
+
+    Node* node = expr();
+
+    mu_assert("Node kind should be ND_ADD", node->kind == ND_ADD);
+    mu_assert("Left value should be 5", node->lhs->val == 5);
+    mu_assert("Right value should be 3", node->rhs->val == 3);
+
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
+    return NULL;
+}
+
+char* test_unary_minus_mul() {
+    token = NULL;
+    Token* head = tokenize("-3*4");
+    token = head;
+
+    Node* node = mul();
+
+    mu_assert("Node kind should be ND_MUL", node->kind == ND_MUL);
+    mu_assert("Right value should be 4", node->rhs->val == 4);
+    mu_assert("Left node kind should be ND_SUB", node->lhs->kind == ND_SUB);
+    mu_assert("Left-left value should be 0", node->lhs->lhs->val == 0);
+    mu_assert("Left-right value should be 3", node->lhs->rhs->val == 3);
+
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
     return NULL;
 }
 
 char* test_primary_num() {
     token = NULL;
-    token = tokenize("42");
+    Token* head = tokenize("42");
+    token = head;
 
     Node* node = primary();
 
@@ -42,13 +126,16 @@ char* test_primary_num() {
     mu_assert("Node value should be 42", node->val == 42);
     mu_assert("Token should be EOF", token->kind == TK_EOF);
 
-    free(node);
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
     return NULL;
 }
 
 char* test_primary_paren() {
     token = NULL;
-    token = tokenize("(42)");
+    Token* head = tokenize("(42)");
+    token = head;
 
     Node* node = primary();
 
@@ -56,26 +143,32 @@ char* test_primary_paren() {
     mu_assert("Node value should be 42", node->val == 42);
     mu_assert("Token should be EOF", token->kind == TK_EOF);
 
-    free(node);
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
     return NULL;
 }
 
 char* test_mul_single_num() {
     token = NULL;
-    token = tokenize("5");
+    Token* head = tokenize("5");
+    token = head;
 
     Node* node = mul();
 
     mu_assert("Node kind should be ND_NUM", node->kind == ND_NUM);
     mu_assert("Node value should be 5", node->val == 5);
 
-    free(node);
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
     return NULL;
 }
 
 char* test_mul_multiply() {
     token = NULL;
-    token = tokenize("2*3");
+    Token* head = tokenize("2*3");
+    token = head;
 
     Node* node = mul();
 
@@ -83,15 +176,16 @@ char* test_mul_multiply() {
     mu_assert("Left value should be 2", node->lhs->val == 2);
     mu_assert("Right value should be 3", node->rhs->val == 3);
 
-    free(node->rhs);
-    free(node->lhs);
-    free(node);
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
     return NULL;
 }
 
 char* test_mul_divide() {
     token = NULL;
-    token = tokenize("6/2");
+    Token* head = tokenize("6/2");
+    token = head;
 
     Node* node = mul();
 
@@ -99,15 +193,16 @@ char* test_mul_divide() {
     mu_assert("Left value should be 6", node->lhs->val == 6);
     mu_assert("Right value should be 2", node->rhs->val == 2);
 
-    free(node->rhs);
-    free(node->lhs);
-    free(node);
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
     return NULL;
 }
 
 char* test_mul_chain() {
     token = NULL;
-    token = tokenize("2*3*4");
+    Token* head = tokenize("2*3*4");
+    token = head;
 
     Node* node = mul();
 
@@ -117,30 +212,32 @@ char* test_mul_chain() {
     mu_assert("Left-left value should be 2", node->lhs->lhs->val == 2);
     mu_assert("Left-right value should be 3", node->lhs->rhs->val == 3);
 
-    free(node->rhs);
-    free(node->lhs->rhs);
-    free(node->lhs->lhs);
-    free(node->lhs);
-    free(node);
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
     return NULL;
 }
 
 char* test_expr_single_num() {
     token = NULL;
-    token = tokenize("42");
+    Token* head = tokenize("42");
+    token = head;
 
     Node* node = expr();
 
     mu_assert("Node kind should be ND_NUM", node->kind == ND_NUM);
     mu_assert("Node value should be 42", node->val == 42);
 
-    free(node);
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
     return NULL;
 }
 
 char* test_expr_add() {
     token = NULL;
-    token = tokenize("1+2");
+    Token* head = tokenize("1+2");
+    token = head;
 
     Node* node = expr();
 
@@ -148,15 +245,16 @@ char* test_expr_add() {
     mu_assert("Left value should be 1", node->lhs->val == 1);
     mu_assert("Right value should be 2", node->rhs->val == 2);
 
-    free(node->rhs);
-    free(node->lhs);
-    free(node);
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
     return NULL;
 }
 
 char* test_expr_subtract() {
     token = NULL;
-    token = tokenize("5-3");
+    Token* head = tokenize("5-3");
+    token = head;
 
     Node* node = expr();
 
@@ -164,15 +262,16 @@ char* test_expr_subtract() {
     mu_assert("Left value should be 5", node->lhs->val == 5);
     mu_assert("Right value should be 3", node->rhs->val == 3);
 
-    free(node->rhs);
-    free(node->lhs);
-    free(node);
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
     return NULL;
 }
 
 char* test_expr_add_sub_chain() {
     token = NULL;
-    token = tokenize("1-2+3");
+    Token* head = tokenize("1-2+3");
+    token = head;
 
     Node* node = expr();
 
@@ -182,17 +281,16 @@ char* test_expr_add_sub_chain() {
     mu_assert("Left-left value should be 1", node->lhs->lhs->val == 1);
     mu_assert("Left-right value should be 2", node->lhs->rhs->val == 2);
 
-    free(node->rhs);
-    free(node->lhs->rhs);
-    free(node->lhs->lhs);
-    free(node->lhs);
-    free(node);
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
     return NULL;
 }
 
 char* test_expr_precedence() {
     token = NULL;
-    token = tokenize("1+2*3");
+    Token* head = tokenize("1+2*3");
+    token = head;
 
     Node* node = expr();
 
@@ -202,17 +300,16 @@ char* test_expr_precedence() {
     mu_assert("Right-left value should be 2", node->rhs->lhs->val == 2);
     mu_assert("Right-right value should be 3", node->rhs->rhs->val == 3);
 
-    free(node->rhs->rhs);
-    free(node->rhs->lhs);
-    free(node->rhs);
-    free(node->lhs);
-    free(node);
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
     return NULL;
 }
 
 char* test_expr_complex_precedence() {
     token = NULL;
-    token = tokenize("1+2*3-4");
+    Token* head = tokenize("1+2*3-4");
+    token = head;
 
     Node* node = expr();
 
@@ -227,12 +324,8 @@ char* test_expr_complex_precedence() {
     mu_assert("Left-right-right value should be 3",
               node->lhs->rhs->rhs->val == 3);
 
-    free(node->rhs);
-    free(node->lhs->rhs->rhs);
-    free(node->lhs->rhs->lhs);
-    free(node->lhs->rhs);
-    free(node->lhs->lhs);
-    free(node->lhs);
-    free(node);
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
     return NULL;
 }

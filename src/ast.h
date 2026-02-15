@@ -2,7 +2,8 @@
 #define __AST_H__
 
 // expr    = mul ("+" mul | "-" mul)*
-// mul     = primary ("*" primary | "/" primary)*
+// mul = unary("*" unary | "/" unary)*
+// unary = ("+" | "-") ? primary
 // primary = num | "(" expr ")"
 
 typedef enum {
@@ -27,6 +28,7 @@ extern Node* new_node_num(int val);
 extern void free_ast(Node* ast);
 extern Node* expr();
 extern Node* mul();
+extern Node* unary();
 extern Node* primary();
 
 #endif
