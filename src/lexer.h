@@ -1,33 +1,7 @@
 #ifndef __LEXER_H__
 #define __LEXER_H__
 
-#include <stdbool.h>
-typedef enum {
-    TK_RESERVED,
-    TK_IDENT,
-    TK_NUM,
-    TK_EOF,
-} TokenKind;
-
-struct Token {
-    TokenKind kind;
-    struct Token* next;
-    int val;
-    const char* str;
-    int len;
-};
-
-// Typedef - guarded to avoid redefinition warnings
-#ifndef TOKEN_TYPEDEF_DEFINED
-#define TOKEN_TYPEDEF_DEFINED
-typedef struct Token Token;
-#endif
-
-// Forward declaration - full definition in ast.h
-#ifndef CONTEXT_TYPEDEF_DEFINED
-#define CONTEXT_TYPEDEF_DEFINED
-typedef struct Context Context;
-#endif
+#include "common.h"
 
 extern Token* tokenize(const char* p);
 extern void free_tokens(Token* head);
