@@ -1,5 +1,5 @@
-#include "generate.h"
-#include "ast.h"
+#include "codegen.h"
+#include "parse.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>

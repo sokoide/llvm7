@@ -1,5 +1,5 @@
-#ifndef __AST_H__
-#define __AST_H__
+#ifndef __PARSE_H__
+#define __PARSE_H__
 
 #include "common.h"
 

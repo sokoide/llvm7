@@ -45,10 +45,20 @@ struct Node {
     int val;
 };
 
+typedef struct LVar LVar;
+
+struct LVar {
+    LVar* next;
+    char* name;
+    int len;
+    int offset;
+};
+
 typedef struct Context Context;
 struct Context {
     Token* current_token;  // Current token being processed
     Node* code[MAX_NODES]; // Generated AST nodes (statements)
+    LVar* locals;          // local variables
     int node_count;        // Number of statements
 };
 

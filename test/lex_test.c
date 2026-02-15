@@ -1,11 +1,11 @@
-#include "lexer_test.h"
-#include "../src/ast.h"
-#include "../src/lexer.h"
+#include "lex_test.h"
+#include "../src/lex.h"
+#include "../src/parse.h"
 #include "test_common.h"
 #include <stdio.h>
 #include <string.h>
 
-char* test_lexer_tokenize() {
+char* test_lex_tokenize() {
     Token* head = tokenize("1 + 2 - 3");
     Token* curr_token = head;
 

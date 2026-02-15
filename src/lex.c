@@ -1,5 +1,5 @@
-#include "lexer.h"
-#include "ast.h"
+#include "lex.h"
+#include "parse.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -63,7 +63,7 @@ Token* tokenize(const char* p) {
         }
 
         else {
-            fprintf(stderr, "Lexer error: Invalid character '%c'\n", *p);
+            fprintf(stderr, "lex error: Invalid character '%c'\n", *p);
             return NULL;
         }
     }
@@ -131,7 +131,7 @@ void expect(Context* ctx, char* op) {
     // Try to consume (match) the expected operator
     if (!consume(ctx, op)) {
         // If the operator doesn't match, print an error message to stderr
-        fprintf(stderr, "Lexer error: Expected '%s'\n", op);
+        fprintf(stderr, "lex error: Expected '%s'\n", op);
         // Exit the program with an error status
         exit(1);
     }
@@ -141,7 +141,7 @@ int expect_number(Context* ctx) {
     // Check if the current token is a number
     if (ctx->current_token->kind != TK_NUM) {
         // If it's not a number, print an error message to stderr
-        fprintf(stderr, "Lexer error: Expected a number\n");
+        fprintf(stderr, "lex error: Expected a number\n");
         // Exit the program with an error status
         exit(1);
     }

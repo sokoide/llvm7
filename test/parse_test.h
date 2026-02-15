@@ -1,7 +1,7 @@
-#ifndef __AST_TEST_H__
-#define __AST_TEST_H__
+#ifndef __PARSE_TEST_H__
+#define __PARSE_TEST_H__
 
-#include "../src/ast.h"
+#include "../src/parse.h"
 
 // Test functions
 char* test_new_node_num();

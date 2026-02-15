@@ -1,5 +1,5 @@
-#include "ast.h"
-#include "lexer.h"
+#include "parse.h"
+#include "lex.h"
 #include <stdlib.h>
 
 Node* new_node(NodeKind kind, Node* lhs, Node* rhs) {

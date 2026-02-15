@@ -1,5 +1,5 @@
-#ifndef __GENERATE_TEST_H__
-#define __GENERATE_TEST_H__
+#ifndef __CODEGEN_TEST_H__
+#define __CODEGEN_TEST_H__
 
 // Function declarations for tests
 char* test_generate_return_42();

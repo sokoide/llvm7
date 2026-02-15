@@ -40,7 +40,7 @@ typedef struct {
 } ReturnExpr;
 ```
 
-Currently only supports return expressions with integer values. Lexer and parser are not yet implemented.
+Currently only supports return expressions with integer values. lex and parser are not yet implemented.
 
 ### LLVM C API Usage
 

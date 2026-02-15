@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "ast.h"
+#include "codegen.h"
 #include "file.h"
-#include "generate.h"
-#include "lexer.h"
+#include "lex.h"
+#include "parse.h"
 
 int main(int argc, const char** argv) {
     if (argc < 2) {

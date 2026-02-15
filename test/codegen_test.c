@@ -4,8 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "../src/ast.h"
-#include "../src/generate.h"
+#include "../src/codegen.h"
+#include "../src/parse.h"
 #include "test_common.h"
 
 // Structure to manage LLVM JIT execution environment initialization/cleanup

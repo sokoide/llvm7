@@ -1,5 +1,5 @@
-#ifndef __LEXER_H__
-#define __LEXER_H__
+#ifndef __LEX_H__
+#define __LEX_H__
 
 #include "common.h"
 

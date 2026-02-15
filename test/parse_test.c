@@ -1,5 +1,5 @@
-#include "ast_test.h"
-#include "../src/lexer.h"
+#include "parse_test.h"
+#include "../src/lex.h"
 #include "test_common.h"
 #include <stdio.h>
 

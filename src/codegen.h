@@ -1,7 +1,7 @@
-#ifndef __GENERATE_H__
-#define __GENERATE_H__
+#ifndef __CODEGEN_H__
+#define __CODEGEN_H__
 
-#include "ast.h"
+#include "parse.h"
 
 #include <llvm-c/Core.h>
 
