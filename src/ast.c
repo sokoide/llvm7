@@ -28,9 +28,9 @@ void free_ast(Node* ast) {
 Node* expr() {
     Node* node = mul();
     while (1) {
-        if (consume('+')) {
+        if (consume("+")) {
             node = new_node(ND_ADD, node, mul());
-        } else if (consume('-')) {
+        } else if (consume("-")) {
             node = new_node(ND_SUB, node, mul());
         } else {
             return node;
@@ -41,9 +41,9 @@ Node* expr() {
 Node* mul() {
     Node* node = unary();
     while (1) {
-        if (consume('*')) {
+        if (consume("*")) {
             node = new_node(ND_MUL, node, unary());
-        } else if (consume('/')) {
+        } else if (consume("/")) {
             node = new_node(ND_DIV, node, unary());
         } else {
             return node;
@@ -52,9 +52,9 @@ Node* mul() {
 }
 
 Node* unary() {
-    if (consume('+')) {
+    if (consume("+")) {
         return primary();
-    } else if (consume('-')) {
+    } else if (consume("-")) {
         return new_node(ND_SUB, new_node_num(0), primary());
     } else {
         return primary();
@@ -62,9 +62,9 @@ Node* unary() {
 }
 
 Node* primary() {
-    if (consume('(')) {
+    if (consume("(")) {
         Node* node = expr();
-        expect(')');
+        expect(")");
         return node;
     }
 

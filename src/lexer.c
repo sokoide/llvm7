@@ -8,7 +8,7 @@
 // Global token pointer for consume/expect functions
 Token* token;
 
-static Token* new_token(TokenKind kind, Token* cur, const char* str) {
+static Token* new_token(TokenKind kind, Token* cur, const char* str, int len) {
     Token* tok = calloc(1, sizeof(Token));
     tok->kind = kind;
     tok->val = 0;
@@ -16,7 +16,7 @@ static Token* new_token(TokenKind kind, Token* cur, const char* str) {
         tok->val = strtol(str, NULL, 10);
     }
     tok->str = str;
-    tok->len = strlen(str);
+    tok->len = len;
     cur->next = tok;
     return tok;
 }
@@ -42,15 +42,14 @@ Token* tokenize(const char* p) {
 
         if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' ||
             *p == ')') {
-            cur = new_token(TK_RESERVED, cur, p);
-            p++;
+            cur = new_token(TK_RESERVED, cur, p++, 1);
             continue;
         } else if (isdigit(*p)) {
             const char* start = p;
             while (isdigit(*p)) {
                 p++;
             }
-            cur = new_token(TK_NUM, cur, start);
+            cur = new_token(TK_NUM, cur, start, p - start);
             continue;
         }
 
@@ -60,7 +59,7 @@ Token* tokenize(const char* p) {
         }
     }
 
-    new_token(TK_EOF, cur, p);
+    new_token(TK_EOF, cur, p, 0);
     return head.next;
 }
 
@@ -84,8 +83,9 @@ void free_tokens(Token* head) {
  * @param[in] op The character operator to be consumed
  * @return true if the token was consumed successfully, false otherwise
  */
-bool consume(char op) {
-    if (token->kind != TK_RESERVED || token->str[0] != op) {
+bool consume(char* op) {
+    if (token->kind != TK_RESERVED || (int)strlen(op) != token->len ||
+        memcmp(token->str, op, token->len)) {
         return false;
     }
     token = token->next;
@@ -95,13 +95,13 @@ bool consume(char op) {
 /**
  * Checks if the next token matches the expected operator
  * If it doesn't match, prints an error message and exits the program
- * @param[in] op The expected operator character
+ * @param[in] op The expected operator string
  */
-void expect(char op) {
+void expect(char* op) {
     // Try to consume (match) the expected operator
     if (!consume(op)) {
         // If the operator doesn't match, print an error message to stderr
-        fprintf(stderr, "Lexer error: Expected '%c'\n", op);
+        fprintf(stderr, "Lexer error: Expected '%s'\n", op);
         // Exit the program with an error status
         exit(1);
     }

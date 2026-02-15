@@ -2,6 +2,7 @@
 #include "../src/lexer.h"
 #include "test_common.h"
 #include <stdio.h>
+#include <string.h>
 
 char* test_lexer_tokenize() {
     // Reset global token before calling tokenize
@@ -19,7 +20,8 @@ char* test_lexer_tokenize() {
     mu_assert("Second token should be TK_RESERVED",
               curr_token != NULL && curr_token->kind == TK_RESERVED);
     mu_assert("Second token should be +",
-              curr_token != NULL && curr_token->str[0] == '+');
+              curr_token != NULL &&
+                  strncmp(curr_token->str, "+", curr_token->len) == 0);
 
     curr_token = curr_token->next;
     mu_assert("Third token should be TK_NUM",
@@ -31,7 +33,8 @@ char* test_lexer_tokenize() {
     mu_assert("Fourth token should be TK_RESERVED",
               curr_token != NULL && curr_token->kind == TK_RESERVED);
     mu_assert("Fourth token should be -",
-              curr_token != NULL && curr_token->str[0] == '-');
+              curr_token != NULL &&
+                  strncmp(curr_token->str, "-", curr_token->len) == 0);
 
     curr_token = curr_token->next;
     mu_assert("Fifth token should be TK_NUM",
@@ -53,11 +56,11 @@ char* test_consume_operator() {
 
     mu_assert("First token should be +",
               token->kind == TK_RESERVED && token->str[0] == '+');
-    mu_assert("Should consume +", consume('+'));
+    mu_assert("Should consume +", consume("+"));
     mu_assert("Current token should now be -",
               token->kind == TK_RESERVED && token->str[0] == '-');
-    mu_assert("Should not consume *", !consume('*'));
-    mu_assert("Should consume -", consume('-'));
+    mu_assert("Should not consume *", !consume("*"));
+    mu_assert("Should consume -", consume("-"));
     mu_assert("Current token should now be EOF", token->kind == TK_EOF);
 
     free_tokens(head);
@@ -71,7 +74,7 @@ char* test_expect_operator() {
 
     mu_assert("First token should be +",
               token->kind == TK_RESERVED && token->str[0] == '+');
-    expect('+');
+    expect("+");
     mu_assert("After expect, token should be number", token->kind == TK_NUM);
 
     free_tokens(head);
