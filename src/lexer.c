@@ -8,7 +8,7 @@
 // Global token pointer for consume/expect functions
 Token* token;
 
-static Token* new_token(TokenKind kind, Token* cur, char* str) {
+static Token* new_token(TokenKind kind, Token* cur, const char* str) {
     Token* tok = calloc(1, sizeof(Token));
     tok->kind = kind;
     tok->val = 0;
@@ -27,7 +27,7 @@ static Token* new_token(TokenKind kind, Token* cur, char* str) {
  * @param[in] p The input string to be tokenized
  * @return Pointer to the head of the token linked list
  */
-Token* tokenize(char* p) {
+Token* tokenize(const char* p) {
     // Initialize head and tail pointers for the token linked list
     Token head;
     head.next = NULL;
@@ -46,7 +46,7 @@ Token* tokenize(char* p) {
             p++;
             continue;
         } else if (isdigit(*p)) {
-            char* start = p;
+            const char* start = p;
             while (isdigit(*p)) {
                 p++;
             }

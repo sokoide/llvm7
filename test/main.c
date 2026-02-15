@@ -5,13 +5,17 @@
 #include <stdio.h>
 
 static char* run_all_tests() {
-    mu_run_test(test_generate_return_zero, "generate: return 0");
-    mu_run_test(test_generate_return_one, "generate: return 1");
     mu_run_test(test_generate_return_42, "generate: return 42");
     mu_run_test(test_generate_return_negative, "generate: return -1");
-    mu_run_test(test_generate_return_medium_positive, "generate: return 12345");
     mu_run_test(test_generate_return_max_int, "generate: return INT_MAX");
     mu_run_test(test_generate_return_min_int, "generate: return INT_MIN");
+    mu_run_test(test_generate_add, "generate: add");
+    mu_run_test(test_generate_sub, "generate: sub");
+    mu_run_test(test_generate_mul, "generate: mul");
+    mu_run_test(test_generate_div, "generate: div");
+    mu_run_test(test_generate_precedence, "generate: precedence");
+    mu_run_test(test_generate_parentheses, "generate: parentheses");
+    mu_run_test(test_generate_complex, "generate: complex");
     mu_run_test(test_lexer_tokenize, "lexer: tokenize");
     mu_run_test(test_consume_operator, "lexer: consume operator");
     mu_run_test(test_expect_operator, "lexer: expect operator");

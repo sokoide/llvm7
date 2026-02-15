@@ -4,7 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "generate.h"
+#include "../src/ast.h"
+#include "../src/generate.h"
 #include "test_common.h"
 
 // Structure to manage LLVM JIT execution environment initialization/cleanup
@@ -61,10 +62,9 @@ static int execute_module(LLVMTestContext* ctx, const char* func_name) {
     return ret_value;
 }
 
-// return 0
-char* test_generate_return_zero() {
-    ReturnExpr ast = {.value = 0};
-    LLVMModuleRef module = generate_module(&ast);
+// Helper to run generate test
+static char* run_generate_test(Node* ast, int expected) {
+    LLVMModuleRef module = generate_module(ast);
 
     LLVMTestContext ctx = {0};
     if (init_llvm_context(&ctx, module) != 0) {
@@ -75,114 +75,127 @@ char* test_generate_return_zero() {
     int result = execute_module(&ctx, "main");
     cleanup_llvm_context(&ctx);
 
-    mu_assert("Expected 0", result == 0);
-    return NULL;
-}
-
-// return 1
-char* test_generate_return_one() {
-    ReturnExpr ast = {.value = 1};
-    LLVMModuleRef module = generate_module(&ast);
-
-    LLVMTestContext ctx = {0};
-    if (init_llvm_context(&ctx, module) != 0) {
-        LLVMDisposeModule(module);
-        return "Failed to initialize LLVM context";
-    }
-
-    int result = execute_module(&ctx, "main");
-    cleanup_llvm_context(&ctx);
-
-    mu_assert("Expected 1", result == 1);
+    static char msg[64];
+    snprintf(msg, sizeof(msg), "Expected %d, got %d", expected, result);
+    mu_assert(msg, result == expected);
     return NULL;
 }
 
 // return 42
 char* test_generate_return_42() {
-    ReturnExpr ast = {.value = 42};
-    LLVMModuleRef module = generate_module(&ast);
-
-    LLVMTestContext ctx = {0};
-    if (init_llvm_context(&ctx, module) != 0) {
-        LLVMDisposeModule(module);
-        return "Failed to initialize LLVM context";
-    }
-
-    int result = execute_module(&ctx, "main");
-    cleanup_llvm_context(&ctx);
-
-    mu_assert("Expected 42", result == 42);
-    return NULL;
+    Node* ast = new_node_num(42);
+    char* result = run_generate_test(ast, 42);
+    free(ast);
+    return result;
 }
 
 // return -1 (negative value)
 char* test_generate_return_negative() {
-    ReturnExpr ast = {.value = -1};
-    LLVMModuleRef module = generate_module(&ast);
-
-    LLVMTestContext ctx = {0};
-    if (init_llvm_context(&ctx, module) != 0) {
-        LLVMDisposeModule(module);
-        return "Failed to initialize LLVM context";
-    }
-
-    int result = execute_module(&ctx, "main");
-    cleanup_llvm_context(&ctx);
-
-    mu_assert("Expected -1", result == -1);
-    return NULL;
+    Node* ast = new_node_num(-1);
+    char* result = run_generate_test(ast, -1);
+    free(ast);
+    return result;
 }
 
 // return INT_MAX (maximum value)
 char* test_generate_return_max_int() {
-    ReturnExpr ast = {.value = INT_MAX};
-    LLVMModuleRef module = generate_module(&ast);
-
-    LLVMTestContext ctx = {0};
-    if (init_llvm_context(&ctx, module) != 0) {
-        LLVMDisposeModule(module);
-        return "Failed to initialize LLVM context";
-    }
-
-    int result = execute_module(&ctx, "main");
-    cleanup_llvm_context(&ctx);
-
-    mu_assert("Expected INT_MAX", result == INT_MAX);
-    return NULL;
-}
-
-// return 12345 (medium positive value)
-char* test_generate_return_medium_positive() {
-    ReturnExpr ast = {.value = 12345};
-    LLVMModuleRef module = generate_module(&ast);
-
-    LLVMTestContext ctx = {0};
-    if (init_llvm_context(&ctx, module) != 0) {
-        LLVMDisposeModule(module);
-        return "Failed to initialize LLVM context";
-    }
-
-    int result = execute_module(&ctx, "main");
-    cleanup_llvm_context(&ctx);
-
-    mu_assert("Expected 12345", result == 12345);
-    return NULL;
+    Node* ast = new_node_num(INT_MAX);
+    char* result = run_generate_test(ast, INT_MAX);
+    free(ast);
+    return result;
 }
 
 // return INT_MIN (minimum value)
 char* test_generate_return_min_int() {
-    ReturnExpr ast = {.value = INT_MIN};
-    LLVMModuleRef module = generate_module(&ast);
+    Node* ast = new_node_num(INT_MIN);
+    char* result = run_generate_test(ast, INT_MIN);
+    free(ast);
+    return result;
+}
 
-    LLVMTestContext ctx = {0};
-    if (init_llvm_context(&ctx, module) != 0) {
-        LLVMDisposeModule(module);
-        return "Failed to initialize LLVM context";
-    }
+// return 1 + 2
+char* test_generate_add() {
+    Node* ast = new_node(ND_ADD, new_node_num(1), new_node_num(2));
+    char* result = run_generate_test(ast, 3);
+    free(ast->rhs);
+    free(ast->lhs);
+    free(ast);
+    return result;
+}
 
-    int result = execute_module(&ctx, "main");
-    cleanup_llvm_context(&ctx);
+// return 5 - 3
+char* test_generate_sub() {
+    Node* ast = new_node(ND_SUB, new_node_num(5), new_node_num(3));
+    char* result = run_generate_test(ast, 2);
+    free(ast->rhs);
+    free(ast->lhs);
+    free(ast);
+    return result;
+}
 
-    mu_assert("Expected INT_MIN", result == INT_MIN);
-    return NULL;
+// return 4 * 6
+char* test_generate_mul() {
+    Node* ast = new_node(ND_MUL, new_node_num(4), new_node_num(6));
+    char* result = run_generate_test(ast, 24);
+    free(ast->rhs);
+    free(ast->lhs);
+    free(ast);
+    return result;
+}
+
+// return 10 / 2
+char* test_generate_div() {
+    Node* ast = new_node(ND_DIV, new_node_num(10), new_node_num(2));
+    char* result = run_generate_test(ast, 5);
+    free(ast->rhs);
+    free(ast->lhs);
+    free(ast);
+    return result;
+}
+
+// return 2 + 3 * 4 (precedence test)
+char* test_generate_precedence() {
+    // 3 * 4 = 12, then 2 + 12 = 14
+    Node* mul = new_node(ND_MUL, new_node_num(3), new_node_num(4));
+    Node* ast = new_node(ND_ADD, new_node_num(2), mul);
+    char* result = run_generate_test(ast, 14);
+    free(ast->rhs);
+    free(ast->lhs);
+    free(ast);
+    return result;
+}
+
+// return (2 + 3) * 4 (parentheses test)
+char* test_generate_parentheses() {
+    // 2 + 3 = 5, then 5 * 4 = 20
+    Node* add = new_node(ND_ADD, new_node_num(2), new_node_num(3));
+    Node* ast = new_node(ND_MUL, add, new_node_num(4));
+    char* result = run_generate_test(ast, 20);
+    free(ast->rhs);
+    free(ast->lhs->rhs);
+    free(ast->lhs->lhs);
+    free(ast->lhs);
+    free(ast);
+    return result;
+}
+
+// return 10 + 4 * 8 - 2 / 2
+char* test_generate_complex() {
+    // 4 * 8 = 32
+    Node* mul = new_node(ND_MUL, new_node_num(4), new_node_num(8));
+    // 2 / 2 = 1
+    Node* div = new_node(ND_DIV, new_node_num(2), new_node_num(2));
+    // 10 + 32 = 42
+    Node* add = new_node(ND_ADD, new_node_num(10), mul);
+    // 42 - 1 = 41
+    Node* ast = new_node(ND_SUB, add, div);
+    char* result = run_generate_test(ast, 41);
+    free(ast->rhs->rhs);
+    free(ast->rhs->lhs);
+    free(ast->rhs);
+    free(ast->lhs->rhs);
+    free(ast->lhs->lhs);
+    free(ast->lhs);
+    free(ast);
+    return result;
 }

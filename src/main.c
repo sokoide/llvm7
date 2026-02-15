@@ -1,14 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "ast.h"
 #include "file.h"
 #include "generate.h"
+#include "lexer.h"
 
-// External declarations
-
-// Make AST from source string
-int main() {
-    const char* filename = "demo/example01.c";
+int main(int argc, const char** argv) {
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
+        return 1;
+    }
+    const char* filename = argv[1];
     const char* source = read_file(filename);
     if (source == NULL) {
         printf("Error: could not read file %s\n", filename);
@@ -17,20 +20,21 @@ int main() {
 
     printf("Compiling: %s\n\n", source);
 
-    // TODO: lexer and parser not available yet
+    // Tokenize
+    token = NULL;
+    token = tokenize(source);
 
-    if (source != NULL) {
-        free((void*)source);
-        source = NULL;
-    }
+    // Parse AST
+    Node* ast = expr();
 
-    // Make an AST manually
-    ReturnExpr* my_ast = malloc(sizeof(ReturnExpr));
-    my_ast->value = 42;
+    // Generate LLVM IR
+    generate_code(ast);
 
-    // generate IR from the AST
-    generate_code(my_ast);
+    // Clean up
+    // memory in source is used by `ast`, don't free until generate_code() is
+    // called
+    free((void*)source);
+    free_ast(ast);
 
-    free(my_ast);
     return 0;
 }

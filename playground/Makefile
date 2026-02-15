@@ -1,7 +1,6 @@
 # Tiny-C Compiler Makefile
 TARGET = ./playground_exe
-CC = gcc
-CFLAGS = -Wall -Wextra -O2 -std=c99
+CFLAGS = -Wall -Wextra -O0 -std=c99
 LIBS =
 
 # Source files

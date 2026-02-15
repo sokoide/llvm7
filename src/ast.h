@@ -24,6 +24,7 @@ typedef struct Node Node;
 
 extern Node* new_node(NodeKind kind, Node* lhs, Node* rhs);
 extern Node* new_node_num(int val);
+extern void free_ast(Node* ast);
 extern Node* expr();
 extern Node* mul();
 extern Node* primary();

@@ -17,6 +17,14 @@ Node* new_node_num(int val) {
     return node;
 }
 
+void free_ast(Node* ast) {
+    if (ast == NULL)
+        return;
+    free_ast(ast->lhs);
+    free_ast(ast->rhs);
+    free(ast);
+}
+
 Node* expr() {
     Node* node = mul();
     while (1) {

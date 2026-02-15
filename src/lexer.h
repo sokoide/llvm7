@@ -14,13 +14,13 @@ struct Token {
     TokenKind kind;
     Token* next;
     int val;
-    char* str;
+    const char* str;
     int len;
 };
 
 extern Token* token;
 
-extern Token* tokenize(char* p);
+extern Token* tokenize(const char* p);
 extern void free_tokens(Token* head);
 extern bool consume(char op);
 extern void expect(char op);

@@ -41,7 +41,7 @@ all: $(TARGET)
 
 .PHONY: run
 run: $(TARGET)
-	$(TARGET)
+	$(TARGET) demo/example01.c
 
 .PHONY: test
 test:

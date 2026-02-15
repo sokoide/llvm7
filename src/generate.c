@@ -2,22 +2,21 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ast.h"
 #include "generate.h"
 
 #define MODULE_NAME "sokoide_module"
 
-void generate_code(ReturnExpr* ast);
-LLVMModuleRef generate_module(ReturnExpr* ast);
+static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder);
 
 /**
- * Internal function: Generates LLVM IR module from a ReturnExpr AST node
+ * Internal function: Generates LLVM IR module from a Node AST
  *
- * @param[in] ast Pointer to the ReturnExpr AST node containing the return
- * value
- * @return LLVMModuleRef Reference to the generated LLVM module
+ * @param[in] ast Pointer to Node AST
+ * @return LLVMModuleRef Reference to generated LLVM module
  */
-LLVMModuleRef generate_module(ReturnExpr* ast) {
-    // Create a new LLVM module with the specified name
+LLVMModuleRef generate_module(Node* ast) {
+    // Create a new LLVM module with specified name
     LLVMModuleRef module = LLVMModuleCreateWithName(MODULE_NAME);
     // Create an LLVM builder for constructing instructions
     LLVMBuilderRef builder = LLVMCreateBuilder();
@@ -31,8 +30,8 @@ LLVMModuleRef generate_module(ReturnExpr* ast) {
     LLVMBasicBlockRef entry = LLVMAppendBasicBlock(main_func, "entry");
     LLVMPositionBuilderAtEnd(builder, entry);
 
-    // load value of the AST, issue `Ret` instruction
-    LLVMValueRef res = LLVMConstInt(LLVMInt32Type(), ast->value, 0);
+    // Generate code from AST
+    LLVMValueRef res = codegen(ast, builder);
     LLVMBuildRet(builder, res);
 
     // Clean up builder
@@ -42,12 +41,52 @@ LLVMModuleRef generate_module(ReturnExpr* ast) {
 }
 
 /**
- * Generates LLVM IR code in stdout from a ReturnExpr AST node
+ * Recursively generates LLVM IR code from AST nodes
  *
- * @param[in] ast Pointer to the ReturnExpr AST node containing the return
- * value
+ * @param[in] node Pointer to Node AST
+ * @param[in] builder LLVM builder
+ * @return LLVMValueRef Generated value
  */
-void generate_code(ReturnExpr* ast) {
+static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder) {
+    if (node == NULL) {
+        return LLVMConstInt(LLVMInt32Type(), 0, 0);
+    }
+
+    switch (node->kind) {
+    case ND_NUM: {
+        return LLVMConstInt(LLVMInt32Type(), node->val, 0);
+    }
+    case ND_ADD: {
+        LLVMValueRef lhs = codegen(node->lhs, builder);
+        LLVMValueRef rhs = codegen(node->rhs, builder);
+        return LLVMBuildAdd(builder, lhs, rhs, "addtmp");
+    }
+    case ND_SUB: {
+        LLVMValueRef lhs = codegen(node->lhs, builder);
+        LLVMValueRef rhs = codegen(node->rhs, builder);
+        return LLVMBuildSub(builder, lhs, rhs, "subtmp");
+    }
+    case ND_MUL: {
+        LLVMValueRef lhs = codegen(node->lhs, builder);
+        LLVMValueRef rhs = codegen(node->rhs, builder);
+        return LLVMBuildMul(builder, lhs, rhs, "multmp");
+    }
+    case ND_DIV: {
+        LLVMValueRef lhs = codegen(node->lhs, builder);
+        LLVMValueRef rhs = codegen(node->rhs, builder);
+        return LLVMBuildSDiv(builder, lhs, rhs, "divtmp");
+    }
+    default:
+        return LLVMConstInt(LLVMInt32Type(), 0, 0);
+    }
+}
+
+/**
+ * Generates LLVM IR code in stdout from a Node AST
+ *
+ * @param[in] ast Pointer to Node AST
+ */
+void generate_code(Node* ast) {
     LLVMModuleRef module = generate_module(ast);
 
     // Output IR
