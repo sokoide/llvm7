@@ -380,7 +380,12 @@ char* test_expr_combined_precedence() {
 }
 
 char* test_new_node_ident() {
-    Node* node = new_node_ident("a");
+    Context ctx = {0};
+    Token head;
+    head.next = NULL;
+
+    Token* tok = new_token(TK_IDENT, &head, "a", 1);
+    Node* node = new_node_ident(&ctx, tok);
 
     mu_assert("Node kind should be ND_LVAR", node->kind == ND_LVAR);
     mu_assert("Node val should be 0", node->val == 0);
@@ -388,16 +393,34 @@ char* test_new_node_ident() {
     mu_assert("Node rhs should be NULL", node->rhs == NULL);
 
     free_ast(node);
+    free_tokens(head.next);
     return NULL;
 }
 
-char* test_new_node_ident_b() {
-    Node* node = new_node_ident("b");
+char* test_new_node_ident_abc() {
+    Context ctx = {0};
+    Token head;
+    head.next = NULL;
 
-    mu_assert("Node kind should be ND_LVAR", node->kind == ND_LVAR);
-    mu_assert("Node val should be 1", node->val == 1);
+    Token* tok = new_token(TK_IDENT, &head, "a1", 2);
+    Node* node = new_node_ident(&ctx, tok);
+    Token* tok2 = new_token(TK_IDENT, tok, "a2", 2);
+    Node* node2 = new_node_ident(&ctx, tok2);
+    Token* tok3 = new_token(TK_IDENT, tok2, "a3", 2);
+    Node* node3 = new_node_ident(&ctx, tok3);
+
+    printf("node2 value %d\n", node2->val);
+    mu_assert("Node2 kind should be ND_LVAR", node2->kind == ND_LVAR);
+    mu_assert("Node val should be 0", node->val == 0);
+    mu_assert("Node2 val should be 1", node2->val == 1);
+    mu_assert("Node3 val should be 2", node3->val == 2);
+    mu_assert("Node2 lhs should be NULL", node2->lhs == NULL);
+    mu_assert("Node2 rhs should be NULL", node2->rhs == NULL);
 
     free_ast(node);
+    free_ast(node2);
+    free_ast(node3);
+    free_tokens(head.next);
     return NULL;
 }
 

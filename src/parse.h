@@ -5,7 +5,7 @@
 
 extern Node* new_node(NodeKind kind, Node* lhs, Node* rhs);
 extern Node* new_node_num(int val);
-extern Node* new_node_ident(const char* name);
+extern Node* new_node_ident(Context* ctx, Token* tok);
 extern void free_ast(Node* ast);
 extern void program(Context* ctx);
 extern Node* stmt(Context* ctx);

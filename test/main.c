@@ -52,7 +52,7 @@ static char* run_all_tests() {
     mu_run_test(test_expr_combined_precedence,
                 "parse: expr combined precedence");
     mu_run_test(test_new_node_ident, "parse: new_node_ident");
-    mu_run_test(test_new_node_ident_b, "parse: new_node_ident_b");
+    mu_run_test(test_new_node_ident_abc, "parse: new_node_ident_abc");
     mu_run_test(test_primary_ident, "parse: primary ident");
     mu_run_test(test_assign, "parse: assign");
     mu_run_test(test_assign_chain, "parse: assign chain");

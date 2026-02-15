@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static Token* new_token(TokenKind kind, Token* cur, const char* str, int len) {
+Token* new_token(TokenKind kind, Token* cur, const char* str, int len) {
     Token* tok = calloc(1, sizeof(Token));
     tok->kind = kind;
     tok->val = 0;

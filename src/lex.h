@@ -3,6 +3,7 @@
 
 #include "common.h"
 
+extern Token* new_token(TokenKind kind, Token* cur, const char* str, int len);
 extern Token* tokenize(const char* p);
 extern void free_tokens(Token* head);
 extern bool consume(Context* ctx, char* op);

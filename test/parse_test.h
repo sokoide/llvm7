@@ -31,7 +31,7 @@ char* test_equality_eq();
 char* test_equality_ne();
 char* test_expr_combined_precedence();
 char* test_new_node_ident();
-char* test_new_node_ident_b();
+char* test_new_node_ident_abc();
 char* test_primary_ident();
 char* test_assign();
 char* test_assign_chain();

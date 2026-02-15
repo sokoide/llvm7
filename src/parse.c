@@ -1,5 +1,6 @@
 #include "parse.h"
 #include "lex.h"
+#include "variable.h"
 #include <stdlib.h>
 
 Node* new_node(NodeKind kind, Node* lhs, Node* rhs) {
@@ -17,10 +18,16 @@ Node* new_node_num(int val) {
     return node;
 }
 
-Node* new_node_ident(const char* name) {
+Node* new_node_ident(Context* ctx, Token* tok) {
     Node* node = calloc(1, sizeof(Node));
     node->kind = ND_LVAR;
-    node->val = name[0] - 'a';
+    LVar* lvar = find_lvar(ctx, tok);
+    if (lvar) {
+        node->val = lvar->offset;
+    } else {
+        lvar = add_lvar(ctx, tok);
+        node->val = lvar->offset;
+    }
 
     return node;
 }
@@ -134,7 +141,7 @@ Node* primary(Context* ctx) {
     // ident
     Token* tok = consume_ident(ctx);
     if (tok) {
-        return new_node_ident(tok->str);
+        return new_node_ident(ctx, tok);
     }
 
     // number

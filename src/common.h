@@ -49,7 +49,7 @@ typedef struct LVar LVar;
 
 struct LVar {
     LVar* next;
-    char* name;
+    const char* name;
     int len;
     int offset;
 };
