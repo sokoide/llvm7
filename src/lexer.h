@@ -1,6 +1,7 @@
 #ifndef __LEXER_H__
 #define __LEXER_H__
 
+#include <stdbool.h>
 typedef enum {
     TK_RESERVED,
     TK_NUM,
@@ -20,5 +21,8 @@ struct Token {
 extern Token* token;
 
 extern Token* tokenize(char* p);
+extern bool consume(char op);
+extern void expect(char op);
+extern int expect_number();
 
 #endif
