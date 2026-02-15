@@ -20,18 +20,24 @@ int main(int argc, const char** argv) {
 
     printf("Compiling: %s\n\n", source);
 
-    // Tokenize
-    token = NULL;
-    token = tokenize(source);
+    // Create context and tokenize
+    Context ctx = {0};
+    ctx.current_token = tokenize(source);
 
     // Parse AST
-    program();
+    program(&ctx);
 
     // Generate LLVM IR
-    generate_code();
+    generate_code(&ctx);
 
     // Clean up
     free((void*)source);
+    for (int i = 0; i < ctx.node_count; i++) {
+        free_ast(ctx.code[i]);
+    }
+    if (ctx.current_token) {
+        free_tokens(ctx.current_token);
+    }
 
     return 0;
 }

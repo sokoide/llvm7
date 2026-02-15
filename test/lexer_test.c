@@ -1,12 +1,11 @@
 #include "lexer_test.h"
+#include "../src/ast.h"
 #include "../src/lexer.h"
 #include "test_common.h"
 #include <stdio.h>
 #include <string.h>
 
 char* test_lexer_tokenize() {
-    // Reset global token before calling tokenize
-    token = NULL;
     Token* head = tokenize("1 + 2 - 3");
     Token* curr_token = head;
 
@@ -50,46 +49,49 @@ char* test_lexer_tokenize() {
 }
 
 char* test_consume_operator() {
-    token = NULL;
-    Token* head = tokenize("+ -");
-    token = head;
+    Context ctx = {0};
+    ctx.current_token = tokenize("+ -");
 
     mu_assert("First token should be +",
-              token->kind == TK_RESERVED && token->str[0] == '+');
-    mu_assert("Should consume +", consume("+"));
+              ctx.current_token->kind == TK_RESERVED &&
+                  ctx.current_token->str[0] == '+');
+    mu_assert("Should consume +", consume(&ctx, "+"));
     mu_assert("Current token should now be -",
-              token->kind == TK_RESERVED && token->str[0] == '-');
-    mu_assert("Should not consume *", !consume("*"));
-    mu_assert("Should consume -", consume("-"));
-    mu_assert("Current token should now be EOF", token->kind == TK_EOF);
+              ctx.current_token->kind == TK_RESERVED &&
+                  ctx.current_token->str[0] == '-');
+    mu_assert("Should not consume *", !consume(&ctx, "*"));
+    mu_assert("Should consume -", consume(&ctx, "-"));
+    mu_assert("Current token should now be EOF",
+              ctx.current_token->kind == TK_EOF);
 
-    free_tokens(head);
+    free_tokens(ctx.current_token);
     return NULL;
 }
 
 char* test_expect_operator() {
-    token = NULL;
-    Token* head = tokenize("+ 1");
-    token = head;
+    Context ctx = {0};
+    ctx.current_token = tokenize("+ 1");
 
     mu_assert("First token should be +",
-              token->kind == TK_RESERVED && token->str[0] == '+');
-    expect("+");
-    mu_assert("After expect, token should be number", token->kind == TK_NUM);
+              ctx.current_token->kind == TK_RESERVED &&
+                  ctx.current_token->str[0] == '+');
+    expect(&ctx, "+");
+    mu_assert("After expect, token should be number",
+              ctx.current_token->kind == TK_NUM);
 
-    free_tokens(head);
+    free_tokens(ctx.current_token);
     return NULL;
 }
 
 char* test_expect_number() {
-    token = NULL;
-    Token* head = tokenize("42");
-    token = head;
+    Context ctx = {0};
+    ctx.current_token = tokenize("42");
 
-    int val = expect_number();
+    int val = expect_number(&ctx);
     mu_assert("expect_number should return 42", val == 42);
-    mu_assert("Current token should now be EOF", token->kind == TK_EOF);
+    mu_assert("Current token should now be EOF",
+              ctx.current_token->kind == TK_EOF);
 
-    free_tokens(head);
+    free_tokens(ctx.current_token);
     return NULL;
 }

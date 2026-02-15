@@ -64,21 +64,22 @@ static int execute_module(LLVMTestContext* ctx, const char* func_name) {
 
 // Helper to run generate test
 static char* run_generate_test(Node* ast, int expected) {
-    // Setup code[] array for single statement
-    extern Node* code[MAX_NODES];
-    code[0] = ast;
-    code[1] = NULL;
+    // Setup Context with single statement
+    Context parse_ctx = {0};
+    parse_ctx.code[0] = ast;
+    parse_ctx.code[1] = NULL;
+    parse_ctx.node_count = 1;
 
-    LLVMModuleRef module = generate_module();
+    LLVMModuleRef module = generate_module(&parse_ctx);
 
-    LLVMTestContext ctx = {0};
-    if (init_llvm_context(&ctx, module) != 0) {
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
         LLVMDisposeModule(module);
         return "Failed to initialize LLVM context";
     }
 
-    int result = execute_module(&ctx, "main");
-    cleanup_llvm_context(&ctx);
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
 
     static char msg[64];
     snprintf(msg, sizeof(msg), "Expected %d, got %d", expected, result);

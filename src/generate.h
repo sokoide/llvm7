@@ -5,7 +5,7 @@
 
 #include <llvm-c/Core.h>
 
-extern void generate_code(void);
-extern LLVMModuleRef generate_module(void);
+extern void generate_code(Context* ctx);
+extern LLVMModuleRef generate_module(Context* ctx);
 
 #endif

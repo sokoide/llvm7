@@ -3,6 +3,30 @@
 
 #include <llvm-c/Core.h>
 
+#define MAX_NODES 128
+
+// Forward declarations
+struct Token;
+struct Node;
+
+// Context structure to hold parser and lexer state
+struct Context {
+    struct Token* current_token;  // Current token being processed
+    struct Node* code[MAX_NODES]; // Generated AST nodes (statements)
+    int node_count;               // Number of statements
+};
+
+// Typedefs - guarded to avoid redefinition warnings
+#ifndef CONTEXT_TYPEDEF_DEFINED
+#define CONTEXT_TYPEDEF_DEFINED
+typedef struct Context Context;
+#endif
+
+#ifndef TOKEN_TYPEDEF_DEFINED
+#define TOKEN_TYPEDEF_DEFINED
+typedef struct Token Token;
+#endif
+
 // program = stmt*
 // stmt = expr ";"
 // expr = assign
@@ -37,24 +61,24 @@ struct Node {
     int val;
 };
 
+#ifndef NODE_TYPEDEF_DEFINED
+#define NODE_TYPEDEF_DEFINED
 typedef struct Node Node;
+#endif
 
 extern Node* new_node(NodeKind kind, Node* lhs, Node* rhs);
 extern Node* new_node_num(int val);
 extern Node* new_node_ident(const char* name);
 extern void free_ast(Node* ast);
-extern void program();
-extern Node* stmt();
-extern Node* expr();
-extern Node* assign();
-extern Node* equality();
-extern Node* relational();
-extern Node* add();
-extern Node* mul();
-extern Node* unary();
-extern Node* primary();
-
-#define MAX_NODES 128
-extern Node* code[MAX_NODES];
+extern void program(Context* ctx);
+extern Node* stmt(Context* ctx);
+extern Node* expr(Context* ctx);
+extern Node* assign(Context* ctx);
+extern Node* equality(Context* ctx);
+extern Node* relational(Context* ctx);
+extern Node* add(Context* ctx);
+extern Node* mul(Context* ctx);
+extern Node* unary(Context* ctx);
+extern Node* primary(Context* ctx);
 
 #endif

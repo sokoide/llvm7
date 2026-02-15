@@ -2,8 +2,6 @@
 #include "lexer.h"
 #include <stdlib.h>
 
-Node* code[MAX_NODES];
-
 Node* new_node(NodeKind kind, Node* lhs, Node* rhs) {
     Node* node = calloc(1, sizeof(Node));
     node->kind = kind;
@@ -35,110 +33,110 @@ void free_ast(Node* ast) {
     free(ast);
 }
 
-void program() {
+void program(Context* ctx) {
     int i = 0;
-    while (!at_eof()) {
-        code[i++] = stmt();
+    while (!at_eof(ctx)) {
+        ctx->code[i++] = stmt(ctx);
     }
-    code[i] = NULL;
+    ctx->node_count = i;
 }
 
-Node* stmt() {
-    Node* node = expr();
-    expect(";");
+Node* stmt(Context* ctx) {
+    Node* node = expr(ctx);
+    expect(ctx, ";");
     return node;
 }
 
-Node* expr() { return assign(); }
+Node* expr(Context* ctx) { return assign(ctx); }
 
-Node* assign() {
-    Node* node = equality();
-    if (consume("=")) {
-        node = new_node(ND_ASSIGN, node, assign());
+Node* assign(Context* ctx) {
+    Node* node = equality(ctx);
+    if (consume(ctx, "=")) {
+        node = new_node(ND_ASSIGN, node, assign(ctx));
     }
     return node;
 }
 
-Node* equality() {
-    Node* node = relational();
+Node* equality(Context* ctx) {
+    Node* node = relational(ctx);
     while (1) {
-        if (consume("==")) {
-            node = new_node(ND_EQ, node, relational());
-        } else if (consume("!=")) {
-            node = new_node(ND_NE, node, relational());
+        if (consume(ctx, "==")) {
+            node = new_node(ND_EQ, node, relational(ctx));
+        } else if (consume(ctx, "!=")) {
+            node = new_node(ND_NE, node, relational(ctx));
         } else {
             return node;
         }
     }
 }
 
-Node* relational() {
-    Node* node = add();
+Node* relational(Context* ctx) {
+    Node* node = add(ctx);
     while (1) {
-        if (consume("<=")) {
-            node = new_node(ND_LE, node, add());
-        } else if (consume(">=")) {
-            node = new_node(ND_GE, node, add());
-        } else if (consume("<")) {
-            node = new_node(ND_LT, node, add());
-        } else if (consume(">")) {
-            node = new_node(ND_GT, node, add());
+        if (consume(ctx, "<=")) {
+            node = new_node(ND_LE, node, add(ctx));
+        } else if (consume(ctx, ">=")) {
+            node = new_node(ND_GE, node, add(ctx));
+        } else if (consume(ctx, "<")) {
+            node = new_node(ND_LT, node, add(ctx));
+        } else if (consume(ctx, ">")) {
+            node = new_node(ND_GT, node, add(ctx));
         } else {
             return node;
         }
     }
 }
 
-Node* add() {
-    Node* node = mul();
+Node* add(Context* ctx) {
+    Node* node = mul(ctx);
     while (1) {
-        if (consume("+")) {
-            node = new_node(ND_ADD, node, mul());
-        } else if (consume("-")) {
-            node = new_node(ND_SUB, node, mul());
+        if (consume(ctx, "+")) {
+            node = new_node(ND_ADD, node, mul(ctx));
+        } else if (consume(ctx, "-")) {
+            node = new_node(ND_SUB, node, mul(ctx));
         } else {
             return node;
         }
     }
 }
 
-Node* mul() {
-    Node* node = unary();
+Node* mul(Context* ctx) {
+    Node* node = unary(ctx);
     while (1) {
-        if (consume("*")) {
-            node = new_node(ND_MUL, node, unary());
-        } else if (consume("/")) {
-            node = new_node(ND_DIV, node, unary());
+        if (consume(ctx, "*")) {
+            node = new_node(ND_MUL, node, unary(ctx));
+        } else if (consume(ctx, "/")) {
+            node = new_node(ND_DIV, node, unary(ctx));
         } else {
             return node;
         }
     }
 }
 
-Node* unary() {
-    if (consume("+")) {
-        return primary();
-    } else if (consume("-")) {
-        return new_node(ND_SUB, new_node_num(0), primary());
+Node* unary(Context* ctx) {
+    if (consume(ctx, "+")) {
+        return primary(ctx);
+    } else if (consume(ctx, "-")) {
+        return new_node(ND_SUB, new_node_num(0), primary(ctx));
     } else {
-        return primary();
+        return primary(ctx);
     }
 }
 
-Node* primary() {
+Node* primary(Context* ctx) {
     // "(" expr ")"
-    if (consume("(")) {
-        Node* node = expr();
-        expect(")");
+    if (consume(ctx, "(")) {
+        Node* node = expr(ctx);
+        expect(ctx, ")");
         return node;
     }
 
     // ident
-    Token* tok = consume_ident();
+    Token* tok = consume_ident(ctx);
     if (tok) {
         return new_node_ident(tok->str);
     }
 
     // number
-    return new_node_num(expect_number());
+    return new_node_num(expect_number(ctx));
 }

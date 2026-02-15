@@ -7,15 +7,16 @@
 
 #define MODULE_NAME "sokoide_module"
 
-static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder, LLVMValueRef local_vars);
+static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
+                            LLVMValueRef local_vars);
 
 /**
  * Internal function: Generates LLVM IR module from a Node AST
  *
- * @param[in] ast Pointer to Node AST
+ * @param[in] ctx Context containing AST nodes
  * @return LLVMModuleRef Reference to generated LLVM module
  */
-LLVMModuleRef generate_module(void) {
+LLVMModuleRef generate_module(Context* ctx) {
     // Create a new LLVM module with specified name
     LLVMModuleRef module = LLVMModuleCreateWithName(MODULE_NAME);
     // Create an LLVM builder for constructing instructions
@@ -38,8 +39,8 @@ LLVMModuleRef generate_module(void) {
 
     // Generate code from AST statements
     LLVMValueRef res = LLVMConstInt(LLVMInt32Type(), 0, 0);
-    for (int i = 0; code[i] != NULL; i++) {
-        res = codegen(code[i], builder, local_vars);
+    for (int i = 0; i < ctx->node_count; i++) {
+        res = codegen(ctx->code[i], builder, local_vars);
     }
     LLVMBuildRet(builder, res);
 
@@ -56,7 +57,8 @@ LLVMModuleRef generate_module(void) {
  * @param[in] builder LLVM builder
  * @return LLVMValueRef Generated value
  */
-static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder, LLVMValueRef local_vars) {
+static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
+                            LLVMValueRef local_vars) {
     if (node == NULL) {
         return LLVMConstInt(LLVMInt32Type(), 0, 0);
     }
@@ -69,8 +71,8 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder, LLVMValueRef loc
         LLVMValueRef index = LLVMConstInt(LLVMInt32Type(), node->val, false);
         LLVMValueRef indices[] = {LLVMConstInt(LLVMInt32Type(), 0, false),
                                   index};
-        LLVMValueRef gep =
-            LLVMBuildInBoundsGEP2(builder, LLVMInt64Type(), local_vars, indices, 2, "arrayidx");
+        LLVMValueRef gep = LLVMBuildInBoundsGEP2(
+            builder, LLVMInt64Type(), local_vars, indices, 2, "arrayidx");
 
         return LLVMBuildLoad2(builder, LLVMInt32Type(), gep, "loadtmp");
     }
@@ -81,11 +83,11 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder, LLVMValueRef loc
 
         LLVMValueRef indices[] = {LLVMConstInt(LLVMInt32Type(), 0, false),
                                   index};
-        LLVMValueRef gep =
-            LLVMBuildInBoundsGEP2(builder, LLVMInt64Type(), local_vars, indices, 2, "arrayidx");
+        LLVMValueRef gep = LLVMBuildInBoundsGEP2(
+            builder, LLVMInt64Type(), local_vars, indices, 2, "arrayidx");
 
         LLVMBuildStore(builder, rhs, gep);
-        return rhs;  // assignment returns the assigned value
+        return rhs; // assignment returns the assigned value
     }
     case ND_ADD: {
         LLVMValueRef lhs = codegen(node->lhs, builder, local_vars);
@@ -113,10 +115,12 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder, LLVMValueRef loc
 }
 
 /**
- * Generates LLVM IR code in stdout from code[] array
+ * Generates LLVM IR code in stdout from Context
+ *
+ * @param[in] ctx Context containing AST nodes
  */
-void generate_code(void) {
-    LLVMModuleRef module = generate_module();
+void generate_code(Context* ctx) {
+    LLVMModuleRef module = generate_module(ctx);
 
     // Output IR
     LLVMDumpModule(module);
