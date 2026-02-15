@@ -3,3 +3,4 @@ b = 2;
 c = 3;
 z = 26;
 d = (z - b * c) / b * 4 + b;
+return c;

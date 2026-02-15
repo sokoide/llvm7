@@ -49,8 +49,14 @@ void program(Context* ctx) {
 }
 
 Node* stmt(Context* ctx) {
-    Node* node = expr(ctx);
+    Node* node;
+    if (consume(ctx, "return")) {
+        node = new_node(ND_RETURN, expr(ctx), NULL);
+    } else {
+        node = expr(ctx);
+    }
     expect(ctx, ";");
+
     return node;
 }
 

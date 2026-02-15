@@ -500,6 +500,53 @@ char* test_stmt_assign() {
     return NULL;
 }
 
+char* test_stmt_return_num() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("return 42;");
+
+    Node* node = stmt(&ctx);
+
+    mu_assert("Node kind should be ND_RETURN", node->kind == ND_RETURN);
+    mu_assert("Left node kind should be ND_NUM", node->lhs->kind == ND_NUM);
+    mu_assert("Left node value should be 42", node->lhs->val == 42);
+    mu_assert("Right node should be NULL", node->rhs == NULL);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
+char* test_stmt_return_ident() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("return a;");
+
+    Node* node = stmt(&ctx);
+
+    mu_assert("Node kind should be ND_RETURN", node->kind == ND_RETURN);
+    mu_assert("Left node kind should be ND_LVAR", node->lhs->kind == ND_LVAR);
+    mu_assert("Right node should be NULL", node->rhs == NULL);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
+char* test_stmt_return_expr() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("return a + b;");
+
+    Node* node = stmt(&ctx);
+
+    mu_assert("Node kind should be ND_RETURN", node->kind == ND_RETURN);
+    mu_assert("Left node kind should be ND_ADD", node->lhs->kind == ND_ADD);
+    mu_assert("Left-left node kind should be ND_LVAR",
+              node->lhs->lhs->kind == ND_LVAR);
+    mu_assert("Left-right node kind should be ND_LVAR",
+              node->lhs->rhs->kind == ND_LVAR);
+    mu_assert("Right node should be NULL", node->rhs == NULL);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
 char* test_program_single_stmt() {
     Context ctx = {0};
     ctx.current_token = tokenize("42;");

@@ -3,6 +3,18 @@
 
 #include "common.h"
 
+// program = stmt*
+// stmt = expr ";"
+//      | "return" expr ";"
+// expr = assign
+// assign = equality("=" assign) ?
+// equality =   relational("==" relational | "!="
+// relational)* relational = add("<" add | "<=" add |
+// ">" add | ">=" add)* add =        mul ("+" mul | "-"
+// mul)* mul =        unary("*" unary | "/" unary)*
+// unary =      ("+" | "-") ? primary
+// primary =    num | ident | "(" expr ")"
+
 extern Node* new_node(NodeKind kind, Node* lhs, Node* rhs);
 extern Node* new_node_num(int val);
 extern Node* new_node_ident(Context* ctx, Token* tok);

@@ -58,6 +58,9 @@ static char* run_all_tests() {
     mu_run_test(test_assign_chain, "parse: assign chain");
     mu_run_test(test_stmt, "parse: stmt");
     mu_run_test(test_stmt_assign, "parse: stmt assign");
+    mu_run_test(test_stmt_return_num, "parse: stmt return num");
+    mu_run_test(test_stmt_return_ident, "parse: stmt return ident");
+    mu_run_test(test_stmt_return_expr, "parse: stmt return expr");
     mu_run_test(test_program_single_stmt, "parse: program single stmt");
     mu_run_test(test_program_multiple_stmts, "parse: program multiple stmts");
     mu_run_test(test_program_assign_stmts, "parse: program assign stmts");
