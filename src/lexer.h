@@ -4,6 +4,7 @@
 #include <stdbool.h>
 typedef enum {
     TK_RESERVED,
+    TK_IDENT,
     TK_NUM,
     TK_EOF,
 } TokenKind;
@@ -23,7 +24,9 @@ extern Token* token;
 extern Token* tokenize(const char* p);
 extern void free_tokens(Token* head);
 extern bool consume(char* op);
+extern Token* consume_ident();
 extern void expect(char* op);
 extern int expect_number();
+extern bool at_eof();
 
 #endif

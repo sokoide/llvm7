@@ -30,5 +30,15 @@ char* test_relational_ge();
 char* test_equality_eq();
 char* test_equality_ne();
 char* test_expr_combined_precedence();
+char* test_new_node_ident();
+char* test_new_node_ident_b();
+char* test_primary_ident();
+char* test_assign();
+char* test_assign_chain();
+char* test_stmt();
+char* test_stmt_assign();
+char* test_program_single_stmt();
+char* test_program_multiple_stmts();
+char* test_program_assign_stmts();
 
 #endif

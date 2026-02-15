@@ -48,7 +48,7 @@ Token* tokenize(const char* p) {
         }
 
         if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' ||
-            *p == ')' || *p == '<' || *p == '>') {
+            *p == ')' || *p == '<' || *p == '>' || *p == '=' || *p == ';') {
             cur = new_token(TK_RESERVED, cur, p++, 1);
             continue;
         } else if (isdigit(*p)) {
@@ -57,6 +57,10 @@ Token* tokenize(const char* p) {
                 p++;
             }
             cur = new_token(TK_NUM, cur, start, p - start);
+            continue;
+        } else if ('a' <= *p && *p <= 'z') {
+            cur = new_token(TK_IDENT, cur, p++, 1);
+            cur->len = 1;
             continue;
         }
 
@@ -100,6 +104,23 @@ bool consume(char* op) {
 }
 
 /**
+ * Function to consume and return an identifier token
+ *
+ * @return Pointer to the identifier token if the current token is an
+ * identifier, NULL otherwise
+ */
+Token* consume_ident() {
+    // Check if the current token is an identifier
+    if (token->kind != TK_IDENT) {
+        return NULL;
+    }
+    // Store current token and advance to the next token
+    Token* t = token;
+    token = token->next;
+    return t;
+}
+
+/**
  * Checks if the next token matches the expected operator
  * If it doesn't match, prints an error message and exits the program
  * @param[in] op The expected operator string
@@ -127,3 +148,5 @@ int expect_number() {
     token = token->next;
     return val;
 }
+
+bool at_eof() { return token->kind == TK_EOF; }

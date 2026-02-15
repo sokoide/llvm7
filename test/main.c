@@ -46,6 +46,16 @@ static char* run_all_tests() {
     mu_run_test(test_equality_eq, "ast: equality eq");
     mu_run_test(test_equality_ne, "ast: equality ne");
     mu_run_test(test_expr_combined_precedence, "ast: expr combined precedence");
+    mu_run_test(test_new_node_ident, "ast: new_node_ident");
+    mu_run_test(test_new_node_ident_b, "ast: new_node_ident_b");
+    mu_run_test(test_primary_ident, "ast: primary ident");
+    mu_run_test(test_assign, "ast: assign");
+    mu_run_test(test_assign_chain, "ast: assign chain");
+    mu_run_test(test_stmt, "ast: stmt");
+    mu_run_test(test_stmt_assign, "ast: stmt assign");
+    mu_run_test(test_program_single_stmt, "ast: program single stmt");
+    mu_run_test(test_program_multiple_stmts, "ast: program multiple stmts");
+    mu_run_test(test_program_assign_stmts, "ast: program assign stmts");
     return NULL;
 }
 
