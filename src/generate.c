@@ -8,7 +8,7 @@
 #define MODULE_NAME "sokoide_module"
 
 static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
-                            LLVMValueRef local_vars);
+                            LLVMValueRef local_vars, LLVMTypeRef array_type);
 
 /**
  * Internal function: Generates LLVM IR module from a Node AST
@@ -32,15 +32,15 @@ LLVMModuleRef generate_module(Context* ctx) {
     LLVMPositionBuilderAtEnd(builder, entry);
 
     // local variable space per function (temporary)
-    LLVMTypeRef i64_type = LLVMInt64Type();
-    LLVMTypeRef array_type = LLVMArrayType(i64_type, 26);
+    LLVMTypeRef i32_type = LLVMInt32Type();
+    LLVMTypeRef array_type = LLVMArrayType(i32_type, 26);
     LLVMValueRef local_vars =
         LLVMBuildAlloca(builder, array_type, "local_vars");
 
     // Generate code from AST statements
     LLVMValueRef res = LLVMConstInt(LLVMInt32Type(), 0, 0);
     for (int i = 0; i < ctx->node_count; i++) {
-        res = codegen(ctx->code[i], builder, local_vars);
+        res = codegen(ctx->code[i], builder, local_vars, array_type);
     }
     LLVMBuildRet(builder, res);
 
@@ -58,7 +58,7 @@ LLVMModuleRef generate_module(Context* ctx) {
  * @return LLVMValueRef Generated value
  */
 static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
-                            LLVMValueRef local_vars) {
+                            LLVMValueRef local_vars, LLVMTypeRef array_type) {
     if (node == NULL) {
         return LLVMConstInt(LLVMInt32Type(), 0, 0);
     }
@@ -72,42 +72,82 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         LLVMValueRef indices[] = {LLVMConstInt(LLVMInt32Type(), 0, false),
                                   index};
         LLVMValueRef gep = LLVMBuildInBoundsGEP2(
-            builder, LLVMInt64Type(), local_vars, indices, 2, "arrayidx");
+            builder, array_type, local_vars, indices, 2, "arrayidx");
 
         return LLVMBuildLoad2(builder, LLVMInt32Type(), gep, "loadtmp");
     }
     case ND_ASSIGN: {
-        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars);
+        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type);
         LLVMValueRef index =
             LLVMConstInt(LLVMInt32Type(), node->lhs->val, false);
 
         LLVMValueRef indices[] = {LLVMConstInt(LLVMInt32Type(), 0, false),
                                   index};
         LLVMValueRef gep = LLVMBuildInBoundsGEP2(
-            builder, LLVMInt64Type(), local_vars, indices, 2, "arrayidx");
+            builder, array_type, local_vars, indices, 2, "arrayidx");
 
         LLVMBuildStore(builder, rhs, gep);
         return rhs; // assignment returns the assigned value
     }
     case ND_ADD: {
-        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars);
-        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars);
+        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type);
+        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type);
         return LLVMBuildAdd(builder, lhs, rhs, "addtmp");
     }
     case ND_SUB: {
-        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars);
-        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars);
+        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type);
+        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type);
         return LLVMBuildSub(builder, lhs, rhs, "subtmp");
     }
     case ND_MUL: {
-        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars);
-        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars);
+        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type);
+        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type);
         return LLVMBuildMul(builder, lhs, rhs, "multmp");
     }
     case ND_DIV: {
-        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars);
-        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars);
+        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type);
+        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type);
         return LLVMBuildSDiv(builder, lhs, rhs, "divtmp");
+    }
+    case ND_LT: {
+        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type);
+        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type);
+        LLVMValueRef res =
+            LLVMBuildICmp(builder, LLVMIntSLT, lhs, rhs, "lttmp");
+        return LLVMBuildZExt(builder, res, LLVMInt32Type(), "zexttmp");
+    }
+    case ND_LE: {
+        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type);
+        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type);
+        LLVMValueRef res =
+            LLVMBuildICmp(builder, LLVMIntSLE, lhs, rhs, "letmp");
+        return LLVMBuildZExt(builder, res, LLVMInt32Type(), "zexttmp");
+    }
+    case ND_EQ: {
+        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type);
+        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type);
+        LLVMValueRef res = LLVMBuildICmp(builder, LLVMIntEQ, lhs, rhs, "eqtmp");
+        return LLVMBuildZExt(builder, res, LLVMInt32Type(), "zexttmp");
+    }
+    case ND_NE: {
+        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type);
+        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type);
+        LLVMValueRef res = LLVMBuildICmp(builder, LLVMIntNE, lhs, rhs, "netmp");
+        return LLVMBuildZExt(builder, res, LLVMInt32Type(), "zexttmp");
+    }
+    case ND_GE: {
+        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type);
+        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type);
+        LLVMValueRef res =
+            LLVMBuildICmp(builder, LLVMIntSGE, lhs, rhs, "getmp");
+        return LLVMBuildZExt(builder, res, LLVMInt32Type(), "zexttmp");
+    }
+    case ND_GT: {
+        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type);
+        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type);
+        LLVMValueRef res =
+            LLVMBuildICmp(builder, LLVMIntSGT, lhs, rhs, "gttmp");
+        return LLVMBuildZExt(builder, res, LLVMInt32Type(), "zexttmp");
     }
     default:
         return LLVMConstInt(LLVMInt32Type(), 0, 0);
@@ -127,4 +167,29 @@ void generate_code(Context* ctx) {
 
     // Clean up module
     LLVMDisposeModule(module);
+}
+
+/**
+ * Generates LLVM IR code to a file
+ *
+ * @param[in] ctx Context containing AST nodes
+ * @param[in] filename Output filename
+ * @return 0 on success, non-zero on failure
+ */
+int generate_code_to_file(Context* ctx, const char* filename) {
+    LLVMModuleRef module = generate_module(ctx);
+
+    // Write IR to file
+    char* error = NULL;
+    int result = LLVMPrintModuleToFile(module, filename, &error);
+
+    if (error) {
+        fprintf(stderr, "Error writing to file: %s\n", error);
+        LLVMDisposeMessage(error);
+    }
+
+    // Clean up module
+    LLVMDisposeModule(module);
+
+    return result;
 }

@@ -13,5 +13,9 @@ char* test_generate_div();
 char* test_generate_precedence();
 char* test_generate_parentheses();
 char* test_generate_complex();
+char* test_generate_lt_true();
+char* test_generate_lt_false();
+char* test_generate_eq_true();
+char* test_generate_ne_false();
 
 #endif

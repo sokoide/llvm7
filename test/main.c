@@ -16,6 +16,10 @@ static char* run_all_tests() {
     mu_run_test(test_generate_precedence, "generate: precedence");
     mu_run_test(test_generate_parentheses, "generate: parentheses");
     mu_run_test(test_generate_complex, "generate: complex");
+    mu_run_test(test_generate_lt_true, "generate: lt true");
+    mu_run_test(test_generate_lt_false, "generate: lt false");
+    mu_run_test(test_generate_eq_true, "generate: eq true");
+    mu_run_test(test_generate_ne_false, "generate: ne false");
     mu_run_test(test_lexer_tokenize, "lexer: tokenize");
     mu_run_test(test_consume_operator, "lexer: consume operator");
     mu_run_test(test_expect_operator, "lexer: expect operator");

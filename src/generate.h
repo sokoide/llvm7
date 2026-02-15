@@ -7,5 +7,6 @@
 
 extern void generate_code(Context* ctx);
 extern LLVMModuleRef generate_module(Context* ctx);
+extern int generate_code_to_file(Context* ctx, const char* filename);
 
 #endif

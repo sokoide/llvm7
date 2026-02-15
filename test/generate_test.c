@@ -205,3 +205,43 @@ char* test_generate_complex() {
     free(ast);
     return result;
 }
+
+// return 1 < 2
+char* test_generate_lt_true() {
+    Node* ast = new_node(ND_LT, new_node_num(1), new_node_num(2));
+    char* result = run_generate_test(ast, 1);
+    free(ast->rhs);
+    free(ast->lhs);
+    free(ast);
+    return result;
+}
+
+// return 2 < 1
+char* test_generate_lt_false() {
+    Node* ast = new_node(ND_LT, new_node_num(2), new_node_num(1));
+    char* result = run_generate_test(ast, 0);
+    free(ast->rhs);
+    free(ast->lhs);
+    free(ast);
+    return result;
+}
+
+// return 1 == 1
+char* test_generate_eq_true() {
+    Node* ast = new_node(ND_EQ, new_node_num(1), new_node_num(1));
+    char* result = run_generate_test(ast, 1);
+    free(ast->rhs);
+    free(ast->lhs);
+    free(ast);
+    return result;
+}
+
+// return 1 != 1
+char* test_generate_ne_false() {
+    Node* ast = new_node(ND_NE, new_node_num(1), new_node_num(1));
+    char* result = run_generate_test(ast, 0);
+    free(ast->rhs);
+    free(ast->lhs);
+    free(ast);
+    return result;
+}
