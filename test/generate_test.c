@@ -63,8 +63,6 @@ static int execute_module(LLVMTestContext* ctx, const char* func_name) {
 
 // return 0
 char* test_generate_return_zero() {
-    printf("--- Test: return 0 ---\n");
-
     ReturnExpr ast = {.value = 0};
     LLVMModuleRef module = generate_module(&ast);
 
@@ -83,8 +81,6 @@ char* test_generate_return_zero() {
 
 // return 1
 char* test_generate_return_one() {
-    printf("--- Test: return 1 ---\n");
-
     ReturnExpr ast = {.value = 1};
     LLVMModuleRef module = generate_module(&ast);
 
@@ -103,8 +99,6 @@ char* test_generate_return_one() {
 
 // return 42
 char* test_generate_return_42() {
-    printf("--- Test: return 42 ---\n");
-
     ReturnExpr ast = {.value = 42};
     LLVMModuleRef module = generate_module(&ast);
 
@@ -123,8 +117,6 @@ char* test_generate_return_42() {
 
 // return -1 (negative value)
 char* test_generate_return_negative() {
-    printf("--- Test: return -1 ---\n");
-
     ReturnExpr ast = {.value = -1};
     LLVMModuleRef module = generate_module(&ast);
 
@@ -143,8 +135,6 @@ char* test_generate_return_negative() {
 
 // return INT_MAX (maximum value)
 char* test_generate_return_max_int() {
-    printf("--- Test: return INT_MAX ---\n");
-
     ReturnExpr ast = {.value = INT_MAX};
     LLVMModuleRef module = generate_module(&ast);
 
@@ -163,8 +153,6 @@ char* test_generate_return_max_int() {
 
 // return 12345 (medium positive value)
 char* test_generate_return_medium_positive() {
-    printf("--- Test: return 12345 ---\n");
-
     ReturnExpr ast = {.value = 12345};
     LLVMModuleRef module = generate_module(&ast);
 
@@ -183,8 +171,6 @@ char* test_generate_return_medium_positive() {
 
 // return INT_MIN (minimum value)
 char* test_generate_return_min_int() {
-    printf("--- Test: return INT_MIN ---\n");
-
     ReturnExpr ast = {.value = INT_MIN};
     LLVMModuleRef module = generate_module(&ast);
 

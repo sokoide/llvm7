@@ -3,8 +3,6 @@
 #include <stdio.h>
 
 char* test_lexer_tokenize() {
-    printf("--- Test: tokenize ---\n");
-
     Token* token = tokenize("1 + 2 - 3");
 
     mu_assert("First token should be TK_NUM", token->kind == TK_NUM);

@@ -14,12 +14,17 @@ extern int tests_run;
             return message;                                                    \
     } while (0)
 
-#define mu_run_test(test)                                                      \
+#define mu_run_test(test, name)                                                \
     do {                                                                       \
+        printf("--- %s ---\n", name);                                          \
         char* message = test();                                                \
         tests_run++;                                                           \
-        if (message)                                                           \
+        if (message) {                                                         \
+            printf("FAIL: %s\n", message);                                     \
             return message;                                                    \
+        } else {                                                               \
+            printf("PASS\n");                                                  \
+        }                                                                      \
     } while (0)
 
 #endif
