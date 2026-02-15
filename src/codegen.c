@@ -331,6 +331,19 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
 
         return LLVMConstInt(LLVMInt32Type(), 0, 0);
     }
+    case ND_BLOCK: {
+        // Execute statements in sequence
+        LLVMValueRef result = LLVMConstInt(LLVMInt32Type(), 0, 0);
+        Node* stmt = node->lhs;
+        while (stmt != NULL) {
+            result = codegen(stmt, builder, local_vars, array_type, has_return);
+            if (*has_return) {
+                break; // Stop if we hit a return
+            }
+            stmt = stmt->next;
+        }
+        return result;
+    }
     default:
         return LLVMConstInt(LLVMInt32Type(), 0, 0);
     }

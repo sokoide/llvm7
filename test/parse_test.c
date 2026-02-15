@@ -587,7 +587,9 @@ char* test_stmt_if_with_block() {
 
     mu_assert("Node kind should be ND_IF", node->kind == ND_IF);
     mu_assert("Condition kind should be ND_LVAR", node->cond->kind == ND_LVAR);
-    mu_assert("Then kind should be ND_RETURN", node->lhs->kind == ND_RETURN);
+    mu_assert("Then kind should be ND_BLOCK", node->lhs->kind == ND_BLOCK);
+    mu_assert("Then first stmt kind should be ND_RETURN",
+              node->lhs->lhs->kind == ND_RETURN);
     mu_assert("Else should be NULL", node->rhs == NULL);
     free_ast(node);
     free_tokens(ctx.current_token);

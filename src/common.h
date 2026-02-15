@@ -39,11 +39,13 @@ typedef enum {
     ND_IF,     // if
     ND_WHILE,  // while
     ND_FOR,    // for
+    ND_BLOCK,  // block
 } NodeKind;
 
 typedef struct Node Node;
 struct Node {
     NodeKind kind;
+    Node* next;
     Node* lhs;  // General left operand, or then branch for if/while/for
     Node* rhs;  // General right operand, or else branch for if, or inc for for
     Node* cond; // Condition for if/while/for

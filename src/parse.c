@@ -6,8 +6,13 @@
 Node* new_node(NodeKind kind, Node* lhs, Node* rhs) {
     Node* node = calloc(1, sizeof(Node));
     node->kind = kind;
+    node->next = NULL;
     node->lhs = lhs;
     node->rhs = rhs;
+    node->init = NULL;
+    node->cond = NULL;
+    node->val = 0;
+
     return node;
 }
 
@@ -37,6 +42,9 @@ void free_ast(Node* ast) {
         return;
     free_ast(ast->lhs);
     free_ast(ast->rhs);
+    free_ast(ast->next);
+    free_ast(ast->cond);
+    free_ast(ast->init);
     free(ast);
 }
 
@@ -91,14 +99,18 @@ Node* stmt(Context* ctx) {
         }
         Node* body = stmt(ctx);
         node = new_node(ND_FOR, body, inc);
-        node->cond = cond;
         node->init = init;
+        node->cond = cond;
         return node;
     } else if (consume(ctx, "{")) {
         // Block statement: consume statements until }
         node = stmt(ctx);
-        expect(ctx, "}");
-        return node;
+        Node* head = node;
+        while (!consume(ctx, "}")) {
+            node->next = stmt(ctx);
+            node = node->next;
+        }
+        return new_node(ND_BLOCK, head, NULL);
     } else {
         node = expr(ctx);
     }
