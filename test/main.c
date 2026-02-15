@@ -39,6 +39,13 @@ static char* run_all_tests() {
     mu_run_test(test_expr_add_sub_chain, "ast: expr add/sub chain");
     mu_run_test(test_expr_precedence, "ast: expr precedence");
     mu_run_test(test_expr_complex_precedence, "ast: expr complex precedence");
+    mu_run_test(test_relational_lt, "ast: relational lt");
+    mu_run_test(test_relational_le, "ast: relational le");
+    mu_run_test(test_relational_gt, "ast: relational gt");
+    mu_run_test(test_relational_ge, "ast: relational ge");
+    mu_run_test(test_equality_eq, "ast: equality eq");
+    mu_run_test(test_equality_ne, "ast: equality ne");
+    mu_run_test(test_expr_combined_precedence, "ast: expr combined precedence");
     return NULL;
 }
 

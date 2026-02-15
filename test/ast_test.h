@@ -23,5 +23,12 @@ char* test_expr_subtract();
 char* test_expr_add_sub_chain();
 char* test_expr_precedence();
 char* test_expr_complex_precedence();
+char* test_relational_lt();
+char* test_relational_le();
+char* test_relational_gt();
+char* test_relational_ge();
+char* test_equality_eq();
+char* test_equality_ne();
+char* test_expr_combined_precedence();
 
 #endif

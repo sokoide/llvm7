@@ -329,3 +329,124 @@ char* test_expr_complex_precedence() {
     free_tokens(head);
     return NULL;
 }
+
+char* test_relational_lt() {
+    token = NULL;
+    Token* head = tokenize("1<2");
+    token = head;
+
+    Node* node = relational();
+
+    mu_assert("Node kind should be ND_LT", node->kind == ND_LT);
+    mu_assert("Left value should be 1", node->lhs->val == 1);
+    mu_assert("Right value should be 2", node->rhs->val == 2);
+
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
+    return NULL;
+}
+
+char* test_relational_le() {
+    token = NULL;
+    Token* head = tokenize("1<=2");
+    token = head;
+
+    Node* node = relational();
+
+    mu_assert("Node kind should be ND_LE", node->kind == ND_LE);
+    mu_assert("Left value should be 1", node->lhs->val == 1);
+    mu_assert("Right value should be 2", node->rhs->val == 2);
+
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
+    return NULL;
+}
+
+char* test_relational_gt() {
+    token = NULL;
+    Token* head = tokenize("1>2");
+    token = head;
+
+    Node* node = relational();
+
+    mu_assert("Node kind should be ND_GT", node->kind == ND_GT);
+    mu_assert("Left value should be 1", node->lhs->val == 1);
+    mu_assert("Right value should be 2", node->rhs->val == 2);
+
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
+    return NULL;
+}
+
+char* test_relational_ge() {
+    token = NULL;
+    Token* head = tokenize("1>=2");
+    token = head;
+
+    Node* node = relational();
+
+    mu_assert("Node kind should be ND_GE", node->kind == ND_GE);
+    mu_assert("Left value should be 1", node->lhs->val == 1);
+    mu_assert("Right value should be 2", node->rhs->val == 2);
+
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
+    return NULL;
+}
+
+char* test_equality_eq() {
+    token = NULL;
+    Token* head = tokenize("1==2");
+    token = head;
+
+    Node* node = equality();
+
+    mu_assert("Node kind should be ND_EQ", node->kind == ND_EQ);
+    mu_assert("Left value should be 1", node->lhs->val == 1);
+    mu_assert("Right value should be 2", node->rhs->val == 2);
+
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
+    return NULL;
+}
+
+char* test_equality_ne() {
+    token = NULL;
+    Token* head = tokenize("1!=2");
+    token = head;
+
+    Node* node = equality();
+
+    mu_assert("Node kind should be ND_NE", node->kind == ND_NE);
+    mu_assert("Left value should be 1", node->lhs->val == 1);
+    mu_assert("Right value should be 2", node->rhs->val == 2);
+
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
+    return NULL;
+}
+
+char* test_expr_combined_precedence() {
+    token = NULL;
+    Token* head = tokenize("1+2==3");
+    token = head;
+
+    Node* node = expr();
+
+    mu_assert("Root node kind should be ND_EQ", node->kind == ND_EQ);
+    mu_assert("Left node kind should be ND_ADD", node->lhs->kind == ND_ADD);
+    mu_assert("Left-left value should be 1", node->lhs->lhs->val == 1);
+    mu_assert("Left-right value should be 2", node->lhs->rhs->val == 2);
+    mu_assert("Right value should be 3", node->rhs->val == 3);
+
+    token = NULL;
+    free_ast(node);
+    free_tokens(head);
+    return NULL;
+}

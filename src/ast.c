@@ -25,7 +25,39 @@ void free_ast(Node* ast) {
     free(ast);
 }
 
-Node* expr() {
+Node* expr() { return equality(); }
+
+Node* equality() {
+    Node* node = relational();
+    while (1) {
+        if (consume("==")) {
+            node = new_node(ND_EQ, node, relational());
+        } else if (consume("!=")) {
+            node = new_node(ND_NE, node, relational());
+        } else {
+            return node;
+        }
+    }
+}
+
+Node* relational() {
+    Node* node = add();
+    while (1) {
+        if (consume("<=")) {
+            node = new_node(ND_LE, node, add());
+        } else if (consume(">=")) {
+            node = new_node(ND_GE, node, add());
+        } else if (consume("<")) {
+            node = new_node(ND_LT, node, add());
+        } else if (consume(">")) {
+            node = new_node(ND_GT, node, add());
+        } else {
+            return node;
+        }
+    }
+}
+
+Node* add() {
     Node* node = mul();
     while (1) {
         if (consume("+")) {
