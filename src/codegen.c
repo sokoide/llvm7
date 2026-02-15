@@ -245,6 +245,92 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
 
         return LLVMConstInt(LLVMInt32Type(), 0, 0);
     }
+    case ND_WHILE: {
+        // Create basic blocks: cond, body, merge
+        LLVMBasicBlockRef cond_bb = LLVMAppendBasicBlock(
+            LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder)), "while.cond");
+        LLVMBasicBlockRef body_bb = LLVMAppendBasicBlock(
+            LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder)), "while.body");
+        LLVMBasicBlockRef merge_bb = LLVMAppendBasicBlock(
+            LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder)), "while.end");
+
+        // Jump to condition
+        LLVMBuildBr(builder, cond_bb);
+
+        // Generate condition block
+        LLVMPositionBuilderAtEnd(builder, cond_bb);
+        LLVMValueRef cond_val = LLVMConstInt(LLVMInt32Type(), 1, 0);
+        if (node->cond) {
+            cond_val = codegen(node->cond, builder, local_vars, array_type,
+                               has_return);
+        }
+        LLVMValueRef zero = LLVMConstInt(LLVMInt32Type(), 0, false);
+        LLVMValueRef cond_bool =
+            LLVMBuildICmp(builder, LLVMIntNE, cond_val, zero, "while.cond");
+        LLVMBuildCondBr(builder, cond_bool, body_bb, merge_bb);
+
+        // Generate body block
+        LLVMPositionBuilderAtEnd(builder, body_bb);
+        codegen(node->lhs, builder, local_vars, array_type, has_return);
+        if (!*has_return) {
+            LLVMBuildBr(builder, cond_bb); // Loop back
+        }
+
+        // Position at merge block
+        LLVMPositionBuilderAtEnd(builder, merge_bb);
+
+        return LLVMConstInt(LLVMInt32Type(), 0, 0);
+    }
+    case ND_FOR: {
+        // Create basic blocks: cond, body, inc, merge
+        LLVMBasicBlockRef cond_bb = LLVMAppendBasicBlock(
+            LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder)), "for.cond");
+        LLVMBasicBlockRef body_bb = LLVMAppendBasicBlock(
+            LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder)), "for.body");
+        LLVMBasicBlockRef inc_bb = LLVMAppendBasicBlock(
+            LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder)), "for.inc");
+        LLVMBasicBlockRef merge_bb = LLVMAppendBasicBlock(
+            LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder)), "for.end");
+
+        // Generate init if present
+        if (node->init) {
+            codegen(node->init, builder, local_vars, array_type, has_return);
+        }
+
+        // Jump to condition
+        LLVMBuildBr(builder, cond_bb);
+
+        // Generate condition block
+        LLVMPositionBuilderAtEnd(builder, cond_bb);
+        LLVMValueRef cond_val = LLVMConstInt(LLVMInt32Type(), 1, 0);
+        if (node->cond) {
+            cond_val = codegen(node->cond, builder, local_vars, array_type,
+                               has_return);
+        }
+        LLVMValueRef zero = LLVMConstInt(LLVMInt32Type(), 0, false);
+        LLVMValueRef cond_bool =
+            LLVMBuildICmp(builder, LLVMIntNE, cond_val, zero, "for.cond");
+        LLVMBuildCondBr(builder, cond_bool, body_bb, merge_bb);
+
+        // Generate body block
+        LLVMPositionBuilderAtEnd(builder, body_bb);
+        codegen(node->lhs, builder, local_vars, array_type, has_return);
+        if (!*has_return) {
+            LLVMBuildBr(builder, inc_bb);
+        }
+
+        // Generate increment block
+        LLVMPositionBuilderAtEnd(builder, inc_bb);
+        if (node->rhs) {
+            codegen(node->rhs, builder, local_vars, array_type, has_return);
+        }
+        LLVMBuildBr(builder, cond_bb); // Loop back to condition
+
+        // Position at merge block
+        LLVMPositionBuilderAtEnd(builder, merge_bb);
+
+        return LLVMConstInt(LLVMInt32Type(), 0, 0);
+    }
     default:
         return LLVMConstInt(LLVMInt32Type(), 0, 0);
     }

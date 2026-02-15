@@ -64,6 +64,36 @@ Node* stmt(Context* ctx) {
         node = new_node(ND_IF, then, els);
         node->cond = cond;
         return node;
+    } else if (consume(ctx, "while")) {
+        expect(ctx, "(");
+        Node* cond = expr(ctx);
+        expect(ctx, ")");
+        Node* body = stmt(ctx);
+        node = new_node(ND_WHILE, body, NULL);
+        node->cond = cond;
+        return node;
+    } else if (consume(ctx, "for")) {
+        expect(ctx, "(");
+        Node* init = NULL;
+        if (!consume(ctx, ";")) {
+            init = expr(ctx);
+            expect(ctx, ";");
+        }
+        Node* cond = NULL;
+        if (!consume(ctx, ";")) {
+            cond = expr(ctx);
+            expect(ctx, ";");
+        }
+        Node* inc = NULL;
+        if (!consume(ctx, ")")) {
+            inc = expr(ctx);
+            expect(ctx, ")");
+        }
+        Node* body = stmt(ctx);
+        node = new_node(ND_FOR, body, inc);
+        node->cond = cond;
+        node->init = init;
+        return node;
     } else if (consume(ctx, "{")) {
         // Block statement: consume statements until }
         node = stmt(ctx);

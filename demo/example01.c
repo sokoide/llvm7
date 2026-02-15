@@ -3,6 +3,7 @@ b = 2;
 c = 3;
 z = 26;
 d = (z - b * c) / b * 4 + b;
+
 if (c == 3) {
     return a;
 } else {

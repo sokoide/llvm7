@@ -44,9 +44,10 @@ typedef enum {
 typedef struct Node Node;
 struct Node {
     NodeKind kind;
-    Node* lhs;  // General left operand, or then branch for if/while
-    Node* rhs;  // General right operand, or else branch for if
+    Node* lhs;  // General left operand, or then branch for if/while/for
+    Node* rhs;  // General right operand, or else branch for if, or inc for for
     Node* cond; // Condition for if/while/for
+    Node* init; // Initialization for for loop
     int val;
 };
 

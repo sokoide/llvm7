@@ -1,6 +1,7 @@
 # Tiny-C Compiler Makefile
 TARGET = ./build/llvm7
 TARGET2 = ./build/tmp
+DEMO ?= ./demo/example02.c
 
 CC = clang
 CFLAGS = -Wall -Wextra -O2 -std=c99 -Isrc -MMD -MP `llvm-config --cflags`
@@ -43,19 +44,17 @@ all: $(TARGET)
 
 .PHONY: run
 run: $(TARGET)
-	$(TARGET) demo/example01.c
+	$(TARGET) $(DEMO)
 
 .PHONY: run2
-run2: $(TARGET2)
-	@$(TARGET2); echo "Exit code: $$?"
-
-$(TARGET2): $(TARGET)
-	$(TARGET) demo/example01.c -o tmp.ll
+run2: $(TARGET)
+	$(TARGET) $(DEMO) -o tmp.ll
 	@echo "Generating .s: $@"
 	llc tmp.ll -o tmp.s
 	@echo "Linking $(TARGET2)..."
 	clang -o $(TARGET2) tmp.s $(LDFLAGS)
 	@chmod +x $(TARGET2)
+	@$(TARGET2); echo "Exit code: $$?"
 
 
 .PHONY: test

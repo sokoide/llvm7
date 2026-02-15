@@ -608,6 +608,67 @@ char* test_stmt_if_complex_cond() {
     return NULL;
 }
 
+char* test_stmt_while() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("while (a) return b;");
+
+    Node* node = stmt(&ctx);
+
+    mu_assert("Node kind should be ND_WHILE", node->kind == ND_WHILE);
+    mu_assert("Condition kind should be ND_LVAR", node->cond->kind == ND_LVAR);
+    mu_assert("Body kind should be ND_RETURN", node->lhs->kind == ND_RETURN);
+    mu_assert("Body lhs kind should be ND_LVAR",
+              node->lhs->lhs->kind == ND_LVAR);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
+char* test_stmt_while_complex_cond() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("while (a < b) a = a + 1;");
+
+    Node* node = stmt(&ctx);
+
+    mu_assert("Node kind should be ND_WHILE", node->kind == ND_WHILE);
+    mu_assert("Condition kind should be ND_LT", node->cond->kind == ND_LT);
+    mu_assert("Body kind should be ND_ASSIGN", node->lhs->kind == ND_ASSIGN);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
+char* test_stmt_for() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("for (a = 0; a < 10; a = a + 1) return b;");
+
+    Node* node = stmt(&ctx);
+
+    mu_assert("Node kind should be ND_FOR", node->kind == ND_FOR);
+    mu_assert("Init kind should be ND_ASSIGN", node->init->kind == ND_ASSIGN);
+    mu_assert("Condition kind should be ND_LT", node->cond->kind == ND_LT);
+    mu_assert("Inc kind should be ND_ASSIGN", node->rhs->kind == ND_ASSIGN);
+    mu_assert("Body kind should be ND_RETURN", node->lhs->kind == ND_RETURN);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
+char* test_stmt_for_no_init() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("for (; a < 10;) return b;");
+
+    Node* node = stmt(&ctx);
+
+    mu_assert("Node kind should be ND_FOR", node->kind == ND_FOR);
+    mu_assert("Init should be NULL", node->init == NULL);
+    mu_assert("Condition kind should be ND_LT", node->cond->kind == ND_LT);
+    mu_assert("Inc should be NULL", node->rhs == NULL);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
 char* test_program_single_stmt() {
     Context ctx = {0};
     ctx.current_token = tokenize("42;");

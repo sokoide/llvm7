@@ -186,7 +186,8 @@ int expect_number(Context* ctx) {
     // Check if the current token is a number
     if (ctx->current_token->kind != TK_NUM) {
         // If it's not a number, print an error message to stderr
-        fprintf(stderr, "lex error: Expected a number\n");
+        fprintf(stderr, "lex error: Expected a number, got kind=%d\n",
+                ctx->current_token->kind);
         // Exit the program with an error status
         exit(1);
     }
