@@ -2,8 +2,10 @@
 #include <limits.h>
 #include <llvm-c/ExecutionEngine.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "generate.h"
+#include "test_common.h"
 
 // Structure to manage LLVM JIT execution environment initialization/cleanup
 typedef struct {
@@ -59,141 +61,142 @@ static int execute_module(LLVMTestContext* ctx, const char* func_name) {
     return ret_value;
 }
 
-// Run single return value test
-static void run_return_test(const char* test_name, int expected_value,
-                            int actual_value) {
-    printf("[%s] ", test_name);
-
-    if (actual_value == expected_value) {
-        printf("PASS - Expected: %d, Got: %d\n", expected_value, actual_value);
-    } else {
-        printf("FAIL - Expected: %d, Got: %d\n", expected_value, actual_value);
-        assert(actual_value == expected_value && "Test failed");
-    }
-}
-
 // return 0
-void test_generate_return_zero() {
-    printf("\n--- Test: return 0 ---\n");
+char* test_generate_return_zero() {
+    printf("--- Test: return 0 ---\n");
 
     ReturnExpr ast = {.value = 0};
-    LLVMModuleRef module = generate_code_to_module(&ast);
+    LLVMModuleRef module = generate_module(&ast);
 
     LLVMTestContext ctx = {0};
     if (init_llvm_context(&ctx, module) != 0) {
-        return;
+        LLVMDisposeModule(module);
+        return "Failed to initialize LLVM context";
     }
 
     int result = execute_module(&ctx, "main");
-    run_return_test("return_zero", 0, result);
-
     cleanup_llvm_context(&ctx);
+
+    mu_assert("Expected 0", result == 0);
+    return NULL;
 }
 
 // return 1
-void test_generate_return_one() {
-    printf("\n--- Test: return 1 ---\n");
+char* test_generate_return_one() {
+    printf("--- Test: return 1 ---\n");
 
     ReturnExpr ast = {.value = 1};
-    LLVMModuleRef module = generate_code_to_module(&ast);
+    LLVMModuleRef module = generate_module(&ast);
 
     LLVMTestContext ctx = {0};
     if (init_llvm_context(&ctx, module) != 0) {
-        return;
+        LLVMDisposeModule(module);
+        return "Failed to initialize LLVM context";
     }
 
     int result = execute_module(&ctx, "main");
-    run_return_test("return_one", 1, result);
-
     cleanup_llvm_context(&ctx);
+
+    mu_assert("Expected 1", result == 1);
+    return NULL;
 }
 
 // return 42
-void test_generate_return_42() {
-    printf("\n--- Test: return 42 ---\n");
+char* test_generate_return_42() {
+    printf("--- Test: return 42 ---\n");
 
     ReturnExpr ast = {.value = 42};
-    LLVMModuleRef module = generate_code_to_module(&ast);
+    LLVMModuleRef module = generate_module(&ast);
 
     LLVMTestContext ctx = {0};
     if (init_llvm_context(&ctx, module) != 0) {
-        return;
+        LLVMDisposeModule(module);
+        return "Failed to initialize LLVM context";
     }
 
     int result = execute_module(&ctx, "main");
-    run_return_test("return_42", 42, result);
-
     cleanup_llvm_context(&ctx);
+
+    mu_assert("Expected 42", result == 42);
+    return NULL;
 }
 
 // return -1 (negative value)
-void test_generate_return_negative() {
-    printf("\n--- Test: return -1 ---\n");
+char* test_generate_return_negative() {
+    printf("--- Test: return -1 ---\n");
 
     ReturnExpr ast = {.value = -1};
-    LLVMModuleRef module = generate_code_to_module(&ast);
+    LLVMModuleRef module = generate_module(&ast);
 
     LLVMTestContext ctx = {0};
     if (init_llvm_context(&ctx, module) != 0) {
-        return;
+        LLVMDisposeModule(module);
+        return "Failed to initialize LLVM context";
     }
 
     int result = execute_module(&ctx, "main");
-    run_return_test("return_negative", -1, result);
-
     cleanup_llvm_context(&ctx);
+
+    mu_assert("Expected -1", result == -1);
+    return NULL;
 }
 
 // return INT_MAX (maximum value)
-void test_generate_return_max_int() {
-    printf("\n--- Test: return INT_MAX ---\n");
+char* test_generate_return_max_int() {
+    printf("--- Test: return INT_MAX ---\n");
 
     ReturnExpr ast = {.value = INT_MAX};
-    LLVMModuleRef module = generate_code_to_module(&ast);
+    LLVMModuleRef module = generate_module(&ast);
 
     LLVMTestContext ctx = {0};
     if (init_llvm_context(&ctx, module) != 0) {
-        return;
+        LLVMDisposeModule(module);
+        return "Failed to initialize LLVM context";
     }
 
     int result = execute_module(&ctx, "main");
-    run_return_test("return_max_int", INT_MAX, result);
-
     cleanup_llvm_context(&ctx);
+
+    mu_assert("Expected INT_MAX", result == INT_MAX);
+    return NULL;
 }
 
 // return 12345 (medium positive value)
-void test_generate_return_medium_positive() {
-    printf("\n--- Test: return 12345 ---\n");
+char* test_generate_return_medium_positive() {
+    printf("--- Test: return 12345 ---\n");
 
     ReturnExpr ast = {.value = 12345};
-    LLVMModuleRef module = generate_code_to_module(&ast);
+    LLVMModuleRef module = generate_module(&ast);
 
     LLVMTestContext ctx = {0};
     if (init_llvm_context(&ctx, module) != 0) {
-        return;
+        LLVMDisposeModule(module);
+        return "Failed to initialize LLVM context";
     }
 
     int result = execute_module(&ctx, "main");
-    run_return_test("return_medium_positive", 12345, result);
-
     cleanup_llvm_context(&ctx);
+
+    mu_assert("Expected 12345", result == 12345);
+    return NULL;
 }
 
 // return INT_MIN (minimum value)
-void test_generate_return_min_int() {
-    printf("\n--- Test: return INT_MIN ---\n");
+char* test_generate_return_min_int() {
+    printf("--- Test: return INT_MIN ---\n");
 
     ReturnExpr ast = {.value = INT_MIN};
-    LLVMModuleRef module = generate_code_to_module(&ast);
+    LLVMModuleRef module = generate_module(&ast);
 
     LLVMTestContext ctx = {0};
     if (init_llvm_context(&ctx, module) != 0) {
-        return;
+        LLVMDisposeModule(module);
+        return "Failed to initialize LLVM context";
     }
 
     int result = execute_module(&ctx, "main");
-    run_return_test("return_min_int", INT_MIN, result);
-
     cleanup_llvm_context(&ctx);
+
+    mu_assert("Expected INT_MIN", result == INT_MIN);
+    return NULL;
 }

@@ -8,6 +8,6 @@ typedef struct {
 } ReturnExpr;
 
 extern void generate_code(ReturnExpr* ast);
-LLVMModuleRef generate_code_to_module(ReturnExpr* ast);
+extern LLVMModuleRef generate_module(ReturnExpr* ast);
 
 #endif

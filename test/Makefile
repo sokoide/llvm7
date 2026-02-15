@@ -5,8 +5,8 @@ CFLAGS = -Wall -Wextra -O2 -std=c99 -I../src `llvm-config --cflags`
 LDFLAGS = `llvm-config --ldflags --libs --system-libs`
 
 # Source files
-TEST_SRC = generate_test.c main.c
-PRODUCT_SRC = ../src/generate.c
+TEST_SRC = $(shell find . -name '*.c')
+PRODUCT_SRC = $(filter-out ../src/main.c, $(shell find ../src -name '*.c'))
 
 # Build directory
 BUILD_DIR = ../build

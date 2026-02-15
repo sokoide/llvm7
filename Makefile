@@ -10,7 +10,7 @@ TMP_DIR = tmp
 SRC_DIR = src
 
 # Source files
-C_SRCS = src/main.c src/generate.c src/file.c
+C_SRCS = $(addprefix $(SRC_DIR)/, $(shell find src -name "*.c"))
 C_OBJS = $(addprefix $(BUILD_DIR)/,$(notdir $(C_SRCS:.c=.o)))
 # LL_FILES = $(TMP_DIR)/$(notdir $(C_SRCS:.c=.ll))
 # S_FILES = $(TMP_DIR)/$(notdir $(LL_FILES:.ll=.s))
