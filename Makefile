@@ -10,7 +10,7 @@ TMP_DIR = tmp
 SRC_DIR = src
 
 # Source files
-C_SRCS = src/main.c src/generate.c
+C_SRCS = src/main.c src/generate.c src/file.c
 C_OBJS = $(addprefix $(BUILD_DIR)/,$(notdir $(C_SRCS:.c=.o)))
 # LL_FILES = $(TMP_DIR)/$(notdir $(C_SRCS:.c=.ll))
 # S_FILES = $(TMP_DIR)/$(notdir $(LL_FILES:.ll=.s))
@@ -43,6 +43,11 @@ clean:
 	rm -rf $(BUILD_DIR) $(TMP_DIR) $(TARGET)
 	$(MAKE) -C test clean
 
+.PHONY: format
+format:
+	clang-format -i $(SRC_DIR)/*.c $(SRC_DIR)/*.h demo/*.c demo/*.h
+	$(MAKE) -C test format
+
 # TARGET
 $(TARGET): $(BUILD_DIR) $(C_OBJS)
 	@echo "Linking $(TARGET)..."
@@ -51,13 +56,19 @@ $(TARGET): $(BUILD_DIR) $(C_OBJS)
 	@chmod +x $(TARGET)
 
 # Object file dependencies
-$(BUILD_DIR)/main.o: $(SRC_DIR)/main.c |  $(BUILD_DIR)
+# $(BUILD_DIR)/main.o: $(SRC_DIR)/main.c |  $(BUILD_DIR)
+# 	@echo $(CC) $(CFLAGS) -Isrc -c $< -o $@
+# 	$(CC) $(CFLAGS) -Isrc -c $< -o $@
+
+# $(BUILD_DIR)/generate.o: $(SRC_DIR)/generate.c |  $(BUILD_DIR)
+# 	@echo $(CC) $(CFLAGS) -Isrc -c $< -o $@
+# 	$(CC) $(CFLAGS) -Isrc -c $< -o $@
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	@echo $(CC) $(CFLAGS) -Isrc -c $< -o $@
 	$(CC) $(CFLAGS) -Isrc -c $< -o $@
 
-$(BUILD_DIR)/generate.o: $(SRC_DIR)/generate.c |  $(BUILD_DIR)
-	@echo $(CC) $(CFLAGS) -Isrc -c $< -o $@
-	$(CC) $(CFLAGS) -Isrc -c $< -o $@
+# Directories
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)

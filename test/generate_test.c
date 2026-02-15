@@ -1,14 +1,9 @@
 #include <assert.h>
 #include <limits.h>
-#include <llvm-c/Core.h>
 #include <llvm-c/ExecutionEngine.h>
 #include <stdio.h>
 
-typedef struct {
-    int value;
-} ReturnExpr;
-
-extern LLVMModuleRef generate_code_to_module(ReturnExpr* ast);
+#include "generate.h"
 
 // Structure to manage LLVM JIT execution environment initialization/cleanup
 typedef struct {
@@ -65,7 +60,8 @@ static int execute_module(LLVMTestContext* ctx, const char* func_name) {
 }
 
 // Run single return value test
-static void run_return_test(const char* test_name, int expected_value, int actual_value) {
+static void run_return_test(const char* test_name, int expected_value,
+                            int actual_value) {
     printf("[%s] ", test_name);
 
     if (actual_value == expected_value) {
@@ -76,8 +72,8 @@ static void run_return_test(const char* test_name, int expected_value, int actua
     }
 }
 
-// Test 1: return 0
-void test_return_zero() {
+// return 0
+void test_generate_return_zero() {
     printf("\n--- Test: return 0 ---\n");
 
     ReturnExpr ast = {.value = 0};
@@ -94,8 +90,8 @@ void test_return_zero() {
     cleanup_llvm_context(&ctx);
 }
 
-// Test 2: return 1
-void test_return_one() {
+// return 1
+void test_generate_return_one() {
     printf("\n--- Test: return 1 ---\n");
 
     ReturnExpr ast = {.value = 1};
@@ -112,8 +108,8 @@ void test_return_one() {
     cleanup_llvm_context(&ctx);
 }
 
-// Test 3: return 42
-void test_return_42() {
+// return 42
+void test_generate_return_42() {
     printf("\n--- Test: return 42 ---\n");
 
     ReturnExpr ast = {.value = 42};
@@ -130,8 +126,8 @@ void test_return_42() {
     cleanup_llvm_context(&ctx);
 }
 
-// Test 4: return -1 (negative value)
-void test_return_negative() {
+// return -1 (negative value)
+void test_generate_return_negative() {
     printf("\n--- Test: return -1 ---\n");
 
     ReturnExpr ast = {.value = -1};
@@ -148,8 +144,8 @@ void test_return_negative() {
     cleanup_llvm_context(&ctx);
 }
 
-// Test 5: return INT_MAX (maximum value)
-void test_return_max_int() {
+// return INT_MAX (maximum value)
+void test_generate_return_max_int() {
     printf("\n--- Test: return INT_MAX ---\n");
 
     ReturnExpr ast = {.value = INT_MAX};
@@ -166,8 +162,8 @@ void test_return_max_int() {
     cleanup_llvm_context(&ctx);
 }
 
-// Test 6: return 12345 (medium positive value)
-void test_return_medium_positive() {
+// return 12345 (medium positive value)
+void test_generate_return_medium_positive() {
     printf("\n--- Test: return 12345 ---\n");
 
     ReturnExpr ast = {.value = 12345};
@@ -184,8 +180,8 @@ void test_return_medium_positive() {
     cleanup_llvm_context(&ctx);
 }
 
-// Test 7: return INT_MIN (minimum value)
-void test_return_min_int() {
+// return INT_MIN (minimum value)
+void test_generate_return_min_int() {
     printf("\n--- Test: return INT_MIN ---\n");
 
     ReturnExpr ast = {.value = INT_MIN};
@@ -200,26 +196,4 @@ void test_return_min_int() {
     run_return_test("return_min_int", INT_MIN, result);
 
     cleanup_llvm_context(&ctx);
-}
-
-int main() {
-    printf("========================================\n");
-    printf("  LLVM JIT Compiler Test Suite\n");
-    printf("  Purpose: Test that code generated from AST executes correctly\n");
-    printf("========================================\n");
-
-    // Run all tests
-    test_return_zero();
-    test_return_one();
-    test_return_42();
-    test_return_negative();
-    test_return_medium_positive();
-    test_return_max_int();
-    test_return_min_int();
-
-    printf("\n========================================\n");
-    printf("  All tests completed successfully\n");
-    printf("========================================\n");
-
-    return 0;
 }

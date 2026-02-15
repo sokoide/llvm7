@@ -1,16 +1,15 @@
-#include <llvm-c/Core.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "generate.h"
+
 #define MODULE_NAME "sokoide_module"
 
-// 1. Simple AST
-typedef struct {
-    int value;
-} ReturnExpr;
+void generate_code(ReturnExpr* ast);
+LLVMModuleRef generate_code_to_module(ReturnExpr* ast);
 
-// 2. generate LLVM IR from AST (dumps to stdout)
+// generate LLVM IR from AST (dumps to stdout)
 void generate_code(ReturnExpr* ast) {
     LLVMModuleRef module = LLVMModuleCreateWithName(MODULE_NAME);
     LLVMBuilderRef builder = LLVMCreateBuilder();
@@ -36,7 +35,7 @@ void generate_code(ReturnExpr* ast) {
     LLVMDisposeModule(module);
 }
 
-// 3. generate LLVM IR from AST and return module (for testing)
+// generate LLVM IR from AST and return module (for testing)
 LLVMModuleRef generate_code_to_module(ReturnExpr* ast) {
     LLVMModuleRef module = LLVMModuleCreateWithName(MODULE_NAME);
     LLVMBuilderRef builder = LLVMCreateBuilder();

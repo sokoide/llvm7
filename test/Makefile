@@ -5,7 +5,7 @@ CFLAGS = -Wall -Wextra -O2 -std=c99 -I../src `llvm-config --cflags`
 LDFLAGS = `llvm-config --ldflags --libs --system-libs`
 
 # Source files
-TEST_SRC = generate_test.c
+TEST_SRC = generate_test.c main.c
 PRODUCT_SRC = ../src/generate.c
 
 # Build directory
@@ -26,6 +26,10 @@ $(TEST_TARGET): $(BUILD_DIR) $(TEST_SRC) $(PRODUCT_SRC)
 test: $(TEST_TARGET)
 	@echo "Running tests..."
 	$(TEST_TARGET)
+
+.PHONY: format
+format:
+	clang-format -i *.c *.h
 
 # Create build directory
 $(BUILD_DIR):
