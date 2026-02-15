@@ -186,6 +186,65 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         *has_return = true;
         return LLVMBuildRet(builder, lhs);
     }
+    case ND_IF: {
+        // Generate condition
+        LLVMValueRef cond_val =
+            codegen(node->cond, builder, local_vars, array_type, has_return);
+
+        // Compare with 0 (condition != 0)
+        LLVMValueRef zero = LLVMConstInt(LLVMInt32Type(), 0, false);
+        LLVMValueRef cond_bool =
+            LLVMBuildICmp(builder, LLVMIntNE, cond_val, zero, "ifcond");
+
+        // Create basic blocks
+        LLVMBasicBlockRef then_bb = LLVMAppendBasicBlock(
+            LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder)), "then");
+        LLVMBasicBlockRef else_bb = LLVMAppendBasicBlock(
+            LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder)), "else");
+
+        // Build conditional branch
+        LLVMBuildCondBr(builder, cond_bool, then_bb, else_bb);
+
+        // Generate then block
+        LLVMPositionBuilderAtEnd(builder, then_bb);
+        bool then_has_return = false;
+        codegen(node->lhs, builder, local_vars, array_type, &then_has_return);
+        LLVMBasicBlockRef then_end = LLVMGetInsertBlock(builder);
+
+        // Generate else block
+        LLVMPositionBuilderAtEnd(builder, else_bb);
+        bool else_has_return = false;
+        if (node->rhs) {
+            codegen(node->rhs, builder, local_vars, array_type,
+                    &else_has_return);
+        }
+        LLVMBasicBlockRef else_end = LLVMGetInsertBlock(builder);
+
+        // If both branches return, no merge block needed
+        if (then_has_return && else_has_return) {
+            *has_return = true;
+            return LLVMConstInt(LLVMInt32Type(), 0, 0);
+        }
+
+        // Create merge block
+        LLVMBasicBlockRef merge_bb = LLVMAppendBasicBlock(
+            LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder)), "ifcont");
+
+        // Add branches to merge for non-returning paths
+        if (!then_has_return) {
+            LLVMPositionBuilderAtEnd(builder, then_end);
+            LLVMBuildBr(builder, merge_bb);
+        }
+        if (!else_has_return) {
+            LLVMPositionBuilderAtEnd(builder, else_end);
+            LLVMBuildBr(builder, merge_bb);
+        }
+
+        // Position at merge block
+        LLVMPositionBuilderAtEnd(builder, merge_bb);
+
+        return LLVMConstInt(LLVMInt32Type(), 0, 0);
+    }
     default:
         return LLVMConstInt(LLVMInt32Type(), 0, 0);
     }

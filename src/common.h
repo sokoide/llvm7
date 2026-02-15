@@ -36,13 +36,17 @@ typedef enum {
     ND_LVAR,   // local var
     ND_NUM,    // Integer
     ND_RETURN, // return
+    ND_IF,     // if
+    ND_WHILE,  // while
+    ND_FOR,    // for
 } NodeKind;
 
 typedef struct Node Node;
 struct Node {
     NodeKind kind;
-    Node* lhs;
-    Node* rhs;
+    Node* lhs;  // General left operand, or then branch for if/while
+    Node* rhs;  // General right operand, or else branch for if
+    Node* cond; // Condition for if/while/for
     int val;
 };
 

@@ -52,6 +52,23 @@ Node* stmt(Context* ctx) {
     Node* node;
     if (consume(ctx, "return")) {
         node = new_node(ND_RETURN, expr(ctx), NULL);
+    } else if (consume(ctx, "if")) {
+        expect(ctx, "(");
+        Node* cond = expr(ctx);
+        expect(ctx, ")");
+        Node* then = stmt(ctx);
+        Node* els = NULL;
+        if (consume(ctx, "else")) {
+            els = stmt(ctx);
+        }
+        node = new_node(ND_IF, then, els);
+        node->cond = cond;
+        return node;
+    } else if (consume(ctx, "{")) {
+        // Block statement: consume statements until }
+        node = stmt(ctx);
+        expect(ctx, "}");
+        return node;
     } else {
         node = expr(ctx);
     }

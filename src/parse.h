@@ -6,6 +6,9 @@
 // program = stmt*
 // stmt = expr ";"
 //      | "return" expr ";"
+//      | "if" "(" expr ")" stmt ("else" stmt)?
+//      | "while" "(" expr ")" stmt
+//      | "for" "(" stmt expr ";" expr ")" stmt
 // expr = assign
 // assign = equality("=" assign) ?
 // equality =   relational("==" relational | "!="

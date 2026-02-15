@@ -36,6 +36,12 @@ Token* tokenize(const char* p) {
     head.next = NULL;
     Token* cur = &head;
 
+    struct {
+        char* str;
+        int len;
+    } keywords[] = {
+        {"return", 6}, {"if", 2}, {"else", 4}, {"while", 5}, {"for", 3}};
+
     // Iterate through the input string until null terminator
     while (*p) {
         if (isspace(*p)) {
@@ -43,31 +49,56 @@ Token* tokenize(const char* p) {
             continue;
         }
 
-        if (strncmp(p, "return", 6) == 0 && !is_alnum(p[6])) {
-            cur = new_token(TK_RESERVED, cur, p, 6);
-            p += 6;
+        // Check for keywords
+        bool keyword_matched = false;
+        for (size_t i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++) {
+            if (strncmp(p, keywords[i].str, keywords[i].len) == 0 &&
+                !is_alnum(p[keywords[i].len])) {
+                cur = new_token(TK_RESERVED, cur, p, keywords[i].len);
+                p += keywords[i].len;
+                keyword_matched = true;
+                break;
+            }
+        }
+        if (keyword_matched) {
             continue;
         }
 
-        if (strncmp(p, "==", 2) == 0 || strncmp(p, "!=", 2) == 0 ||
-            strncmp(p, "<=", 2) == 0 || strncmp(p, ">=", 2) == 0) {
-            cur = new_token(TK_RESERVED, cur, p, 2);
-            p += 2;
+        // Check for two-character operators
+        bool two_char_matched = false;
+        char* two_char_ops[] = {"==", "!=", "<=", ">="};
+        for (size_t i = 0; i < sizeof(two_char_ops) / sizeof(two_char_ops[0]);
+             i++) {
+            if (strncmp(p, two_char_ops[i], 2) == 0) {
+                cur = new_token(TK_RESERVED, cur, p, 2);
+                p += 2;
+                two_char_matched = true;
+                break;
+            }
+        }
+        if (two_char_matched) {
             continue;
         }
 
-        if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' ||
-            *p == ')' || *p == '<' || *p == '>' || *p == '=' || *p == ';') {
+        // Check for single-character operators and delimiters
+        char* single_char_ops = "+-*/()<>;={}";
+        if (strchr(single_char_ops, *p)) {
             cur = new_token(TK_RESERVED, cur, p++, 1);
             continue;
-        } else if (isdigit(*p)) {
+        }
+
+        // Number
+        if (isdigit(*p)) {
             const char* start = p;
             while (isdigit(*p)) {
                 p++;
             }
             cur = new_token(TK_NUM, cur, start, p - start);
             continue;
-        } else if ('a' <= *p && *p <= 'z') {
+        }
+
+        // Identifier
+        if ('a' <= *p && *p <= 'z') {
             const char* start = p;
             while (('a' <= *p && *p <= 'z') || ('A' <= *p && *p <= 'Z') ||
                    ('0' <= *p && *p <= '9') || *p == '_') {
@@ -77,10 +108,9 @@ Token* tokenize(const char* p) {
             continue;
         }
 
-        else {
-            fprintf(stderr, "lex error: Invalid character '%c'\n", *p);
-            return NULL;
-        }
+        // Error
+        fprintf(stderr, "lex error: Invalid character '%c'\n", *p);
+        return NULL;
     }
 
     new_token(TK_EOF, cur, p, 0);

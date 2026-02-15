@@ -547,6 +547,67 @@ char* test_stmt_return_expr() {
     return NULL;
 }
 
+char* test_stmt_if() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("if (a) return b;");
+
+    Node* node = stmt(&ctx);
+
+    mu_assert("Node kind should be ND_IF", node->kind == ND_IF);
+    mu_assert("Condition kind should be ND_LVAR", node->cond->kind == ND_LVAR);
+    mu_assert("Then kind should be ND_RETURN", node->lhs->kind == ND_RETURN);
+    mu_assert("Then lhs kind should be ND_LVAR",
+              node->lhs->lhs->kind == ND_LVAR);
+    mu_assert("Else should be NULL", node->rhs == NULL);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
+char* test_stmt_if_else() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("if (a) return b; else return c;");
+
+    Node* node = stmt(&ctx);
+
+    mu_assert("Node kind should be ND_IF", node->kind == ND_IF);
+    mu_assert("Condition kind should be ND_LVAR", node->cond->kind == ND_LVAR);
+    mu_assert("Then kind should be ND_RETURN", node->lhs->kind == ND_RETURN);
+    mu_assert("Else kind should be ND_RETURN", node->rhs->kind == ND_RETURN);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
+char* test_stmt_if_with_block() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("if (a) { return b; }");
+
+    Node* node = stmt(&ctx);
+
+    mu_assert("Node kind should be ND_IF", node->kind == ND_IF);
+    mu_assert("Condition kind should be ND_LVAR", node->cond->kind == ND_LVAR);
+    mu_assert("Then kind should be ND_RETURN", node->lhs->kind == ND_RETURN);
+    mu_assert("Else should be NULL", node->rhs == NULL);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
+char* test_stmt_if_complex_cond() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("if (a == b) return c;");
+
+    Node* node = stmt(&ctx);
+
+    mu_assert("Node kind should be ND_IF", node->kind == ND_IF);
+    mu_assert("Condition kind should be ND_EQ", node->cond->kind == ND_EQ);
+    mu_assert("Then kind should be ND_RETURN", node->lhs->kind == ND_RETURN);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
 char* test_program_single_stmt() {
     Context ctx = {0};
     ctx.current_token = tokenize("42;");
