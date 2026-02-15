@@ -64,7 +64,12 @@ static int execute_module(LLVMTestContext* ctx, const char* func_name) {
 
 // Helper to run generate test
 static char* run_generate_test(Node* ast, int expected) {
-    LLVMModuleRef module = generate_module(ast);
+    // Setup code[] array for single statement
+    extern Node* code[MAX_NODES];
+    code[0] = ast;
+    code[1] = NULL;
+
+    LLVMModuleRef module = generate_module();
 
     LLVMTestContext ctx = {0};
     if (init_llvm_context(&ctx, module) != 0) {

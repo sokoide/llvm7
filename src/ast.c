@@ -22,7 +22,8 @@ Node* new_node_num(int val) {
 Node* new_node_ident(const char* name) {
     Node* node = calloc(1, sizeof(Node));
     node->kind = ND_LVAR;
-    node->offset = (name[0] - 'a' + 1) * 8;
+    node->val = name[0] - 'a';
+
     return node;
 }
 

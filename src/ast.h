@@ -1,6 +1,8 @@
 #ifndef __AST_H__
 #define __AST_H__
 
+#include <llvm-c/Core.h>
+
 // program = stmt*
 // stmt = expr ";"
 // expr = assign
@@ -32,8 +34,7 @@ struct Node {
     NodeKind kind;
     struct Node* lhs;
     struct Node* rhs;
-    int val;    // used if kind = ND_NUM
-    int offset; // used if kind = ND_LVAR
+    int val;
 };
 
 typedef struct Node Node;

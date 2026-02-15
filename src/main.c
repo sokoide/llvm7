@@ -25,16 +25,13 @@ int main(int argc, const char** argv) {
     token = tokenize(source);
 
     // Parse AST
-    Node* ast = expr();
+    program();
 
     // Generate LLVM IR
-    generate_code(ast);
+    generate_code();
 
     // Clean up
-    // memory in source is used by `ast`, don't free until generate_code() is
-    // called
     free((void*)source);
-    free_ast(ast);
 
     return 0;
 }

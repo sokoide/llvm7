@@ -5,7 +5,7 @@
 
 #include <llvm-c/Core.h>
 
-extern void generate_code(Node* ast);
-extern LLVMModuleRef generate_module(Node* ast);
+extern void generate_code(void);
+extern LLVMModuleRef generate_module(void);
 
 #endif

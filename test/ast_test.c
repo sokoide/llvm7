@@ -455,7 +455,7 @@ char* test_new_node_ident() {
     Node* node = new_node_ident("a");
 
     mu_assert("Node kind should be ND_LVAR", node->kind == ND_LVAR);
-    mu_assert("Node offset should be 8", node->offset == 8);
+    mu_assert("Node val should be 0", node->val == 0);
     mu_assert("Node lhs should be NULL", node->lhs == NULL);
     mu_assert("Node rhs should be NULL", node->rhs == NULL);
 
@@ -467,7 +467,7 @@ char* test_new_node_ident_b() {
     Node* node = new_node_ident("b");
 
     mu_assert("Node kind should be ND_LVAR", node->kind == ND_LVAR);
-    mu_assert("Node offset should be 16", node->offset == 16);
+    mu_assert("Node val should be 1", node->val == 1);
 
     free_ast(node);
     return NULL;
@@ -481,7 +481,7 @@ char* test_primary_ident() {
     Node* node = primary();
 
     mu_assert("Node kind should be ND_LVAR", node->kind == ND_LVAR);
-    mu_assert("Node offset should be 8", node->offset == 8);
+    mu_assert("Node val should be 0", node->val == 0);
     mu_assert("Token should be EOF", token->kind == TK_EOF);
 
     token = NULL;
@@ -499,7 +499,7 @@ char* test_assign() {
 
     mu_assert("Node kind should be ND_ASSIGN", node->kind == ND_ASSIGN);
     mu_assert("Left node kind should be ND_LVAR", node->lhs->kind == ND_LVAR);
-    mu_assert("Left offset should be 8", node->lhs->offset == 8);
+    mu_assert("Left val should be 0", node->lhs->val == 0);
     mu_assert("Right node kind should be ND_NUM", node->rhs->kind == ND_NUM);
     mu_assert("Right value should be 42", node->rhs->val == 42);
 
@@ -518,10 +518,10 @@ char* test_assign_chain() {
 
     mu_assert("Root node kind should be ND_ASSIGN", node->kind == ND_ASSIGN);
     mu_assert("Left node kind should be ND_LVAR", node->lhs->kind == ND_LVAR);
-    mu_assert("Left offset should be 8", node->lhs->offset == 8);
+    mu_assert("Left val should be 0", node->lhs->val == 0);
     mu_assert("Right node kind should be ND_ASSIGN",
               node->rhs->kind == ND_ASSIGN);
-    mu_assert("Right-left offset should be 16", node->rhs->lhs->offset == 16);
+    mu_assert("Right-left val should be 1", node->rhs->lhs->val == 1);
     mu_assert("Right-right value should be 5", node->rhs->rhs->val == 5);
 
     token = NULL;
