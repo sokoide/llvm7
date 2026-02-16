@@ -1,11 +1,10 @@
-a = 12 + (1 + 3) * 8 - 6 / 3;
-b = 2;
-c = 3;
-z = 26;
-d = (z - b * c) / b * 4 + b;
-
-if (c == 3) {
-    return a;
-} else {
-    return b;
+main() {
+    a = 0;
+    b = 2;
+    if (a < 5) {
+        a = a + 1;
+        b = b + 1;
+        return a + b;
+    }
+    return 0;
 }

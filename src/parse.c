@@ -51,10 +51,44 @@ void free_ast(Node* ast) {
     free(ast);
 }
 
+// function = ident "(" ")" "{" stmt* "}"
+Node* function(Context* ctx) {
+    Token* tok = consume_ident(ctx);
+    if (!tok) {
+        fprintf(stderr, "Expected function name\n");
+        exit(1);
+    }
+
+    expect(ctx, "(");
+    expect(ctx, ")");
+    expect(ctx, "{");
+
+    // Create function node
+    Node* node = new_node(ND_FUNCTION, NULL, NULL);
+    node->tok = tok;
+
+    // Parse function body (statements)
+    Node* head = NULL;
+    Node* tail = NULL;
+    while (!consume(ctx, "}")) {
+        Node* stmt_node = stmt(ctx);
+        if (head == NULL) {
+            head = stmt_node;
+            tail = stmt_node;
+        } else {
+            tail->next = stmt_node;
+            tail = stmt_node;
+        }
+    }
+    node->lhs = head;
+
+    return node;
+}
+
 void program(Context* ctx) {
     int i = 0;
     while (!at_eof(ctx)) {
-        ctx->code[i++] = stmt(ctx);
+        ctx->code[i++] = function(ctx);
     }
     ctx->node_count = i;
 }

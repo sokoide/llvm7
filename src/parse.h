@@ -3,7 +3,8 @@
 
 #include "common.h"
 
-// program = stmt*
+// program = function*
+// function = ident "(" ")" "{" stmt* "}"
 // stmt = expr ";"
 //      | "{" stmt* "}"
 //      | "return" expr ";"
@@ -11,12 +12,12 @@
 //      | "while" "(" expr ")" stmt
 //      | "for" "(" stmt expr ";" expr ")" stmt
 // expr = assign
-// assign = equality("=" assign) ?
-// equality =   relational("==" relational | "!="
-// relational)* relational = add("<" add | "<=" add |
-// ">" add | ">=" add)* add =        mul ("+" mul | "-"
-// mul)* mul =        unary("*" unary | "/" unary)*
-// unary =      ("+" | "-") ? primary
+// assign = equality("=" assign)?
+// equality = relational("==" relational | "!=" relational)*
+// relational = add("<" add | "<=" add | ">" add | ">=" add)*
+// add = mul("+" mul | "-" mul)*
+// mul = unary("*" unary | "/" unary)*
+// unary = ("+" | "-")? primary
 // primary = num
 //         | ident ("(" args? ")")?
 //         | "(" expr ")"
@@ -37,5 +38,6 @@ extern Node* mul(Context* ctx);
 extern Node* unary(Context* ctx);
 extern Node* primary(Context* ctx);
 extern Node* args(Context* ctx);
+extern Node* function(Context* ctx);
 
 #endif

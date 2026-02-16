@@ -17,5 +17,6 @@ char* test_generate_lt_true();
 char* test_generate_lt_false();
 char* test_generate_eq_true();
 char* test_generate_ne_false();
+char* test_generate_main_required();
 
 #endif

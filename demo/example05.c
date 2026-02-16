@@ -1,2 +1,7 @@
-foo(40, 2);
-a = 3;
+main() {
+    sum = 0;
+    for (i = 1; i <= 10; i = i + 1) {
+        sum = sum + i;
+    }
+    return sum;
+}

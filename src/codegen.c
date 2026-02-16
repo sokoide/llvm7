@@ -23,33 +23,66 @@ LLVMModuleRef generate_module(Context* ctx) {
     // Create an LLVM builder for constructing instructions
     LLVMBuilderRef builder = LLVMCreateBuilder();
 
-    // main function
-    LLVMTypeRef ret_type = LLVMInt32Type();
-    LLVMTypeRef func_type = LLVMFunctionType(ret_type, NULL, 0, 0);
-    LLVMValueRef main_func = LLVMAddFunction(module, "main", func_type);
+    // Track if main function exists
+    bool has_main = false;
 
-    // basic block
-    LLVMBasicBlockRef entry = LLVMAppendBasicBlock(main_func, "entry");
-    LLVMPositionBuilderAtEnd(builder, entry);
-
-    // local variable space per function (temporary)
-    LLVMTypeRef i32_type = LLVMInt32Type();
-    LLVMTypeRef array_type = LLVMArrayType(i32_type, 26);
-    LLVMValueRef local_vars =
-        LLVMBuildAlloca(builder, array_type, "local_vars");
-
-    // Generate code from AST statements
-    LLVMValueRef res = LLVMConstInt(LLVMInt32Type(), 0, 0);
-    bool has_return = false;
+    // Generate code for each function
     for (int i = 0; i < ctx->node_count; i++) {
-        res = codegen(ctx->code[i], builder, local_vars, array_type,
-                      &has_return, module);
-        if (has_return) {
-            break;
+        Node* func_node = ctx->code[i];
+
+        if (func_node->kind != ND_FUNCTION) {
+            fprintf(stderr, "Expected function definition\n");
+            continue;
+        }
+
+        // Get function name
+        char func_name[64];
+        int len = func_node->tok->len < 63 ? func_node->tok->len : 63;
+        strncpy(func_name, func_node->tok->str, len);
+        func_name[len] = '\0';
+
+        // Check for main function
+        if (strcmp(func_name, "main") == 0) {
+            has_main = true;
+        }
+
+        // Create function type
+        LLVMTypeRef ret_type = LLVMInt32Type();
+        LLVMTypeRef func_type = LLVMFunctionType(ret_type, NULL, 0, 0);
+        LLVMValueRef func = LLVMAddFunction(module, func_name, func_type);
+
+        // Create entry block
+        LLVMBasicBlockRef entry = LLVMAppendBasicBlock(func, "entry");
+        LLVMPositionBuilderAtEnd(builder, entry);
+
+        // Local variable space per function (temporary)
+        LLVMTypeRef i32_type = LLVMInt32Type();
+        LLVMTypeRef array_type = LLVMArrayType(i32_type, 26);
+        LLVMValueRef local_vars =
+            LLVMBuildAlloca(builder, array_type, "local_vars");
+
+        // Generate function body statements
+        LLVMValueRef res = LLVMConstInt(LLVMInt32Type(), 0, 0);
+        bool has_return = false;
+        Node* stmt = func_node->lhs;
+        while (stmt != NULL) {
+            res = codegen(stmt, builder, local_vars, array_type, &has_return,
+                          module);
+            if (has_return) {
+                break;
+            }
+            stmt = stmt->next;
+        }
+        if (!has_return) {
+            LLVMBuildRet(builder, res);
         }
     }
-    if (!has_return) {
-        LLVMBuildRet(builder, res);
+
+    if (!has_main) {
+        fprintf(stderr, "Error: main function is required\n");
+        LLVMDisposeBuilder(builder);
+        LLVMDisposeModule(module);
+        exit(1);
     }
 
     // Clean up builder

@@ -53,5 +53,10 @@ char* test_stmt_call_with_args();
 char* test_program_single_stmt();
 char* test_program_multiple_stmts();
 char* test_program_assign_stmts();
+char* test_function_simple();
+char* test_function_multiple_stmts();
+char* test_program_single_function();
+char* test_program_multiple_functions();
+char* test_function_with_block();
 
 #endif

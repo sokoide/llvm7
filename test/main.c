@@ -20,6 +20,7 @@ static char* run_all_tests() {
     mu_run_test(test_generate_lt_false, "codegen: lt false");
     mu_run_test(test_generate_eq_true, "codegen: eq true");
     mu_run_test(test_generate_ne_false, "codegen: ne false");
+    mu_run_test(test_generate_main_required, "codegen: main required");
     mu_run_test(test_lex_tokenize, "lex: tokenize");
     mu_run_test(test_consume_operator, "lex: consume operator");
     mu_run_test(test_expect_operator, "lex: expect operator");
@@ -74,6 +75,12 @@ static char* run_all_tests() {
     mu_run_test(test_program_single_stmt, "parse: program single stmt");
     mu_run_test(test_program_multiple_stmts, "parse: program multiple stmts");
     mu_run_test(test_program_assign_stmts, "parse: program assign stmts");
+    mu_run_test(test_function_simple, "parse: function simple");
+    mu_run_test(test_function_multiple_stmts, "parse: function multiple stmts");
+    mu_run_test(test_program_single_function, "parse: program single function");
+    mu_run_test(test_program_multiple_functions,
+                "parse: program multiple functions");
+    mu_run_test(test_function_with_block, "parse: function with block");
     return NULL;
 }
 

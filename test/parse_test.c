@@ -2,6 +2,7 @@
 #include "../src/lex.h"
 #include "test_common.h"
 #include <stdio.h>
+#include <string.h>
 
 char* test_new_node_num() {
     Node* node = new_node_num(42);
@@ -673,13 +674,16 @@ char* test_stmt_for_no_init() {
 
 char* test_program_single_stmt() {
     Context ctx = {0};
-    ctx.current_token = tokenize("42;");
+    ctx.current_token = tokenize("main() { 42; }");
 
     program(&ctx);
 
     mu_assert("ctx.code[0] should not be NULL", ctx.code[0] != NULL);
-    mu_assert("ctx.code[0] kind should be ND_NUM", ctx.code[0]->kind == ND_NUM);
-    mu_assert("ctx.code[0] value should be 42", ctx.code[0]->val == 42);
+    mu_assert("ctx.code[0] kind should be ND_FUNCTION",
+              ctx.code[0]->kind == ND_FUNCTION);
+    mu_assert("ctx.code[0] name should be 'main'",
+              ctx.code[0]->tok->len == 4 &&
+                  strncmp(ctx.code[0]->tok->str, "main", 4) == 0);
     mu_assert("ctx.code[1] should be NULL", ctx.code[1] == NULL);
     free_ast(ctx.code[0]);
     free_tokens(ctx.current_token);
@@ -688,42 +692,40 @@ char* test_program_single_stmt() {
 
 char* test_program_multiple_stmts() {
     Context ctx = {0};
-    ctx.current_token = tokenize("1;2;3;");
+    ctx.current_token = tokenize("main() { 1; 2; 3; }");
 
     program(&ctx);
 
     mu_assert("ctx.code[0] should not be NULL", ctx.code[0] != NULL);
-    mu_assert("ctx.code[0] kind should be ND_NUM", ctx.code[0]->kind == ND_NUM);
-    mu_assert("ctx.code[0] value should be 1", ctx.code[0]->val == 1);
-    mu_assert("ctx.code[1] should not be NULL", ctx.code[1] != NULL);
-    mu_assert("ctx.code[1] kind should be ND_NUM", ctx.code[1]->kind == ND_NUM);
-    mu_assert("ctx.code[1] value should be 2", ctx.code[1]->val == 2);
-    mu_assert("ctx.code[2] should not be NULL", ctx.code[2] != NULL);
-    mu_assert("ctx.code[2] kind should be ND_NUM", ctx.code[2]->kind == ND_NUM);
-    mu_assert("ctx.code[2] value should be 3", ctx.code[2]->val == 3);
-    mu_assert("ctx.code[3] should be NULL", ctx.code[3] == NULL);
+    mu_assert("ctx.code[0] kind should be ND_FUNCTION",
+              ctx.code[0]->kind == ND_FUNCTION);
+    mu_assert("ctx.code[0] body first stmt value should be 1",
+              ctx.code[0]->lhs->val == 1);
+    mu_assert("ctx.code[0] body second stmt value should be 2",
+              ctx.code[0]->lhs->next->val == 2);
+    mu_assert("ctx.code[0] body third stmt value should be 3",
+              ctx.code[0]->lhs->next->next->val == 3);
+    mu_assert("ctx.code[1] should be NULL", ctx.code[1] == NULL);
     free_ast(ctx.code[0]);
-    free_ast(ctx.code[1]);
-    free_ast(ctx.code[2]);
     free_tokens(ctx.current_token);
     return NULL;
 }
 
 char* test_program_assign_stmts() {
     Context ctx = {0};
-    ctx.current_token = tokenize("a=1;b=2;");
+    ctx.current_token = tokenize("main() { a=1; b=2; }");
 
     program(&ctx);
 
     mu_assert("ctx.code[0] should not be NULL", ctx.code[0] != NULL);
-    mu_assert("ctx.code[0] kind should be ND_ASSIGN",
-              ctx.code[0]->kind == ND_ASSIGN);
-    mu_assert("ctx.code[1] should not be NULL", ctx.code[1] != NULL);
-    mu_assert("ctx.code[1] kind should be ND_ASSIGN",
-              ctx.code[1]->kind == ND_ASSIGN);
-    mu_assert("ctx.code[2] should be NULL", ctx.code[2] == NULL);
+    mu_assert("ctx.code[0] kind should be ND_FUNCTION",
+              ctx.code[0]->kind == ND_FUNCTION);
+    mu_assert("ctx.code[0] body first stmt kind should be ND_ASSIGN",
+              ctx.code[0]->lhs->kind == ND_ASSIGN);
+    mu_assert("ctx.code[0] body second stmt kind should be ND_ASSIGN",
+              ctx.code[0]->lhs->next->kind == ND_ASSIGN);
+    mu_assert("ctx.code[1] should be NULL", ctx.code[1] == NULL);
     free_ast(ctx.code[0]);
-    free_ast(ctx.code[1]);
     free_tokens(ctx.current_token);
     return NULL;
 }
@@ -756,6 +758,101 @@ char* test_stmt_call_with_args() {
     mu_assert("Second arg should exist", node->lhs->next != NULL);
     mu_assert("Second arg should be ND_NUM", node->lhs->next->kind == ND_NUM);
     mu_assert("Second arg value should be 2", node->lhs->next->val == 2);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
+char* test_function_simple() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("main() { return 42; }");
+
+    Node* node = function(&ctx);
+
+    mu_assert("Node kind should be ND_FUNCTION", node->kind == ND_FUNCTION);
+    mu_assert("Function name should be 'main'",
+              node->tok->len == 4 && strncmp(node->tok->str, "main", 4) == 0);
+    mu_assert("Body should not be NULL", node->lhs != NULL);
+    mu_assert("First stmt kind should be ND_RETURN",
+              node->lhs->kind == ND_RETURN);
+    mu_assert("First stmt lhs value should be 42", node->lhs->lhs->val == 42);
+    mu_assert("Token should be EOF", ctx.current_token->kind == TK_EOF);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
+char* test_function_multiple_stmts() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("main() { a=1; return a; }");
+
+    Node* node = function(&ctx);
+
+    mu_assert("Node kind should be ND_FUNCTION", node->kind == ND_FUNCTION);
+    mu_assert("Body should not be NULL", node->lhs != NULL);
+    mu_assert("First stmt kind should be ND_ASSIGN",
+              node->lhs->kind == ND_ASSIGN);
+    mu_assert("Second stmt should exist", node->lhs->next != NULL);
+    mu_assert("Second stmt kind should be ND_RETURN",
+              node->lhs->next->kind == ND_RETURN);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
+char* test_program_single_function() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("main() { return 42; }");
+
+    program(&ctx);
+
+    mu_assert("ctx.code[0] should not be NULL", ctx.code[0] != NULL);
+    mu_assert("ctx.code[0] kind should be ND_FUNCTION",
+              ctx.code[0]->kind == ND_FUNCTION);
+    mu_assert("ctx.code[0] name should be 'main'",
+              ctx.code[0]->tok->len == 4 &&
+                  strncmp(ctx.code[0]->tok->str, "main", 4) == 0);
+    mu_assert("ctx.code[1] should be NULL", ctx.code[1] == NULL);
+    free_ast(ctx.code[0]);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
+char* test_program_multiple_functions() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("foo() { return 1; } main() { return 42; }");
+
+    program(&ctx);
+
+    mu_assert("ctx.code[0] should not be NULL", ctx.code[0] != NULL);
+    mu_assert("ctx.code[0] kind should be ND_FUNCTION",
+              ctx.code[0]->kind == ND_FUNCTION);
+    mu_assert("ctx.code[0] name should be 'foo'",
+              ctx.code[0]->tok->len == 3 &&
+                  strncmp(ctx.code[0]->tok->str, "foo", 3) == 0);
+    mu_assert("ctx.code[1] should not be NULL", ctx.code[1] != NULL);
+    mu_assert("ctx.code[1] kind should be ND_FUNCTION",
+              ctx.code[1]->kind == ND_FUNCTION);
+    mu_assert("ctx.code[1] name should be 'main'",
+              ctx.code[1]->tok->len == 4 &&
+                  strncmp(ctx.code[1]->tok->str, "main", 4) == 0);
+    free_ast(ctx.code[0]);
+    free_ast(ctx.code[1]);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
+char* test_function_with_block() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("main() { if (1) { return 42; } }");
+
+    Node* node = function(&ctx);
+
+    mu_assert("Node kind should be ND_FUNCTION", node->kind == ND_FUNCTION);
+    mu_assert("Body should not be NULL", node->lhs != NULL);
+    mu_assert("First stmt kind should be ND_IF", node->lhs->kind == ND_IF);
+    mu_assert("If body kind should be ND_BLOCK",
+              node->lhs->lhs->kind == ND_BLOCK);
     free_ast(node);
     free_tokens(ctx.current_token);
     return NULL;

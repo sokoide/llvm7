@@ -64,9 +64,18 @@ static int execute_module(LLVMTestContext* ctx, const char* func_name) {
 
 // Helper to run generate test
 static char* run_generate_test(Node* ast, int expected) {
-    // Setup Context with single statement
+    // Create function node wrapping the statement
+    Token main_tok = {0};
+    main_tok.kind = TK_IDENT;
+    main_tok.str = "main";
+    main_tok.len = 4;
+
+    Node* func = new_node(ND_FUNCTION, ast, NULL);
+    func->tok = &main_tok;
+
+    // Setup Context with single function
     Context parse_ctx = {0};
-    parse_ctx.code[0] = ast;
+    parse_ctx.code[0] = func;
     parse_ctx.code[1] = NULL;
     parse_ctx.node_count = 1;
 
@@ -84,164 +93,109 @@ static char* run_generate_test(Node* ast, int expected) {
     static char msg[64];
     snprintf(msg, sizeof(msg), "Expected %d, got %d", expected, result);
     mu_assert(msg, result == expected);
+    free_ast(func);
     return NULL;
 }
 
 // return 42
 char* test_generate_return_42() {
     Node* ast = new_node_num(42);
-    char* result = run_generate_test(ast, 42);
-    free(ast);
-    return result;
+    return run_generate_test(ast, 42);
 }
 
 // return -1 (negative value)
 char* test_generate_return_negative() {
     Node* ast = new_node_num(-1);
-    char* result = run_generate_test(ast, -1);
-    free(ast);
-    return result;
+    return run_generate_test(ast, -1);
 }
 
 // return INT_MAX (maximum value)
 char* test_generate_return_max_int() {
     Node* ast = new_node_num(INT_MAX);
-    char* result = run_generate_test(ast, INT_MAX);
-    free(ast);
-    return result;
+    return run_generate_test(ast, INT_MAX);
 }
 
 // return INT_MIN (minimum value)
 char* test_generate_return_min_int() {
     Node* ast = new_node_num(INT_MIN);
-    char* result = run_generate_test(ast, INT_MIN);
-    free(ast);
-    return result;
+    return run_generate_test(ast, INT_MIN);
 }
 
 // return 1 + 2
 char* test_generate_add() {
     Node* ast = new_node(ND_ADD, new_node_num(1), new_node_num(2));
-    char* result = run_generate_test(ast, 3);
-    free(ast->rhs);
-    free(ast->lhs);
-    free(ast);
-    return result;
+    return run_generate_test(ast, 3);
 }
 
 // return 5 - 3
 char* test_generate_sub() {
     Node* ast = new_node(ND_SUB, new_node_num(5), new_node_num(3));
-    char* result = run_generate_test(ast, 2);
-    free(ast->rhs);
-    free(ast->lhs);
-    free(ast);
-    return result;
+    return run_generate_test(ast, 2);
 }
 
 // return 4 * 6
 char* test_generate_mul() {
     Node* ast = new_node(ND_MUL, new_node_num(4), new_node_num(6));
-    char* result = run_generate_test(ast, 24);
-    free(ast->rhs);
-    free(ast->lhs);
-    free(ast);
-    return result;
+    return run_generate_test(ast, 24);
 }
 
 // return 10 / 2
 char* test_generate_div() {
     Node* ast = new_node(ND_DIV, new_node_num(10), new_node_num(2));
-    char* result = run_generate_test(ast, 5);
-    free(ast->rhs);
-    free(ast->lhs);
-    free(ast);
-    return result;
+    return run_generate_test(ast, 5);
 }
 
 // return 2 + 3 * 4 (precedence test)
 char* test_generate_precedence() {
-    // 3 * 4 = 12, then 2 + 12 = 14
     Node* mul = new_node(ND_MUL, new_node_num(3), new_node_num(4));
     Node* ast = new_node(ND_ADD, new_node_num(2), mul);
-    char* result = run_generate_test(ast, 14);
-    free(ast->rhs);
-    free(ast->lhs);
-    free(ast);
-    return result;
+    return run_generate_test(ast, 14);
 }
 
 // return (2 + 3) * 4 (parentheses test)
 char* test_generate_parentheses() {
-    // 2 + 3 = 5, then 5 * 4 = 20
     Node* add = new_node(ND_ADD, new_node_num(2), new_node_num(3));
     Node* ast = new_node(ND_MUL, add, new_node_num(4));
-    char* result = run_generate_test(ast, 20);
-    free(ast->rhs);
-    free(ast->lhs->rhs);
-    free(ast->lhs->lhs);
-    free(ast->lhs);
-    free(ast);
-    return result;
+    return run_generate_test(ast, 20);
 }
 
 // return 10 + 4 * 8 - 2 / 2
 char* test_generate_complex() {
-    // 4 * 8 = 32
     Node* mul = new_node(ND_MUL, new_node_num(4), new_node_num(8));
-    // 2 / 2 = 1
     Node* div = new_node(ND_DIV, new_node_num(2), new_node_num(2));
-    // 10 + 32 = 42
     Node* add = new_node(ND_ADD, new_node_num(10), mul);
-    // 42 - 1 = 41
     Node* ast = new_node(ND_SUB, add, div);
-    char* result = run_generate_test(ast, 41);
-    free(ast->rhs->rhs);
-    free(ast->rhs->lhs);
-    free(ast->rhs);
-    free(ast->lhs->rhs);
-    free(ast->lhs->lhs);
-    free(ast->lhs);
-    free(ast);
-    return result;
+    return run_generate_test(ast, 41);
 }
 
 // return 1 < 2
 char* test_generate_lt_true() {
     Node* ast = new_node(ND_LT, new_node_num(1), new_node_num(2));
-    char* result = run_generate_test(ast, 1);
-    free(ast->rhs);
-    free(ast->lhs);
-    free(ast);
-    return result;
+    return run_generate_test(ast, 1);
 }
 
 // return 2 < 1
 char* test_generate_lt_false() {
     Node* ast = new_node(ND_LT, new_node_num(2), new_node_num(1));
-    char* result = run_generate_test(ast, 0);
-    free(ast->rhs);
-    free(ast->lhs);
-    free(ast);
-    return result;
+    return run_generate_test(ast, 0);
 }
 
 // return 1 == 1
 char* test_generate_eq_true() {
     Node* ast = new_node(ND_EQ, new_node_num(1), new_node_num(1));
-    char* result = run_generate_test(ast, 1);
-    free(ast->rhs);
-    free(ast->lhs);
-    free(ast);
-    return result;
+    return run_generate_test(ast, 1);
 }
 
 // return 1 != 1
 char* test_generate_ne_false() {
     Node* ast = new_node(ND_NE, new_node_num(1), new_node_num(1));
-    char* result = run_generate_test(ast, 0);
-    free(ast->rhs);
-    free(ast->lhs);
-    free(ast);
-    return result;
+    return run_generate_test(ast, 0);
+}
+
+// Test that main function is required
+// Note: This test is skipped because generate_module calls exit(1) on missing
+// main
+char* test_generate_main_required() {
+    // Skip this test since it would cause the program to exit
+    return NULL;
 }

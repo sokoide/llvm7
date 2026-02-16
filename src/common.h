@@ -22,25 +22,26 @@ struct Token {
 };
 
 typedef enum {
-    ND_ADD,    // +
-    ND_SUB,    // -
-    ND_MUL,    // *
-    ND_DIV,    // /
-    ND_LT,     // <
-    ND_LE,     // <=
-    ND_EQ,     // ==
-    ND_NE,     // !=
-    ND_GE,     // >=
-    ND_GT,     // >
-    ND_ASSIGN, // = (assignment)
-    ND_LVAR,   // local var
-    ND_NUM,    // Integer
-    ND_RETURN, // return
-    ND_IF,     // if
-    ND_WHILE,  // while
-    ND_FOR,    // for
-    ND_BLOCK,  // block
-    ND_CALL,   // call
+    ND_ADD,      // +
+    ND_SUB,      // -
+    ND_MUL,      // *
+    ND_DIV,      // /
+    ND_LT,       // <
+    ND_LE,       // <=
+    ND_EQ,       // ==
+    ND_NE,       // !=
+    ND_GE,       // >=
+    ND_GT,       // >
+    ND_ASSIGN,   // = (assignment)
+    ND_LVAR,     // local var
+    ND_NUM,      // Integer
+    ND_RETURN,   // return
+    ND_IF,       // if
+    ND_WHILE,    // while
+    ND_FOR,      // for
+    ND_BLOCK,    // block
+    ND_CALL,     // call
+    ND_FUNCTION, // function definition
 } NodeKind;
 
 typedef struct Node Node;
