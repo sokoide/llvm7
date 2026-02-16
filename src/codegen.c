@@ -181,13 +181,9 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         return LLVMBuildZExt(builder, res, LLVMInt32Type(), "zexttmp");
     }
     case ND_CALL: {
-        Token* tok = (Token*)node->lhs;
-        if (!tok) {
-            return LLVMConstInt(LLVMInt32Type(), 0, 0);
-        }
         char func_name[64];
-        int len = tok->len < 63 ? tok->len : 63;
-        strncpy(func_name, tok->str, len);
+        int len = node->tok->len < 63 ? node->tok->len : 63;
+        strncpy(func_name, node->tok->str, len);
         func_name[len] = '\0';
 
         LLVMValueRef func = LLVMGetNamedFunction(module, func_name);

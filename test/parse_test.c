@@ -735,7 +735,7 @@ char* test_stmt_call() {
     Node* node = stmt(&ctx);
 
     mu_assert("Node kind should be ND_CALL", node->kind == ND_CALL);
-    mu_assert("LHS should not be NULL", node->lhs != NULL);
+    mu_assert("tok should not be NULL", node->tok != NULL);
     free_ast(node);
     free_tokens(ctx.current_token);
     return NULL;

@@ -208,11 +208,19 @@ Node* primary(Context* ctx) {
 
     // function call or ident
     Token* tok = consume_ident(ctx);
+
     if (tok) {
         if (consume(ctx, "(")) {
+            Node* node_args = NULL;
+            if (!consume(ctx, ")")) {
+                // args
+                node_args = args(ctx);
+                expect(ctx, ")");
+            }
             // function call
-            expect(ctx, ")");
-            return new_node(ND_CALL, tok, NULL);
+            Node* node_func = new_node(ND_CALL, node_args, NULL);
+            node_func->tok = tok;
+            return node_func;
         }
         // ident
         return new_node_ident(ctx, tok);
@@ -220,4 +228,14 @@ Node* primary(Context* ctx) {
 
     // number
     return new_node_num(expect_number(ctx));
+}
+
+Node* args(Context* ctx) {
+    Node* node = expr(ctx);
+    Node* head = node;
+    while (consume(ctx, ",")) {
+        node->next = expr(ctx);
+        node = node->next;
+    }
+    return head;
 }

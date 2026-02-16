@@ -18,8 +18,9 @@
 // mul)* mul =        unary("*" unary | "/" unary)*
 // unary =      ("+" | "-") ? primary
 // primary = num
-//         | ident ("(" ")")?
+//         | ident ("(" args? ")")?
 //         | "(" expr ")"
+// args = expr ("," expr)*
 
 extern Node* new_node(NodeKind kind, Node* lhs, Node* rhs);
 extern Node* new_node_num(int val);
@@ -35,5 +36,6 @@ extern Node* add(Context* ctx);
 extern Node* mul(Context* ctx);
 extern Node* unary(Context* ctx);
 extern Node* primary(Context* ctx);
+extern Node* args(Context* ctx);
 
 #endif

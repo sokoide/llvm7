@@ -51,6 +51,7 @@ struct Node {
     Node* rhs;  // General right operand, or else branch for if, or inc for for
     Node* cond; // Condition for if/while/for
     Node* init; // Initialization for for loop
+    Token* tok; // Function name or token for the node
     int val;
 };
 
