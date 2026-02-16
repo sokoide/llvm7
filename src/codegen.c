@@ -46,9 +46,25 @@ LLVMModuleRef generate_module(Context* ctx) {
             has_main = true;
         }
 
-        // Create function type
+        // Count parameters
+        int param_count = 0;
+        Node* param = func_node->rhs;
+        while (param != NULL) {
+            param_count++;
+            param = param->next;
+        }
+
+        // Create function type with parameters
         LLVMTypeRef ret_type = LLVMInt32Type();
-        LLVMTypeRef func_type = LLVMFunctionType(ret_type, NULL, 0, 0);
+        LLVMTypeRef* param_types = NULL;
+        if (param_count > 0) {
+            param_types = malloc(param_count * sizeof(LLVMTypeRef));
+            for (int i = 0; i < param_count; i++) {
+                param_types[i] = LLVMInt32Type();
+            }
+        }
+        LLVMTypeRef func_type =
+            LLVMFunctionType(ret_type, param_types, param_count, 0);
         LLVMValueRef func = LLVMAddFunction(module, func_name, func_type);
 
         // Create entry block
@@ -60,6 +76,24 @@ LLVMModuleRef generate_module(Context* ctx) {
         LLVMTypeRef array_type = LLVMArrayType(i32_type, 26);
         LLVMValueRef local_vars =
             LLVMBuildAlloca(builder, array_type, "local_vars");
+
+        // Store parameter values into local variables
+        param = func_node->rhs;
+        for (int i = 0; i < param_count; i++) {
+            LLVMValueRef arg = LLVMGetParam(func, i);
+            LLVMValueRef index =
+                LLVMConstInt(LLVMInt32Type(), param->val, false);
+            LLVMValueRef indices[] = {LLVMConstInt(LLVMInt32Type(), 0, false),
+                                      index};
+            LLVMValueRef gep = LLVMBuildInBoundsGEP2(
+                builder, array_type, local_vars, indices, 2, "arrayidx");
+            LLVMBuildStore(builder, arg, gep);
+            param = param->next;
+        }
+
+        if (param_types) {
+            free(param_types);
+        }
 
         // Generate function body statements
         LLVMValueRef res = LLVMConstInt(LLVMInt32Type(), 0, 0);

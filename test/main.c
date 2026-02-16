@@ -81,6 +81,9 @@ static char* run_all_tests() {
     mu_run_test(test_program_multiple_functions,
                 "parse: program multiple functions");
     mu_run_test(test_function_with_block, "parse: function with block");
+    mu_run_test(test_function_with_params, "parse: function with params");
+    mu_run_test(test_function_with_single_param,
+                "parse: function with single param");
     return NULL;
 }
 

@@ -51,7 +51,30 @@ void free_ast(Node* ast) {
     free(ast);
 }
 
-// function = ident "(" ")" "{" stmt* "}"
+// params = ident ("," ident)*
+Node* params(Context* ctx) {
+    Token* tok = consume_ident(ctx);
+    if (!tok) {
+        return NULL;
+    }
+
+    Node* head = new_node_ident(ctx, tok);
+    Node* tail = head;
+
+    while (consume(ctx, ",")) {
+        tok = consume_ident(ctx);
+        if (!tok) {
+            fprintf(stderr, "Expected parameter name\n");
+            exit(1);
+        }
+        tail->next = new_node_ident(ctx, tok);
+        tail = tail->next;
+    }
+
+    return head;
+}
+
+// function = ident "(" params? ")" "{" stmt* "}"
 Node* function(Context* ctx) {
     Token* tok = consume_ident(ctx);
     if (!tok) {
@@ -60,12 +83,20 @@ Node* function(Context* ctx) {
     }
 
     expect(ctx, "(");
-    expect(ctx, ")");
+
+    // Parse parameters
+    Node* func_params = NULL;
+    if (!consume(ctx, ")")) {
+        func_params = params(ctx);
+        expect(ctx, ")");
+    }
+
     expect(ctx, "{");
 
     // Create function node
     Node* node = new_node(ND_FUNCTION, NULL, NULL);
     node->tok = tok;
+    node->rhs = func_params; // Store parameters in rhs
 
     // Parse function body (statements)
     Node* head = NULL;

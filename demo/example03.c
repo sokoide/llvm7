@@ -1,7 +1,6 @@
-foo() { return 42; }
+foo(a, b) { return a + b; }
 
 main() {
-    foo(40, 2);
-    a = 3;
+    a = foo(40, 2);
     return a;
 }

@@ -4,7 +4,8 @@
 #include "common.h"
 
 // program = function*
-// function = ident "(" ")" "{" stmt* "}"
+// function = ident "(" params? ")" "{" stmt* "}"
+// params = ident ("," ident)*
 // stmt = expr ";"
 //      | "{" stmt* "}"
 //      | "return" expr ";"
@@ -39,5 +40,6 @@ extern Node* unary(Context* ctx);
 extern Node* primary(Context* ctx);
 extern Node* args(Context* ctx);
 extern Node* function(Context* ctx);
+extern Node* params(Context* ctx);
 
 #endif

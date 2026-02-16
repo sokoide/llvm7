@@ -58,5 +58,7 @@ char* test_function_multiple_stmts();
 char* test_program_single_function();
 char* test_program_multiple_functions();
 char* test_function_with_block();
+char* test_function_with_params();
+char* test_function_with_single_param();
 
 #endif

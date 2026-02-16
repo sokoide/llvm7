@@ -857,3 +857,43 @@ char* test_function_with_block() {
     free_tokens(ctx.current_token);
     return NULL;
 }
+
+char* test_function_with_params() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("foo(a, b) { return a + b; }");
+
+    Node* node = function(&ctx);
+
+    mu_assert("Node kind should be ND_FUNCTION", node->kind == ND_FUNCTION);
+    mu_assert("Function name should be 'foo'",
+              node->tok->len == 3 && strncmp(node->tok->str, "foo", 3) == 0);
+    mu_assert("Params should not be NULL", node->rhs != NULL);
+    mu_assert("First param kind should be ND_LVAR", node->rhs->kind == ND_LVAR);
+    mu_assert("First param offset should be 0", node->rhs->val == 0);
+    mu_assert("Second param should exist", node->rhs->next != NULL);
+    mu_assert("Second param kind should be ND_LVAR",
+              node->rhs->next->kind == ND_LVAR);
+    mu_assert("Second param offset should be 1", node->rhs->next->val == 1);
+    mu_assert("Body should not be NULL", node->lhs != NULL);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
+char* test_function_with_single_param() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("bar(x) { return x; }");
+
+    Node* node = function(&ctx);
+
+    mu_assert("Node kind should be ND_FUNCTION", node->kind == ND_FUNCTION);
+    mu_assert("Function name should be 'bar'",
+              node->tok->len == 3 && strncmp(node->tok->str, "bar", 3) == 0);
+    mu_assert("Params should not be NULL", node->rhs != NULL);
+    mu_assert("Param kind should be ND_LVAR", node->rhs->kind == ND_LVAR);
+    mu_assert("Param offset should be 0", node->rhs->val == 0);
+    mu_assert("No second param", node->rhs->next == NULL);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
