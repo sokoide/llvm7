@@ -186,16 +186,53 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         strncpy(func_name, node->tok->str, len);
         func_name[len] = '\0';
 
+        // Count arguments and generate code for each
+        int arg_count = 0;
+        Node* arg = node->lhs;
+        while (arg != NULL) {
+            arg_count++;
+            arg = arg->next;
+        }
+
+        // Generate argument values
+        LLVMValueRef* args = NULL;
+        if (arg_count > 0) {
+            args = malloc(arg_count * sizeof(LLVMValueRef));
+            arg = node->lhs;
+            for (int i = 0; i < arg_count; i++) {
+                args[i] = codegen(arg, builder, local_vars, array_type,
+                                  has_return, module);
+                arg = arg->next;
+            }
+        }
+
         LLVMValueRef func = LLVMGetNamedFunction(module, func_name);
         LLVMTypeRef func_type;
         if (!func) {
             LLVMTypeRef i32_type = LLVMInt32Type();
-            func_type = LLVMFunctionType(i32_type, NULL, 0, 0);
+            // Create parameter types array
+            LLVMTypeRef* param_types = NULL;
+            if (arg_count > 0) {
+                param_types = malloc(arg_count * sizeof(LLVMTypeRef));
+                for (int i = 0; i < arg_count; i++) {
+                    param_types[i] = i32_type;
+                }
+            }
+            func_type = LLVMFunctionType(i32_type, param_types, arg_count, 0);
             func = LLVMAddFunction(module, func_name, func_type);
+            if (param_types) {
+                free(param_types);
+            }
         } else {
             func_type = LLVMGlobalGetValueType(func);
         }
-        return LLVMBuildCall2(builder, func_type, func, NULL, 0, "calltmp");
+
+        LLVMValueRef result = LLVMBuildCall2(builder, func_type, func, args,
+                                             arg_count, "calltmp");
+        if (args) {
+            free(args);
+        }
+        return result;
     }
     case ND_RETURN: {
         LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type,

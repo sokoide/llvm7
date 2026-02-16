@@ -49,6 +49,7 @@ char* test_stmt_while_complex_cond();
 char* test_stmt_for();
 char* test_stmt_for_no_init();
 char* test_stmt_call();
+char* test_stmt_call_with_args();
 char* test_program_single_stmt();
 char* test_program_multiple_stmts();
 char* test_program_assign_stmts();

@@ -70,6 +70,7 @@ static char* run_all_tests() {
     mu_run_test(test_stmt_for, "parse: stmt for");
     mu_run_test(test_stmt_for_no_init, "parse: stmt for no init");
     mu_run_test(test_stmt_call, "parse: stmt call");
+    mu_run_test(test_stmt_call_with_args, "parse: stmt call with args");
     mu_run_test(test_program_single_stmt, "parse: program single stmt");
     mu_run_test(test_program_multiple_stmts, "parse: program multiple stmts");
     mu_run_test(test_program_assign_stmts, "parse: program assign stmts");

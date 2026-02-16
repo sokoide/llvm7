@@ -736,6 +736,26 @@ char* test_stmt_call() {
 
     mu_assert("Node kind should be ND_CALL", node->kind == ND_CALL);
     mu_assert("tok should not be NULL", node->tok != NULL);
+    mu_assert("LHS (args) should be NULL", node->lhs == NULL);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
+char* test_stmt_call_with_args() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("foo(40, 2);");
+
+    Node* node = stmt(&ctx);
+
+    mu_assert("Node kind should be ND_CALL", node->kind == ND_CALL);
+    mu_assert("tok should not be NULL", node->tok != NULL);
+    mu_assert("LHS (args) should not be NULL", node->lhs != NULL);
+    mu_assert("First arg should be ND_NUM", node->lhs->kind == ND_NUM);
+    mu_assert("First arg value should be 40", node->lhs->val == 40);
+    mu_assert("Second arg should exist", node->lhs->next != NULL);
+    mu_assert("Second arg should be ND_NUM", node->lhs->next->kind == ND_NUM);
+    mu_assert("Second arg value should be 2", node->lhs->next->val == 2);
     free_ast(node);
     free_tokens(ctx.current_token);
     return NULL;
