@@ -40,7 +40,10 @@ Node* new_node_ident(Context* ctx, Token* tok) {
 void free_ast(Node* ast) {
     if (ast == NULL)
         return;
-    free_ast(ast->lhs);
+    // Don't free ast->lhs for ND_CALL (it's a Token*, not a Node*)
+    if (ast->kind != ND_CALL) {
+        free_ast(ast->lhs);
+    }
     free_ast(ast->rhs);
     free_ast(ast->next);
     free_ast(ast->cond);
@@ -203,9 +206,15 @@ Node* primary(Context* ctx) {
         return node;
     }
 
-    // ident
+    // function call or ident
     Token* tok = consume_ident(ctx);
     if (tok) {
+        if (consume(ctx, "(")) {
+            // function call
+            expect(ctx, ")");
+            return new_node(ND_CALL, tok, NULL);
+        }
+        // ident
         return new_node_ident(ctx, tok);
     }
 

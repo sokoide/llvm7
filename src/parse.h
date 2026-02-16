@@ -17,7 +17,9 @@
 // ">" add | ">=" add)* add =        mul ("+" mul | "-"
 // mul)* mul =        unary("*" unary | "/" unary)*
 // unary =      ("+" | "-") ? primary
-// primary =    num | ident | "(" expr ")"
+// primary = num
+//         | ident ("(" ")")?
+//         | "(" expr ")"
 
 extern Node* new_node(NodeKind kind, Node* lhs, Node* rhs);
 extern Node* new_node_num(int val);

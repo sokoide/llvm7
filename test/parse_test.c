@@ -727,3 +727,16 @@ char* test_program_assign_stmts() {
     free_tokens(ctx.current_token);
     return NULL;
 }
+
+char* test_stmt_call() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("foo();");
+
+    Node* node = stmt(&ctx);
+
+    mu_assert("Node kind should be ND_CALL", node->kind == ND_CALL);
+    mu_assert("LHS should not be NULL", node->lhs != NULL);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}

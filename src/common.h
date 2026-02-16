@@ -40,6 +40,7 @@ typedef enum {
     ND_WHILE,  // while
     ND_FOR,    // for
     ND_BLOCK,  // block
+    ND_CALL,   // call
 } NodeKind;
 
 typedef struct Node Node;
