@@ -42,6 +42,8 @@ typedef enum {
     ND_BLOCK,    // block
     ND_CALL,     // call
     ND_FUNCTION, // function definition
+    ND_DEREF,    // * (pointer dereference)
+    ND_ADDR,     // & (address-of)
 } NodeKind;
 
 typedef struct Node Node;

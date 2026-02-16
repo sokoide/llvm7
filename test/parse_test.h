@@ -60,5 +60,9 @@ char* test_program_multiple_functions();
 char* test_function_with_block();
 char* test_function_with_params();
 char* test_function_with_single_param();
+char* test_unary_deref();
+char* test_unary_addr();
+char* test_unary_deref_complex();
+char* test_expr_with_deref();
 
 #endif

@@ -156,15 +156,27 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
     case ND_ASSIGN: {
         LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type,
                                    has_return, module);
-        LLVMValueRef index =
-            LLVMConstInt(LLVMInt32Type(), node->lhs->val, false);
 
-        LLVMValueRef indices[] = {LLVMConstInt(LLVMInt32Type(), 0, false),
-                                  index};
-        LLVMValueRef gep = LLVMBuildInBoundsGEP2(
-            builder, array_type, local_vars, indices, 2, "arrayidx");
-
-        LLVMBuildStore(builder, rhs, gep);
+        if (node->lhs->kind == ND_DEREF) {
+            // *ptr = value - store through pointer (using variable index)
+            LLVMValueRef addr_int = codegen(node->lhs->lhs, builder, local_vars,
+                                            array_type, has_return, module);
+            // The "address" is actually a variable index
+            LLVMValueRef indices[] = {LLVMConstInt(LLVMInt32Type(), 0, false),
+                                      addr_int};
+            LLVMValueRef gep = LLVMBuildInBoundsGEP2(
+                builder, array_type, local_vars, indices, 2, "derefgep");
+            LLVMBuildStore(builder, rhs, gep);
+        } else {
+            // Regular variable assignment
+            LLVMValueRef index =
+                LLVMConstInt(LLVMInt32Type(), node->lhs->val, false);
+            LLVMValueRef indices[] = {LLVMConstInt(LLVMInt32Type(), 0, false),
+                                      index};
+            LLVMValueRef gep = LLVMBuildInBoundsGEP2(
+                builder, array_type, local_vars, indices, 2, "arrayidx");
+            LLVMBuildStore(builder, rhs, gep);
+        }
         return rhs; // assignment returns the assigned value
     }
     case ND_ADD: {
@@ -468,6 +480,28 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
             stmt = stmt->next;
         }
         return result;
+    }
+    case ND_DEREF: {
+        // *expr - load from address (where address is stored as variable index)
+        LLVMValueRef addr_int = codegen(node->lhs, builder, local_vars,
+                                        array_type, has_return, module);
+        // The "address" is actually a variable index, use it to get the actual
+        // address
+        LLVMValueRef index = addr_int;
+        LLVMValueRef indices[] = {LLVMConstInt(LLVMInt32Type(), 0, false),
+                                  index};
+        LLVMValueRef gep = LLVMBuildInBoundsGEP2(
+            builder, array_type, local_vars, indices, 2, "derefgep");
+        return LLVMBuildLoad2(builder, LLVMInt32Type(), gep, "deref");
+    }
+    case ND_ADDR: {
+        // &expr - get address of local variable (store as variable index)
+        if (node->lhs->kind == ND_LVAR) {
+            // Return the variable index as the "address"
+            return LLVMConstInt(LLVMInt32Type(), node->lhs->val, false);
+        }
+        // For non-LVAR, return 0 for now
+        return LLVMConstInt(LLVMInt32Type(), 0, 0);
     }
     default:
         return LLVMConstInt(LLVMInt32Type(), 0, 0);

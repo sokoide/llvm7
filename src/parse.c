@@ -258,6 +258,10 @@ Node* unary(Context* ctx) {
         return primary(ctx);
     } else if (consume(ctx, "-")) {
         return new_node(ND_SUB, new_node_num(0), primary(ctx));
+    } else if (consume(ctx, "*")) {
+        return new_node(ND_DEREF, unary(ctx), NULL);
+    } else if (consume(ctx, "&")) {
+        return new_node(ND_ADDR, unary(ctx), NULL);
     } else {
         return primary(ctx);
     }

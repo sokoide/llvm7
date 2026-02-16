@@ -897,3 +897,59 @@ char* test_function_with_single_param() {
     free_tokens(ctx.current_token);
     return NULL;
 }
+
+char* test_unary_deref() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("*p");
+
+    Node* node = unary(&ctx);
+
+    mu_assert("Node kind should be ND_DEREF", node->kind == ND_DEREF);
+    mu_assert("Operand should be ND_LVAR", node->lhs->kind == ND_LVAR);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
+char* test_unary_addr() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("&x");
+
+    Node* node = unary(&ctx);
+
+    mu_assert("Node kind should be ND_ADDR", node->kind == ND_ADDR);
+    mu_assert("Operand should be ND_LVAR", node->lhs->kind == ND_LVAR);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
+char* test_unary_deref_complex() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("**p");
+
+    Node* node = unary(&ctx);
+
+    mu_assert("Node kind should be ND_DEREF", node->kind == ND_DEREF);
+    mu_assert("Operand should be ND_DEREF", node->lhs->kind == ND_DEREF);
+    mu_assert("Inner operand should be ND_LVAR",
+              node->lhs->lhs->kind == ND_LVAR);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}
+
+char* test_expr_with_deref() {
+    Context ctx = {0};
+    ctx.current_token = tokenize("*p + 1");
+
+    Node* node = expr(&ctx);
+
+    mu_assert("Root kind should be ND_ADD", node->kind == ND_ADD);
+    mu_assert("Left should be ND_DEREF", node->lhs->kind == ND_DEREF);
+    mu_assert("Right should be ND_NUM", node->rhs->kind == ND_NUM);
+    mu_assert("Right value should be 1", node->rhs->val == 1);
+    free_ast(node);
+    free_tokens(ctx.current_token);
+    return NULL;
+}

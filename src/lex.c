@@ -81,7 +81,7 @@ Token* tokenize(const char* p) {
         }
 
         // Check for single-character operators and delimiters
-        char* single_char_ops = "+-*/()<>;={},";
+        char* single_char_ops = "+-*/()<>;={},&";
         if (strchr(single_char_ops, *p)) {
             cur = new_token(TK_RESERVED, cur, p++, 1);
             continue;

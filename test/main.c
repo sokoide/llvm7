@@ -84,6 +84,10 @@ static char* run_all_tests() {
     mu_run_test(test_function_with_params, "parse: function with params");
     mu_run_test(test_function_with_single_param,
                 "parse: function with single param");
+    mu_run_test(test_unary_deref, "parse: unary deref");
+    mu_run_test(test_unary_addr, "parse: unary addr");
+    mu_run_test(test_unary_deref_complex, "parse: unary deref complex");
+    mu_run_test(test_expr_with_deref, "parse: expr with deref");
     return NULL;
 }
 
