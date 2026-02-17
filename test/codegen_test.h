@@ -38,5 +38,14 @@ char* test_generate_struct_simple();
 char* test_generate_struct_assign();
 char* test_generate_char_simple();
 char* test_generate_comments();
+char* test_generate_sizeof_types();
+char* test_generate_logic();
+char* test_generate_char_literal();
+char* test_generate_arrow();
+char* test_generate_typedef();
+char* test_generate_enum();
+char* test_generate_builtin_const();
+char* test_generate_switch();
+char* test_generate_inc_dec();
 
 #endif

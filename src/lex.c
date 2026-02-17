@@ -39,9 +39,14 @@ Token* tokenize(const char* p) {
     struct {
         char* str;
         int len;
-    } keywords[] = {{"return", 6}, {"if", 2},    {"else", 4}, {"while", 5},
-                    {"for", 3},    {"int", 3},   {"char", 4}, {"void", 4},
-                    {"sizeof", 6}, {"struct", 6}};
+    } keywords[] = {
+        {"return", 6}, {"if", 2},     {"else", 4},    {"while", 5},
+        {"for", 3},    {"int", 3},    {"char", 4},    {"void", 4},
+        {"sizeof", 6}, {"struct", 6}, {"typedef", 7}, {"enum", 4},
+        {"static", 6}, {"extern", 6}, {"const", 5},   {"long", 4},
+        {"bool", 4},   {"size_t", 6}, {"NULL", 4},    {"true", 4},
+        {"false", 5},  {"switch", 6}, {"case", 4},    {"default", 7},
+        {"break", 5}};
 
     // Iterate through the input string until null terminator
     while (*p) {
@@ -86,7 +91,8 @@ Token* tokenize(const char* p) {
 
         // Check for two-character operators
         bool two_char_matched = false;
-        char* two_char_ops[] = {"==", "!=", "<=", ">="};
+        char* two_char_ops[] = {"==", "!=", "<=", ">=", "&&",
+                                "||", "->", "++", "--"};
         for (size_t i = 0; i < sizeof(two_char_ops) / sizeof(two_char_ops[0]);
              i++) {
             if (strncmp(p, two_char_ops[i], 2) == 0) {
@@ -101,7 +107,7 @@ Token* tokenize(const char* p) {
         }
 
         // Check for single-character operators and delimiters
-        char* single_char_ops = "+-*/()<>;={},&[].";
+        char* single_char_ops = "+-*/()<>;={},&[].!:";
         if (strchr(single_char_ops, *p)) {
             cur = new_token(TK_RESERVED, cur, p++, 1);
             continue;
@@ -124,6 +130,37 @@ Token* tokenize(const char* p) {
             continue;
         }
 
+        // Character literal
+        if (*p == '\'') {
+            p++; // skip '
+            int val;
+            if (*p == '\\') {
+                p++;
+                if (*p == 'n')
+                    val = '\n';
+                else if (*p == 'r')
+                    val = '\r';
+                else if (*p == 't')
+                    val = '\t';
+                else if (*p == '0')
+                    val = '\0';
+                else
+                    val = *p;
+                p++;
+            } else {
+                val = *p++;
+            }
+
+            if (*p != '\'') {
+                fprintf(stderr, "lex error: unterminated character literal\n");
+                return NULL;
+            }
+            p++; // skip closing '
+            cur = new_token(TK_NUM, cur, p, 0);
+            cur->val = val;
+            continue;
+        }
+
         // Number
         if (isdigit(*p)) {
             const char* start = p;
@@ -135,7 +172,7 @@ Token* tokenize(const char* p) {
         }
 
         // Identifier
-        if ('a' <= *p && *p <= 'z') {
+        if (('a' <= *p && *p <= 'z') || ('A' <= *p && *p <= 'Z') || *p == '_') {
             const char* start = p;
             while (('a' <= *p && *p <= 'z') || ('A' <= *p && *p <= 'Z') ||
                    ('0' <= *p && *p <= '9') || *p == '_') {

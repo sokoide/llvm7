@@ -46,6 +46,15 @@ static char* run_all_tests() {
     mu_run_test(test_generate_struct_assign, "codegen: struct assign");
     mu_run_test(test_generate_char_simple, "codegen: char simple");
     mu_run_test(test_generate_comments, "codegen: comments");
+    mu_run_test(test_generate_sizeof_types, "codegen: sizeof types");
+    mu_run_test(test_generate_logic, "codegen: logic");
+    mu_run_test(test_generate_char_literal, "codegen: char literal");
+    mu_run_test(test_generate_arrow, "codegen: arrow operator");
+    mu_run_test(test_generate_typedef, "codegen: typedef");
+    mu_run_test(test_generate_enum, "codegen: enum");
+    mu_run_test(test_generate_builtin_const, "codegen: builtin constants");
+    mu_run_test(test_generate_switch, "codegen: switch");
+    mu_run_test(test_generate_inc_dec, "codegen: inc dec");
     mu_run_test(test_lex_tokenize, "lex: tokenize");
 
     mu_run_test(test_consume_operator, "lex: consume operator");
