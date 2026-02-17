@@ -29,6 +29,9 @@ static char* run_all_tests() {
     mu_run_test(test_generate_sizeof, "codegen: sizeof");
     mu_run_test(test_generate_sizeof_expr, "codegen: sizeof expr");
     mu_run_test(test_generate_array, "codegen: array");
+    mu_run_test(test_generate_array_subscript, "codegen: array subscript");
+    mu_run_test(test_generate_array_subscript_reversed,
+                "codegen: array subscript reversed");
     mu_run_test(test_lex_tokenize, "lex: tokenize");
     mu_run_test(test_consume_operator, "lex: consume operator");
     mu_run_test(test_expect_operator, "lex: expect operator");

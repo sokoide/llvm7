@@ -24,5 +24,7 @@ char* test_generate_pointer_arithmetic_sub();
 char* test_generate_sizeof();
 char* test_generate_sizeof_expr();
 char* test_generate_array();
+char* test_generate_array_subscript();
+char* test_generate_array_subscript_reversed();
 
 #endif

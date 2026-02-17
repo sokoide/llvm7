@@ -512,11 +512,71 @@ Node* parse_primary(Context* ctx) {
             node_func->type = new_type_int();
             return node_func;
         }
-        // ident
-        return new_node_ident(ctx, tok);
+        // ident or array subscript
+        Node* ident_node = new_node_ident(ctx, tok);
+
+        // Check for array subscript: ident[expr]
+        if (consume(ctx, "[")) {
+            // x[y] -> *(x+y)
+            Node* index = parse_expr(ctx);
+            expect(ctx, "]");
+
+            // For arrays, ident_node is the array variable.
+            // We need to get its address, then add the index.
+            // convert_array_to_ptr handles this by wrapping in ND_ADDR
+            Node* base = convert_array_to_ptr(ident_node);
+
+            // Create addition node (base+index)
+            Node* add_node = new_node(ND_ADD, base, index);
+            // Type inference for pointer addition
+            if (base->type && base->type->ty == PTR) {
+                add_node->type = base->type;
+            } else if (index->type && index->type->ty == PTR) {
+                add_node->type = index->type;
+            } else {
+                add_node->type = new_type_int();
+            }
+            // Create dereference node *(...)
+            Node* deref_node = new_node(ND_DEREF, add_node, NULL);
+            if (add_node->type && add_node->type->ty == PTR) {
+                deref_node->type = add_node->type->ptr_to;
+            } else {
+                deref_node->type = new_type_int();
+            }
+            return deref_node;
+        }
+        return ident_node;
     }
 
-    // number
+    // Check for number followed by subscript (e.g., 0[a])
+    if (ctx->current_token->kind == TK_NUM) {
+        Node* num_node = new_node_num(expect_number(ctx));
+        // Check for [ after number
+        if (consume(ctx, "[")) {
+            // 0[y] -> *(0+y)
+            Node* index = parse_expr(ctx);
+            expect(ctx, "]");
+            // Create addition node (0+index)
+            Node* add_node = new_node(ND_ADD, num_node, index);
+            // Type inference
+            if (index->type && index->type->ty == PTR) {
+                add_node->type = index->type;
+            } else {
+                add_node->type = new_type_int();
+            }
+            // Create dereference node *(...)
+            Node* deref_node = new_node(ND_DEREF, add_node, NULL);
+            if (add_node->type && add_node->type->ty == PTR) {
+                deref_node->type = add_node->type->ptr_to;
+            } else {
+                deref_node->type = new_type_int();
+            }
+            return deref_node;
+        }
+        return num_node;
+    }
+
+    // number (without subscript)
     return new_node_num(expect_number(ctx));
 }
 

@@ -391,3 +391,58 @@ char* test_generate_array() {
     mu_assert(msg, result == 3);
     return NULL;
 }
+
+char* test_generate_array_subscript() {
+    Context ctx = {0};
+    // int a[3]; a[0] = 10; a[1] = 20; a[2] = 30; return a[0] + a[1] + a[2];
+    // 10 + 20 + 30 = 60
+    Token* head =
+        tokenize("int main() { int a[3]; a[0] = 10; a[1] = 20; a[2] = 30; "
+                 "return a[0] + a[1] + a[2]; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+
+    static char msg[64];
+    snprintf(msg, sizeof(msg), "Expected 60, got %d", result);
+    mu_assert(msg, result == 60);
+    return NULL;
+}
+
+char* test_generate_array_subscript_reversed() {
+    Context ctx = {0};
+    // int a[2]; a[0] = 5; a[1] = 7; return 0[a] + 1[a]; // 5 + 7 = 12
+    // Note: 0[a] is equivalent to a[0] in C
+    Token* head = tokenize("int main() { int a[2]; a[0] = 5; a[1] = 7; return "
+                           "0[a] + 1[a]; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+
+    static char msg[64];
+    snprintf(msg, sizeof(msg), "Expected 12, got %d", result);
+    mu_assert(msg, result == 12);
+    return NULL;
+}
