@@ -257,3 +257,56 @@ char* test_generate_pointer_example() {
     mu_assert(msg, result == 3);
     return NULL;
 }
+
+char* test_generate_pointer_arithmetic() {
+    Context ctx = {0};
+    // Tokenize full program with main
+    // int *p; alloc4(&p, 1, 2, 4, 8); int *q; q = p + 2; return *q;
+    Token* head = tokenize("int main() { int *p; alloc4(&p, 1, 2, 4, 8); int "
+                           "*q; q = p + 2; return *q; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+
+    static char msg[64];
+    snprintf(msg, sizeof(msg), "Expected 4, got %d", result);
+    mu_assert(msg, result == 4);
+    return NULL;
+}
+
+char* test_generate_pointer_arithmetic_sub() {
+    Context ctx = {0};
+    // int *p; alloc4(&p, 1, 2, 4, 8); int *q; q = p + 3; q = q - 1; return *q;
+    Token* head = tokenize("int main() { int *p; alloc4(&p, 1, 2, 4, 8); int "
+                           "*q; q = p + 3; q = q - 1; return *q; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+
+    static char msg[64];
+    snprintf(msg, sizeof(msg), "Expected 4, got %d", result);
+    mu_assert(msg, result == 4);
+    return NULL;
+}

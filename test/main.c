@@ -22,6 +22,10 @@ static char* run_all_tests() {
     mu_run_test(test_generate_ne_false, "codegen: ne false");
     mu_run_test(test_generate_main_required, "codegen: main required");
     mu_run_test(test_generate_pointer_example, "codegen: pointer example");
+    mu_run_test(test_generate_pointer_arithmetic,
+                "codegen: pointer arithmetic");
+    mu_run_test(test_generate_pointer_arithmetic_sub,
+                "codegen: pointer arithmetic sub");
     mu_run_test(test_lex_tokenize, "lex: tokenize");
     mu_run_test(test_consume_operator, "lex: consume operator");
     mu_run_test(test_expect_operator, "lex: expect operator");

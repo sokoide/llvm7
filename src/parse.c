@@ -326,9 +326,25 @@ Node* parse_add(Context* ctx) {
     Node* node = parse_mul(ctx);
     while (1) {
         if (consume(ctx, "+")) {
-            node = new_node(ND_ADD, node, parse_mul(ctx));
+            Node* rhs = parse_mul(ctx);
+            Node* newNode = new_node(ND_ADD, node, rhs);
+            if (node->type && node->type->ty == PTR) {
+                newNode->type = node->type;
+            } else if (rhs->type && rhs->type->ty == PTR) {
+                newNode->type = rhs->type;
+            } else {
+                newNode->type = new_type_int();
+            }
+            node = newNode;
         } else if (consume(ctx, "-")) {
-            node = new_node(ND_SUB, node, parse_mul(ctx));
+            Node* rhs = parse_mul(ctx);
+            Node* newNode = new_node(ND_SUB, node, rhs);
+            if (node->type && node->type->ty == PTR) {
+                newNode->type = node->type;
+            } else {
+                newNode->type = new_type_int();
+            }
+            node = newNode;
         } else {
             return node;
         }

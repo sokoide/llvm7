@@ -213,6 +213,19 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
             codegen(node->lhs, builder, local_allocas, has_return, module);
         LLVMValueRef rhs =
             codegen(node->rhs, builder, local_allocas, has_return, module);
+
+        if (node->lhs->type && node->lhs->type->ty == PTR) {
+            // ptr + int
+            LLVMTypeRef elem_type = to_llvm_type(node->lhs->type->ptr_to);
+            return LLVMBuildInBoundsGEP2(builder, elem_type, lhs, &rhs, 1,
+                                         "ptradd");
+        }
+        if (node->rhs->type && node->rhs->type->ty == PTR) {
+            // int + ptr
+            LLVMTypeRef elem_type = to_llvm_type(node->rhs->type->ptr_to);
+            return LLVMBuildInBoundsGEP2(builder, elem_type, rhs, &lhs, 1,
+                                         "ptradd");
+        }
         return LLVMBuildAdd(builder, lhs, rhs, "addtmp");
     }
     case ND_SUB: {
@@ -220,6 +233,20 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
             codegen(node->lhs, builder, local_allocas, has_return, module);
         LLVMValueRef rhs =
             codegen(node->rhs, builder, local_allocas, has_return, module);
+
+        if (node->lhs->type && node->lhs->type->ty == PTR) {
+            if (node->rhs->type && node->rhs->type->ty == PTR) {
+                // ptr - ptr
+                LLVMTypeRef elem_type = to_llvm_type(node->lhs->type->ptr_to);
+                return LLVMBuildPtrDiff2(builder, elem_type, lhs, rhs,
+                                         "ptrdiff");
+            }
+            // ptr - int
+            LLVMValueRef neg_rhs = LLVMBuildNeg(builder, rhs, "neg");
+            LLVMTypeRef elem_type = to_llvm_type(node->lhs->type->ptr_to);
+            return LLVMBuildInBoundsGEP2(builder, elem_type, lhs, &neg_rhs, 1,
+                                         "ptrsub");
+        }
         return LLVMBuildSub(builder, lhs, rhs, "subtmp");
     }
     case ND_MUL: {
@@ -304,12 +331,15 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
 
         // Generate argument values
         LLVMValueRef* args = NULL;
+        LLVMTypeRef* param_types = NULL;
         if (arg_count > 0) {
             args = malloc(arg_count * sizeof(LLVMValueRef));
+            param_types = malloc(arg_count * sizeof(LLVMTypeRef));
             arg = node->lhs;
             for (int i = 0; i < arg_count; i++) {
                 args[i] =
                     codegen(arg, builder, local_allocas, has_return, module);
+                param_types[i] = LLVMTypeOf(args[i]);
                 arg = arg->next;
             }
         }
@@ -318,19 +348,8 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         LLVMTypeRef func_type;
         if (!func) {
             LLVMTypeRef i32_type = LLVMInt32Type();
-            // Create parameter types array
-            LLVMTypeRef* param_types = NULL;
-            if (arg_count > 0) {
-                param_types = malloc(arg_count * sizeof(LLVMTypeRef));
-                for (int i = 0; i < arg_count; i++) {
-                    param_types[i] = i32_type;
-                }
-            }
             func_type = LLVMFunctionType(i32_type, param_types, arg_count, 0);
             func = LLVMAddFunction(module, func_name, func_type);
-            if (param_types) {
-                free(param_types);
-            }
         } else {
             func_type = LLVMGlobalGetValueType(func);
         }
@@ -339,6 +358,9 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
                                              arg_count, "calltmp");
         if (args) {
             free(args);
+        }
+        if (param_types) {
+            free(param_types);
         }
         return result;
     }

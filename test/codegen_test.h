@@ -19,5 +19,7 @@ char* test_generate_eq_true();
 char* test_generate_ne_false();
 char* test_generate_main_required();
 char* test_generate_pointer_example();
+char* test_generate_pointer_arithmetic();
+char* test_generate_pointer_arithmetic_sub();
 
 #endif
