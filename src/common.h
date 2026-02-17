@@ -78,6 +78,7 @@ typedef enum {
     ND_POST_INC,     // i++
     ND_PRE_DEC,      // --i
     ND_POST_DEC,     // i--
+    ND_CAST,         // (type)expr
 } NodeKind;
 
 typedef struct LVar LVar;

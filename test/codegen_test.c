@@ -874,8 +874,7 @@ char* test_generate_switch() {
 }
 
 char* test_generate_inc_dec() {
-    printf("--- starting test_generate_inc_dec ---\n");
-    fflush(stdout);
+    // test inc/dec operations
     Context ctx = {0};
     Token* head =
         tokenize("int main() { "
@@ -899,5 +898,39 @@ char* test_generate_inc_dec() {
     cleanup_llvm_context(&llvm_ctx);
     free_tokens(head);
     mu_assert("Expected 34", result == 34);
+    return NULL;
+}
+
+char* test_generate_proto_and_init() {
+    Context ctx = {0};
+    Token* head = tokenize("int foo(int x); "
+                           "int gx = 10; "
+                           "int* gpx = &gx; "
+                           "char* gs = \"abc\"; "
+                           "int main() { "
+                           "  if (gx != 10) return 1; "
+                           "  if (*gpx != 10) return 2; "
+                           "  if (gs[0] != 97) return 3; "
+                           "  int x = (int)gx; "
+                           "  char y = (char)x; "
+                           "  return foo(y); "
+                           "} "
+                           "int foo(int x) { return x + 5; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+
+    for (int i = 0; i < ctx.node_count; i++) {
+        free_ast(ctx.code[i]);
+    }
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+    mu_assert("Expected 15", result == 15);
     return NULL;
 }

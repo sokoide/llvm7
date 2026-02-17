@@ -55,6 +55,7 @@ static char* run_all_tests() {
     mu_run_test(test_generate_builtin_const, "codegen: builtin constants");
     mu_run_test(test_generate_switch, "codegen: switch");
     mu_run_test(test_generate_inc_dec, "codegen: inc dec");
+    mu_run_test(test_generate_proto_and_init, "codegen: proto and init");
     mu_run_test(test_lex_tokenize, "lex: tokenize");
 
     mu_run_test(test_consume_operator, "lex: consume operator");

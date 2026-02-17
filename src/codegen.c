@@ -57,29 +57,43 @@ static LLVMTypeRef to_llvm_type(Type* ty) {
  * @param[in] ctx Context containing AST nodes
  * @return LLVMModuleRef Reference to generated LLVM module
  */
+static LLVMValueRef codegen_constant(Node* node, LLVMModuleRef module) {
+    if (node->kind == ND_NUM) {
+        return LLVMConstInt(to_llvm_type(node->type), node->val, 1);
+    }
+    if (node->kind == ND_STR) {
+        char name[32];
+        snprintf(name, sizeof(name), ".str.%d", node->val);
+        LLVMValueRef gstr = LLVMGetNamedGlobal(module, name);
+        if (!gstr)
+            return LLVMConstNull(to_llvm_type(node->type));
+        LLVMValueRef indices[] = {LLVMConstInt(LLVMInt32Type(), 0, 0),
+                                  LLVMConstInt(LLVMInt32Type(), 0, 0)};
+        return LLVMConstInBoundsGEP2(LLVMGlobalGetValueType(gstr), gstr,
+                                     indices, 2);
+    }
+    if (node->kind == ND_CAST) {
+        return codegen_constant(node->lhs, module);
+    }
+    if (node->kind == ND_ADDR) {
+        if (node->lhs->kind == ND_GVAR) {
+            char var_name[64];
+            int len = node->lhs->tok->len < 63 ? node->lhs->tok->len : 63;
+            strncpy(var_name, node->lhs->tok->str, len);
+            var_name[len] = '\0';
+            return LLVMGetNamedGlobal(module, var_name);
+        }
+    }
+    return LLVMConstNull(to_llvm_type(node->type));
+}
+
 LLVMModuleRef generate_module(Context* ctx) {
     // Create a new LLVM module with specified name
     LLVMModuleRef module = LLVMModuleCreateWithName(MODULE_NAME);
     // Create an LLVM builder for constructing instructions
     LLVMBuilderRef builder = LLVMCreateBuilder();
 
-    // First pass: generate global variables
-    for (int i = 0; i < ctx->node_count; i++) {
-        Node* node = ctx->code[i];
-        if (node->kind == ND_GVAR) {
-            char var_name[64];
-            int len = node->tok->len < 63 ? node->tok->len : 63;
-            strncpy(var_name, node->tok->str, len);
-            var_name[len] = '\0';
-
-            LLVMTypeRef var_type = to_llvm_type(node->type);
-            LLVMValueRef gvar = LLVMAddGlobal(module, var_type, var_name);
-            LLVMSetInitializer(gvar, LLVMConstNull(var_type));
-            LLVMSetLinkage(gvar, LLVMExternalLinkage);
-        }
-    }
-
-    // Generate string literal global constants
+    // First pass: generate string literal global constants
     for (int i = 0; i < ctx->string_count; i++) {
         char name[32];
         snprintf(name, sizeof(name), ".str.%d", i);
@@ -96,6 +110,26 @@ LLVMModuleRef generate_module(Context* ctx) {
         LLVMSetGlobalConstant(gstr, true);
         LLVMSetLinkage(gstr, LLVMPrivateLinkage);
         free(str_data);
+    }
+
+    // Second pass: generate global variables
+    for (int i = 0; i < ctx->node_count; i++) {
+        Node* node = ctx->code[i];
+        if (node->kind == ND_GVAR) {
+            char var_name[64];
+            int len = node->tok->len < 63 ? node->tok->len : 63;
+            strncpy(var_name, node->tok->str, len);
+            var_name[len] = '\0';
+
+            LLVMTypeRef var_type = to_llvm_type(node->type);
+            LLVMValueRef gvar = LLVMAddGlobal(module, var_type, var_name);
+            if (node->init) {
+                LLVMSetInitializer(gvar, codegen_constant(node->init, module));
+            } else {
+                LLVMSetInitializer(gvar, LLVMConstNull(var_type));
+            }
+            LLVMSetLinkage(gvar, LLVMExternalLinkage);
+        }
     }
 
     // Track if main function exists
@@ -148,7 +182,18 @@ LLVMModuleRef generate_module(Context* ctx) {
         }
         LLVMTypeRef func_type =
             LLVMFunctionType(ret_type, param_types, param_count, 0);
-        LLVMValueRef func = LLVMAddFunction(module, func_name, func_type);
+
+        LLVMValueRef func = LLVMGetNamedFunction(module, func_name);
+        if (!func) {
+            func = LLVMAddFunction(module, func_name, func_type);
+        }
+
+        // If it's a prototype (no body), skip building the body
+        if (func_node->lhs == NULL) {
+            if (param_types)
+                free(param_types);
+            continue;
+        }
 
         // Create entry block
         LLVMBasicBlockRef entry = LLVMAppendBasicBlock(func, "entry");
@@ -218,7 +263,6 @@ LLVMModuleRef generate_module(Context* ctx) {
 
     // Clean up builder
     LLVMDisposeBuilder(builder);
-
     return module;
 }
 
@@ -888,7 +932,66 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         // For other nodes, return null for now
         return LLVMConstPointerNull(LLVMPointerType(LLVMInt32Type(), 0));
     }
+    case ND_CAST: {
+        LLVMValueRef val =
+            codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
+        LLVMTypeRef dest_type = to_llvm_type(node->type);
+        LLVMTypeRef src_type = LLVMTypeOf(val);
+
+        // Same type — no conversion needed
+        if (src_type == dest_type) {
+            return val;
+        }
+
+        unsigned src_bits = LLVMGetIntTypeWidth(src_type);
+        unsigned dst_bits = LLVMGetIntTypeWidth(dest_type);
+
+        // Both are integers
+        if (src_bits > 0 && dst_bits > 0) {
+            if (dst_bits > src_bits) {
+                return LLVMBuildSExt(builder, val, dest_type, "cast_sext");
+            } else if (dst_bits < src_bits) {
+                return LLVMBuildTrunc(builder, val, dest_type, "cast_trunc");
+            }
+            return val;
+        }
+
+        // Pointer <-> Integer
+        if (LLVMGetTypeKind(src_type) == LLVMPointerTypeKind && dst_bits > 0) {
+            return LLVMBuildPtrToInt(builder, val, dest_type, "cast_ptoi");
+        }
+        if (src_bits > 0 && LLVMGetTypeKind(dest_type) == LLVMPointerTypeKind) {
+            return LLVMBuildIntToPtr(builder, val, dest_type, "cast_itop");
+        }
+
+        // Pointer <-> Pointer
+        if (LLVMGetTypeKind(src_type) == LLVMPointerTypeKind &&
+            LLVMGetTypeKind(dest_type) == LLVMPointerTypeKind) {
+            return LLVMBuildBitCast(builder, val, dest_type, "cast_bitcast");
+        }
+
+        // Fallback: just return value
+        return val;
+    }
     case ND_DECL: {
+        if (node->init) {
+            if (node->val < 0 || node->val >= 100) {
+                fprintf(stderr, "ND_DECL: node->val %d out of bounds\n",
+                        node->val);
+                fflush(stderr);
+                exit(1);
+            }
+            LLVMValueRef alloca_ptr = local_allocas[node->val];
+            if (!alloca_ptr) {
+                fprintf(stderr, "ND_DECL: alloca_ptr is NULL for val %d\n",
+                        node->val);
+                fflush(stderr);
+                exit(1);
+            }
+            LLVMValueRef val = codegen(ctx, node->init, builder, local_allocas,
+                                       has_return, module);
+            LLVMBuildStore(builder, val, alloca_ptr);
+        }
         return LLVMConstInt(LLVMInt32Type(), 0, 0);
     }
     case ND_STR: {

@@ -47,5 +47,6 @@ char* test_generate_enum();
 char* test_generate_builtin_const();
 char* test_generate_switch();
 char* test_generate_inc_dec();
+char* test_generate_proto_and_init();
 
 #endif

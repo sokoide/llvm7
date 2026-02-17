@@ -253,9 +253,10 @@ Node* parse_params(Context* ctx) {
     }
 
     // Add parameter to locals before creating node
-    add_lvar(ctx, tok, ty);
+    LVar* lvar = add_lvar(ctx, tok, ty);
     Node* head = new_node_ident(ctx, tok);
     head->type = ty; // Store type in node
+    head->val = lvar->offset;
     Node* tail = head;
 
     while (consume(ctx, ",")) {
@@ -275,9 +276,10 @@ Node* parse_params(Context* ctx) {
         }
 
         // Add parameter to locals before creating node
-        add_lvar(ctx, tok, ty);
+        lvar = add_lvar(ctx, tok, ty);
         tail->next = new_node_ident(ctx, tok);
         tail->next->type = ty; // Store type in node
+        tail->next->val = lvar->offset;
         tail = tail->next;
     }
 
@@ -405,72 +407,24 @@ void parse_program(Context* ctx) {
 
         // Check if this is a function definition (followed by "(")
         if (consume(ctx, "(")) {
-            // This is a function - parse the rest
-            // Put the token back by recreating the state
-            // Actually, we need to call parse_function but we've already
-            // consumed type and name Let's use a different approach: peek for
-            // the "("
-
             // Reconstruct the parse state for parse_function
-            // We need to reset and call parse_function
-            // Since we can't easily put tokens back, let's restructure
-
-            // Actually, let's just parse the function directly from here
-            // Reset locals for each function
             ctx->locals = NULL;
 
             // Parse parameters
             Node* func_params = NULL;
             if (!consume(ctx, ")")) {
-                // We need to parse params but parse_type already consumed the
-                // first param's type So we need to handle this carefully Let's
-                // use parse_params but it expects to parse type first We need
-                // to add the first param manually
-
-                // First param type was already parsed as ty
-                // But we don't have the name yet
-                Token* param_tok = consume_ident(ctx);
-                if (!param_tok) {
-                    fprintf(stderr, "Expected parameter name\n");
-                    exit(1);
-                }
-
-                if (consume(ctx, "[")) {
-                    if (!consume(ctx, "]")) {
-                        expect_number(ctx);
-                        expect(ctx, "]");
-                    }
-                    ty = new_type_ptr(ty);
-                }
-
-                add_lvar(ctx, param_tok, ty);
-                Node* head = new_node_ident(ctx, param_tok);
-                head->type = ty;
-                Node* tail = head;
-
-                while (consume(ctx, ",")) {
-                    Type* param_ty = parse_type(ctx);
-                    param_tok = consume_ident(ctx);
-                    if (!param_tok) {
-                        fprintf(stderr, "Expected parameter name\n");
-                        exit(1);
-                    }
-
-                    if (consume(ctx, "[")) {
-                        if (!consume(ctx, "]")) {
-                            expect_number(ctx);
-                            expect(ctx, "]");
-                        }
-                        param_ty = new_type_ptr(param_ty);
-                    }
-
-                    add_lvar(ctx, param_tok, param_ty);
-                    tail->next = new_node_ident(ctx, param_tok);
-                    tail->next->type = param_ty;
-                    tail = tail->next;
-                }
-                func_params = head;
+                func_params = parse_params(ctx);
                 expect(ctx, ")");
+            }
+
+            if (consume(ctx, ";")) {
+                // Prototype
+                Node* node = new_node(ND_FUNCTION, NULL, NULL);
+                node->tok = tok;
+                node->type = ty;
+                node->rhs = func_params;
+                ctx->code[i++] = node;
+                continue;
             }
 
             expect(ctx, "{");
@@ -508,7 +462,6 @@ void parse_program(Context* ctx) {
                 expect(ctx, "]");
                 ty = new_type_array(ty, size);
             }
-            expect(ctx, ";");
 
             // Add to globals
             LVar* lvar = calloc(1, sizeof(LVar));
@@ -522,6 +475,12 @@ void parse_program(Context* ctx) {
             Node* node = new_node(ND_GVAR, NULL, NULL);
             node->tok = tok;
             node->type = ty;
+
+            if (consume(ctx, "=")) {
+                node->init = parse_expr(ctx);
+            }
+            expect(ctx, ";");
+
             ctx->code[i++] = node;
         }
     }
@@ -548,14 +507,18 @@ Node* parse_stmt(Context* ctx) {
                 ty = new_type_array(ty, size);
             }
 
-            expect(ctx, ";");
-
             // Add variable to locals
             LVar* lvar = add_lvar(ctx, tok, ty);
             Node* decl = new_node(ND_DECL, NULL, NULL);
             decl->tok = tok;
             decl->val = lvar->offset;
             decl->type = ty;
+
+            if (consume(ctx, "=")) {
+                decl->init = parse_expr(ctx);
+            }
+            expect(ctx, ";");
+
             return decl;
         }
     }
@@ -930,7 +893,43 @@ static Node* convert_array_to_ptr(Node* node) {
     return node;
 }
 
+static bool is_type(Context* ctx) {
+    Token* tok = ctx->current_token;
+    if (tok->kind == TK_RESERVED) {
+        char* keywords[] = {"int",    "char",   "void",    "long",  "bool",
+                            "size_t", "enum",   "struct",  "const", "static",
+                            "extern", "signed", "unsigned"};
+        for (size_t i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++) {
+            if ((size_t)tok->len == strlen(keywords[i]) &&
+                strncmp(tok->str, keywords[i], tok->len) == 0)
+                return true;
+        }
+    }
+    if (tok->kind == TK_IDENT && find_typedef(ctx, tok))
+        return true;
+    return false;
+}
+
 Node* parse_unary(Context* ctx) {
+    if (ctx->current_token->kind == TK_RESERVED &&
+        ctx->current_token->len == 1 && ctx->current_token->str[0] == '(') {
+        Token* next = ctx->current_token->next;
+        // Peek if it's a type
+        Token* old_tok = ctx->current_token;
+        ctx->current_token = next;
+        bool it = is_type(ctx);
+        ctx->current_token = old_tok;
+
+        if (it) {
+            consume(ctx, "(");
+            Type* ty = parse_type(ctx);
+            expect(ctx, ")");
+            Node* node = new_node(ND_CAST, parse_unary(ctx), NULL);
+            node->type = ty;
+            return node;
+        }
+    }
+
     if (consume(ctx, "+")) {
         return parse_unary(ctx);
     }
