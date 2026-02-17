@@ -49,6 +49,7 @@ extern Node* parse_params(Context* ctx);
 extern Type* parse_type(Context* ctx);
 extern Type* try_parse_type(Context* ctx);
 extern Type* new_type_int(void);
+extern Type* new_type_char(void);
 extern Type* new_type_ptr(Type* base);
 
 #endif

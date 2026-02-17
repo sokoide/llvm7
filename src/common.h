@@ -10,6 +10,7 @@ typedef enum {
     TK_RESERVED,
     TK_IDENT,
     TK_NUM,
+    TK_STR,
     TK_EOF,
 } TokenKind;
 
@@ -24,7 +25,7 @@ struct Token {
 
 typedef struct Type Type;
 struct Type {
-    enum { INT, PTR } ty;
+    enum { INT, CHAR, PTR } ty;
     Type* ptr_to; // For PTR, points to the type being pointed to
     size_t array_size;
 };
@@ -54,6 +55,7 @@ typedef enum {
     ND_DEREF,    // * (pointer dereference)
     ND_ADDR,     // & (address-of)
     ND_DECL,     // local variable declaration
+    ND_STR,      // string literal
 } NodeKind;
 
 typedef struct LVar LVar;
@@ -81,11 +83,14 @@ struct Node {
 
 typedef struct Context Context;
 struct Context {
-    Token* current_token;  // Current token being processed
-    Node* code[MAX_NODES]; // Generated AST nodes (statements)
-    LVar* locals;          // local variables
-    LVar* globals;         // global variables
-    int node_count;        // Number of statements
+    Token* current_token;           // Current token being processed
+    Node* code[MAX_NODES];          // Generated AST nodes (statements)
+    LVar* locals;                   // local variables
+    LVar* globals;                  // global variables
+    int node_count;                 // Number of statements
+    const char* strings[MAX_NODES]; // string literal data
+    int string_lens[MAX_NODES];     // string literal lengths
+    int string_count;               // number of string literals
 };
 
 #endif

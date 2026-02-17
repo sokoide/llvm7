@@ -39,8 +39,9 @@ Token* tokenize(const char* p) {
     struct {
         char* str;
         int len;
-    } keywords[] = {{"return", 6}, {"if", 2},  {"else", 4}, {"while", 5},
-                    {"for", 3},    {"int", 3}, {"void", 4}, {"sizeof", 6}};
+    } keywords[] = {{"return", 6}, {"if", 2},   {"else", 4},
+                    {"while", 5},  {"for", 3},  {"int", 3},
+                    {"char", 4},   {"void", 4}, {"sizeof", 6}};
 
     // Iterate through the input string until null terminator
     while (*p) {
@@ -84,6 +85,23 @@ Token* tokenize(const char* p) {
         char* single_char_ops = "+-*/()<>;={},&[]";
         if (strchr(single_char_ops, *p)) {
             cur = new_token(TK_RESERVED, cur, p++, 1);
+            continue;
+        }
+
+        // String literal
+        if (*p == '"') {
+            const char* start = p + 1; // skip opening quote
+            p++;
+            while (*p && *p != '"') {
+                p++;
+            }
+            if (*p != '"') {
+                fprintf(stderr, "lex error: unterminated string literal\n");
+                return NULL;
+            }
+            int len = p - start; // length without quotes
+            cur = new_token(TK_STR, cur, start, len);
+            p++; // skip closing quote
             continue;
         }
 

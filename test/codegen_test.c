@@ -547,3 +547,45 @@ char* test_generate_global_ptr_return_func() {
     mu_assert("Expected 123", result == 123);
     return NULL;
 }
+
+char* test_generate_char_array() {
+    Context ctx = {0};
+    // char x[3]; x[0] = -1; x[1] = 2; int y; y = 4; return x[0] + y; → 3
+    Token* head =
+        tokenize("int main() { char x[3]; x[0] = -1; x[1] = 2; int y; "
+                 "y = 4; return x[0] + y; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+    mu_assert("Expected 3", result == 3);
+    return NULL;
+}
+
+char* test_generate_string_literal() {
+    Context ctx = {0};
+    // char *s; s = "ABC"; return *s; → 65 (ASCII 'A')
+    Token* head = tokenize("int main() { char *s; s = \"ABC\"; return *s; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+    mu_assert("Expected 65 (ASCII A)", result == 65);
+    return NULL;
+}

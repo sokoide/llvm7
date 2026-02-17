@@ -18,6 +18,9 @@ static LLVMTypeRef to_llvm_type(Type* ty) {
     if (ty == NULL || ty->ty == INT) {
         return LLVMInt32Type();
     }
+    if (ty->ty == CHAR) {
+        return LLVMInt8Type();
+    }
     if (ty->ty == PTR) {
         if (ty->array_size > 0) {
             return LLVMArrayType(to_llvm_type(ty->ptr_to), ty->array_size);
@@ -56,6 +59,25 @@ LLVMModuleRef generate_module(Context* ctx) {
             LLVMSetInitializer(gvar, LLVMConstNull(var_type));
             LLVMSetLinkage(gvar, LLVMExternalLinkage);
         }
+    }
+
+    // Generate string literal global constants
+    for (int i = 0; i < ctx->string_count; i++) {
+        char name[32];
+        snprintf(name, sizeof(name), ".str.%d", i);
+        // Create null-terminated string constant
+        int str_len = ctx->string_lens[i];
+        char* str_data = malloc(str_len + 1);
+        memcpy(str_data, ctx->strings[i], str_len);
+        str_data[str_len] = '\0';
+        LLVMValueRef str_const = LLVMConstStringInContext(
+            LLVMGetGlobalContext(), str_data, str_len + 1, true);
+        LLVMTypeRef str_type = LLVMArrayType(LLVMInt8Type(), str_len + 1);
+        LLVMValueRef gstr = LLVMAddGlobal(module, str_type, name);
+        LLVMSetInitializer(gstr, str_const);
+        LLVMSetGlobalConstant(gstr, true);
+        LLVMSetLinkage(gstr, LLVMPrivateLinkage);
+        free(str_data);
     }
 
     // Track if main function exists
@@ -204,7 +226,14 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         if (node->val < 100 && local_allocas[node->val]) {
             LLVMValueRef alloca_ptr = local_allocas[node->val];
             LLVMTypeRef var_type = to_llvm_type(node->type);
-            return LLVMBuildLoad2(builder, var_type, alloca_ptr, "loadtmp");
+            LLVMValueRef loaded =
+                LLVMBuildLoad2(builder, var_type, alloca_ptr, "loadtmp");
+            // Sign-extend char (i8) to int (i32) for use in expressions
+            if (node->type && node->type->ty == CHAR) {
+                loaded = LLVMBuildSExt(builder, loaded, LLVMInt32Type(),
+                                       "sext_char");
+            }
+            return loaded;
         }
         return LLVMConstInt(LLVMInt32Type(), 0, 0);
     }
@@ -218,7 +247,14 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         LLVMValueRef gvar = LLVMGetNamedGlobal(module, var_name);
         if (gvar) {
             LLVMTypeRef var_type = to_llvm_type(node->type);
-            return LLVMBuildLoad2(builder, var_type, gvar, "gload");
+            LLVMValueRef loaded =
+                LLVMBuildLoad2(builder, var_type, gvar, "gload");
+            // Sign-extend char (i8) to int (i32) for use in expressions
+            if (node->type && node->type->ty == CHAR) {
+                loaded = LLVMBuildSExt(builder, loaded, LLVMInt32Type(),
+                                       "sext_char");
+            }
+            return loaded;
         }
         return LLVMConstInt(LLVMInt32Type(), 0, 0);
     }
@@ -226,16 +262,29 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         LLVMValueRef rhs =
             codegen(node->rhs, builder, local_allocas, has_return, module);
 
+        // Truncate rhs to i8 if assigning to a char type
+        LLVMValueRef store_val = rhs;
+        if (node->lhs->type && node->lhs->type->ty == CHAR) {
+            store_val =
+                LLVMBuildTrunc(builder, rhs, LLVMInt8Type(), "trunc_char");
+        }
+
         if (node->lhs->kind == ND_DEREF) {
             // *ptr = value - store through pointer
             LLVMValueRef ptr = codegen(node->lhs->lhs, builder, local_allocas,
                                        has_return, module);
-            LLVMBuildStore(builder, rhs, ptr);
+            // Truncate if dereferenced type is char
+            LLVMValueRef deref_store = rhs;
+            if (node->lhs->type && node->lhs->type->ty == CHAR) {
+                deref_store =
+                    LLVMBuildTrunc(builder, rhs, LLVMInt8Type(), "trunc_char");
+            }
+            LLVMBuildStore(builder, deref_store, ptr);
         } else if (node->lhs->kind == ND_LVAR) {
             // Regular variable assignment
             if (node->lhs->val < 100 && local_allocas[node->lhs->val]) {
                 LLVMValueRef alloca_ptr = local_allocas[node->lhs->val];
-                LLVMBuildStore(builder, rhs, alloca_ptr);
+                LLVMBuildStore(builder, store_val, alloca_ptr);
             }
         } else if (node->lhs->kind == ND_GVAR) {
             // Global variable assignment
@@ -246,10 +295,10 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
 
             LLVMValueRef gvar = LLVMGetNamedGlobal(module, var_name);
             if (gvar) {
-                LLVMBuildStore(builder, rhs, gvar);
+                LLVMBuildStore(builder, store_val, gvar);
             }
         }
-        return rhs; // assignment returns the assigned value
+        return rhs; // assignment returns the assigned value (as i32)
     }
     case ND_ADD: {
         LLVMValueRef lhs =
@@ -576,7 +625,14 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         LLVMValueRef ptr =
             codegen(node->lhs, builder, local_allocas, has_return, module);
         LLVMTypeRef loaded_type = to_llvm_type(node->type);
-        return LLVMBuildLoad2(builder, loaded_type, ptr, "deref");
+        LLVMValueRef loaded =
+            LLVMBuildLoad2(builder, loaded_type, ptr, "deref");
+        // Sign-extend char (i8) to int (i32) for use in expressions
+        if (node->type && node->type->ty == CHAR) {
+            loaded =
+                LLVMBuildSExt(builder, loaded, LLVMInt32Type(), "sext_char");
+        }
+        return loaded;
     }
     case ND_ADDR: {
         // &expr - get address of variable
@@ -618,6 +674,21 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
     }
     case ND_DECL: {
         return LLVMConstInt(LLVMInt32Type(), 0, 0);
+    }
+    case ND_STR: {
+        // Get the global string constant by name
+        char name[32];
+        snprintf(name, sizeof(name), ".str.%d", node->val);
+        LLVMValueRef gstr = LLVMGetNamedGlobal(module, name);
+        if (gstr) {
+            // GEP to get pointer to first element (i8*)
+            LLVMValueRef indices[] = {LLVMConstInt(LLVMInt32Type(), 0, false),
+                                      LLVMConstInt(LLVMInt32Type(), 0, false)};
+            LLVMTypeRef str_type = LLVMGlobalGetValueType(gstr);
+            return LLVMBuildInBoundsGEP2(builder, str_type, gstr, indices, 2,
+                                         "str_ptr");
+        }
+        return LLVMConstPointerNull(LLVMPointerType(LLVMInt8Type(), 0));
     }
     default:
         return LLVMConstInt(LLVMInt32Type(), 0, 0);

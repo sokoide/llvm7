@@ -69,6 +69,14 @@ void free_ast(Node* ast) {
 // parse_type = "int" | "void" | type "*"
 Type* parse_type(Context* ctx);
 
+// Helper to create a new char type
+Type* new_type_char(void) {
+    Type* t = calloc(1, sizeof(Type));
+    t->ty = CHAR;
+    t->ptr_to = NULL;
+    return t;
+}
+
 // Helper to create a new int type
 Type* new_type_int(void) {
     Type* t = calloc(1, sizeof(Type));
@@ -100,6 +108,8 @@ Type* try_parse_type(Context* ctx) {
     Type* base = NULL;
     if (consume(ctx, "int")) {
         base = new_type_int();
+    } else if (consume(ctx, "char")) {
+        base = new_type_char();
     } else if (consume(ctx, "void")) {
         base = new_type_int();
         base->ty = 1; // Use 1 for void (not INT)
@@ -398,36 +408,43 @@ void parse_program(Context* ctx) {
 Node* parse_stmt(Context* ctx) {
     Node* node;
 
-    // Check for type declaration: int ident ";"
-    if (consume(ctx, "int")) {
-        // Check for pointers (e.g., int* x)
-        Type* ty = new_type_int();
-        while (consume(ctx, "*")) {
-            ty = new_type_ptr(ty);
+    // Check for type declaration: (int|char) ident ";"
+    {
+        Type* ty = NULL;
+        if (consume(ctx, "int")) {
+            ty = new_type_int();
+        } else if (consume(ctx, "char")) {
+            ty = new_type_char();
         }
+        if (ty) {
+            // Check for pointers (e.g., int* x, char* s)
+            while (consume(ctx, "*")) {
+                ty = new_type_ptr(ty);
+            }
 
-        Token* tok = consume_ident(ctx);
-        if (!tok) {
-            fprintf(stderr, "Expected variable name after type\n");
-            exit(1);
+            Token* tok = consume_ident(ctx);
+            if (!tok) {
+                fprintf(stderr, "Expected variable name after type\n");
+                exit(1);
+            }
+
+            // Check for array definitions (e.g., int a[10], char x[3])
+            if (consume(ctx, "[")) {
+                int size = expect_number(ctx);
+                expect(ctx, "]");
+                ty = new_type_array(ty, size);
+            }
+
+            expect(ctx, ";");
+
+            // Add variable to locals
+            LVar* lvar = add_lvar(ctx, tok, ty);
+            Node* decl = new_node(ND_DECL, NULL, NULL);
+            decl->tok = tok;
+            decl->val = lvar->offset;
+            decl->type = ty;
+            return decl;
         }
-
-        // Check for array definitions (e.g., int a[10])
-        if (consume(ctx, "[")) {
-            int size = expect_number(ctx);
-            expect(ctx, "]");
-            ty = new_type_array(ty, size);
-        }
-
-        expect(ctx, ";");
-
-        // Add variable to locals
-        LVar* lvar = add_lvar(ctx, tok, ty);
-        Node* decl = new_node(ND_DECL, NULL, NULL);
-        decl->tok = tok;
-        decl->val = lvar->offset;
-        decl->type = ty;
-        return decl;
     }
 
     if (consume(ctx, "return")) {
@@ -598,6 +615,10 @@ Node* parse_mul(Context* ctx) {
 static int type_size(Type* ty) {
     if (ty == NULL)
         return 4;
+    if (ty->ty == CHAR)
+        return 1;
+    if (ty->ty == INT)
+        return 4;
     if (ty->array_size > 0)
         return type_size(ty->ptr_to) * ty->array_size;
     if (ty->ty == PTR)
@@ -666,6 +687,23 @@ Node* parse_primary(Context* ctx) {
     if (consume(ctx, "(")) {
         Node* node = parse_expr(ctx);
         expect(ctx, ")");
+        return node;
+    }
+
+    // String literal
+    if (ctx->current_token->kind == TK_STR) {
+        Token* tok = ctx->current_token;
+        ctx->current_token = ctx->current_token->next;
+        // Add string to context's string vector
+        int idx = ctx->string_count++;
+        ctx->strings[idx] = tok->str;
+        ctx->string_lens[idx] = tok->len;
+        // Create ND_STR node
+        Node* node = calloc(1, sizeof(Node));
+        node->kind = ND_STR;
+        node->val = idx; // index into strings vector
+        // Type is char* (pointer to char)
+        node->type = new_type_ptr(new_type_char());
         return node;
     }
 
