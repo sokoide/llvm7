@@ -12,11 +12,12 @@ LVar* find_lvar(Context* ctx, Token* tok) {
     return NULL;
 }
 
-LVar* add_lvar(Context* ctx, Token* tok) {
+LVar* add_lvar(Context* ctx, Token* tok, Type* type) {
     LVar* new_var = calloc(1, sizeof(LVar));
     new_var->name = tok->str;
     new_var->len = tok->len;
     new_var->next = NULL;
+    new_var->type = type;
 
     if (ctx->locals == NULL) {
         new_var->offset = 0;

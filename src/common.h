@@ -21,10 +21,11 @@ struct Token {
     int len;
 };
 
-typedef enum {
-    TY_INT,
-    TY_VOID,
-} Type;
+typedef struct Type Type;
+struct Type {
+    enum { INT, PTR } ty;
+    Type* ptr_to; // For PTR, points to the type being pointed to
+};
 
 typedef enum {
     ND_ADD,      // +
@@ -52,6 +53,15 @@ typedef enum {
     ND_DECL,     // local variable declaration
 } NodeKind;
 
+typedef struct LVar LVar;
+struct LVar {
+    LVar* next;
+    const char* name;
+    int len;
+    int offset;
+    Type* type; // Type of the variable
+};
+
 typedef struct Node Node;
 struct Node {
     NodeKind kind;
@@ -62,15 +72,8 @@ struct Node {
     Node* init; // Initialization for for loop
     Token* tok; // Function name or token for the node
     int val;
-};
-
-typedef struct LVar LVar;
-
-struct LVar {
-    LVar* next;
-    const char* name;
-    int len;
-    int offset;
+    Type* type;   // Type of the node (for ND_DECL, ND_LVAR, etc.)
+    LVar* locals; // Local variables (for ND_FUNCTION)
 };
 
 typedef struct Context Context;

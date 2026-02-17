@@ -6,7 +6,7 @@
 // program = function*
 // function = type ident "(" params? ")" "{" stmt* "}"
 // params = type ident ("," type ident)*
-// type = "int" | "void"
+// type = "int" | "void" | type "*"
 // stmt = expr ";"
 //      | "{" stmt* "}"
 //      | "return" expr ";"
@@ -45,6 +45,9 @@ extern Node* parse_primary(Context* ctx);
 extern Node* parse_args(Context* ctx);
 extern Node* parse_function(Context* ctx);
 extern Node* parse_params(Context* ctx);
-extern Type parse_type(Context* ctx);
+extern Type* parse_type(Context* ctx);
+extern Type* try_parse_type(Context* ctx);
+extern Type* new_type_int(void);
+extern Type* new_type_ptr(Type* base);
 
 #endif

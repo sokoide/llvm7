@@ -2,6 +2,7 @@
 #include "lex.h"
 #include "variable.h"
 #include <stdlib.h>
+#include <string.h>
 
 Node* new_node(NodeKind kind, Node* lhs, Node* rhs) {
     Node* node = calloc(1, sizeof(Node));
@@ -20,6 +21,7 @@ Node* new_node_num(int val) {
     Node* node = calloc(1, sizeof(Node));
     node->kind = ND_NUM;
     node->val = val;
+    node->type = new_type_int();
     return node;
 }
 
@@ -35,6 +37,7 @@ Node* new_node_ident(Context* ctx, Token* tok) {
         exit(1);
     }
     node->val = lvar->offset;
+    node->type = lvar->type; // Store type
 
     return node;
 }
@@ -53,20 +56,58 @@ void free_ast(Node* ast) {
     free(ast);
 }
 
-// parse_type = "int" | "void"
-Type parse_type(Context* ctx) {
+// parse_type = "int" | "void" | type "*"
+Type* parse_type(Context* ctx);
+
+// Helper to create a new int type
+Type* new_type_int(void) {
+    Type* t = calloc(1, sizeof(Type));
+    t->ty = INT;
+    t->ptr_to = NULL;
+    return t;
+}
+
+// Helper to create a pointer type
+Type* new_type_ptr(Type* base) {
+    Type* t = calloc(1, sizeof(Type));
+    t->ty = PTR;
+    t->ptr_to = base;
+    return t;
+}
+
+// Try to parse a type, returns NULL if not a type
+Type* try_parse_type(Context* ctx) {
+    // Parse base type
+    Type* base = NULL;
     if (consume(ctx, "int")) {
-        return TY_INT;
+        base = new_type_int();
     } else if (consume(ctx, "void")) {
-        return TY_VOID;
+        base = new_type_int();
+        base->ty = 1; // Use 1 for void (not INT)
+    } else {
+        return NULL; // Not a type
     }
-    fprintf(stderr, "Expected type (int or void)\n");
-    exit(1);
+
+    // Parse pointers
+    while (consume(ctx, "*")) {
+        base = new_type_ptr(base);
+    }
+
+    return base;
+}
+
+Type* parse_type(Context* ctx) {
+    Type* base = try_parse_type(ctx);
+    if (!base) {
+        fprintf(stderr, "Expected type (int or void)\n");
+        exit(1);
+    }
+    return base;
 }
 
 // params = ty ident ("," ty ident)*
 Node* parse_params(Context* ctx) {
-    (void)parse_type(ctx); // Parse type (currently all params are int)
+    Type* ty = parse_type(ctx);
     Token* tok = consume_ident(ctx);
     if (!tok) {
         fprintf(stderr, "Expected parameter name\n");
@@ -74,20 +115,22 @@ Node* parse_params(Context* ctx) {
     }
 
     // Add parameter to locals before creating node
-    add_lvar(ctx, tok);
+    add_lvar(ctx, tok, ty);
     Node* head = new_node_ident(ctx, tok);
+    head->type = ty; // Store type in node
     Node* tail = head;
 
     while (consume(ctx, ",")) {
-        (void)parse_type(ctx); // Parse type (currently all params are int)
+        ty = parse_type(ctx);
         tok = consume_ident(ctx);
         if (!tok) {
             fprintf(stderr, "Expected parameter name\n");
             exit(1);
         }
         // Add parameter to locals before creating node
-        add_lvar(ctx, tok);
+        add_lvar(ctx, tok, ty);
         tail->next = new_node_ident(ctx, tok);
+        tail->next->type = ty; // Store type in node
         tail = tail->next;
     }
 
@@ -96,12 +139,15 @@ Node* parse_params(Context* ctx) {
 
 // function = ty ident "(" params? ")" "{" stmt* "}"
 Node* parse_function(Context* ctx) {
-    Type return_ty = parse_type(ctx);
+    Type* return_ty = parse_type(ctx);
     Token* tok = consume_ident(ctx);
     if (!tok) {
         fprintf(stderr, "Expected function name\n");
         exit(1);
     }
+
+    // Reset locals for each function
+    ctx->locals = NULL;
 
     expect(ctx, "(");
 
@@ -117,7 +163,7 @@ Node* parse_function(Context* ctx) {
     // Create function node with return type
     Node* node = new_node(ND_FUNCTION, NULL, NULL);
     node->tok = tok;
-    node->val = return_ty;   // Store return type in val field
+    node->type = return_ty;  // Store return type
     node->rhs = func_params; // Store parameters in rhs
 
     // Parse function body (statements)
@@ -134,6 +180,7 @@ Node* parse_function(Context* ctx) {
         }
     }
     node->lhs = head;
+    node->locals = ctx->locals; // Store local variables
 
     return node;
 }
@@ -149,19 +196,28 @@ void parse_program(Context* ctx) {
 Node* parse_stmt(Context* ctx) {
     Node* node;
 
-    // Check for type declaration: ty ident ";"
+    // Check for type declaration: int ident ";"
     if (consume(ctx, "int")) {
+        // Check for pointers (e.g., int* x)
+        Type* ty = new_type_int();
+        while (consume(ctx, "*")) {
+            ty = new_type_ptr(ty);
+        }
+
         Token* tok = consume_ident(ctx);
         if (!tok) {
             fprintf(stderr, "Expected variable name after type\n");
             exit(1);
         }
+
         expect(ctx, ";");
+
         // Add variable to locals
-        LVar* lvar = add_lvar(ctx, tok);
+        LVar* lvar = add_lvar(ctx, tok, ty);
         Node* decl = new_node(ND_DECL, NULL, NULL);
         decl->tok = tok;
-        decl->val = lvar->offset; // Store offset
+        decl->val = lvar->offset;
+        decl->type = ty;
         return decl;
     }
 
@@ -298,9 +354,20 @@ Node* parse_unary(Context* ctx) {
     } else if (consume(ctx, "-")) {
         return new_node(ND_SUB, new_node_num(0), parse_primary(ctx));
     } else if (consume(ctx, "*")) {
-        return new_node(ND_DEREF, parse_unary(ctx), NULL);
+        Node* operand = parse_unary(ctx);
+        Node* node = new_node(ND_DEREF, operand, NULL);
+        if (operand->type && operand->type->ty == PTR) {
+            node->type = operand->type->ptr_to;
+        } else {
+            node->type = new_type_int();
+        }
+        return node;
     } else if (consume(ctx, "&")) {
-        return new_node(ND_ADDR, parse_unary(ctx), NULL);
+        Node* operand = parse_unary(ctx);
+        Node* node = new_node(ND_ADDR, operand, NULL);
+        node->type =
+            new_type_ptr(operand->type ? operand->type : new_type_int());
+        return node;
     } else {
         return parse_primary(ctx);
     }

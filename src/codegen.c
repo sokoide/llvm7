@@ -8,8 +8,24 @@
 #define MODULE_NAME "sokoide_module"
 
 static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
-                            LLVMValueRef local_vars, LLVMTypeRef array_type,
-                            bool* has_return, LLVMModuleRef module);
+                            LLVMValueRef* local_allocas, bool* has_return,
+                            LLVMModuleRef module);
+
+/**
+ * Converts Type to LLVMTypeRef
+ */
+static LLVMTypeRef to_llvm_type(Type* ty) {
+    if (ty == NULL || ty->ty == INT) {
+        return LLVMInt32Type();
+    }
+    if (ty->ty == PTR) {
+        if (ty->ptr_to == NULL) {
+            return LLVMPointerType(LLVMInt32Type(), 0);
+        }
+        return LLVMPointerType(to_llvm_type(ty->ptr_to), 0);
+    }
+    return LLVMInt32Type();
+}
 
 /**
  * Internal function: Generates LLVM IR module from a Node AST
@@ -56,16 +72,20 @@ LLVMModuleRef generate_module(Context* ctx) {
 
         // Determine return type from function node
         LLVMTypeRef ret_type;
-        if (func_node->val == TY_VOID) {
+        if (func_node->type && func_node->type->ty == 1 &&
+            func_node->type->ptr_to == NULL) { // void hack
             ret_type = LLVMVoidType();
         } else {
-            ret_type = LLVMInt32Type();
+            ret_type = to_llvm_type(func_node->type);
         }
+
         LLVMTypeRef* param_types = NULL;
         if (param_count > 0) {
             param_types = malloc(param_count * sizeof(LLVMTypeRef));
+            param = func_node->rhs;
             for (int i = 0; i < param_count; i++) {
-                param_types[i] = LLVMInt32Type();
+                param_types[i] = to_llvm_type(param->type);
+                param = param->next;
             }
         }
         LLVMTypeRef func_type =
@@ -76,23 +96,31 @@ LLVMModuleRef generate_module(Context* ctx) {
         LLVMBasicBlockRef entry = LLVMAppendBasicBlock(func, "entry");
         LLVMPositionBuilderAtEnd(builder, entry);
 
-        // Local variable space per function (temporary)
-        LLVMTypeRef i32_type = LLVMInt32Type();
-        LLVMTypeRef array_type = LLVMArrayType(i32_type, 26);
-        LLVMValueRef local_vars =
-            LLVMBuildAlloca(builder, array_type, "local_vars");
+        // Local variable space per function
+        LLVMValueRef local_allocas[100]; // Max 100 locals for now
+        memset(local_allocas, 0, sizeof(local_allocas));
+
+        LVar* var = func_node->locals;
+        while (var) {
+            if (var->offset < 100) {
+                char var_name[64];
+                int len = var->len < 63 ? var->len : 63;
+                strncpy(var_name, var->name, len);
+                var_name[len] = '\0';
+                LLVMTypeRef var_type = to_llvm_type(var->type);
+                local_allocas[var->offset] =
+                    LLVMBuildAlloca(builder, var_type, var_name);
+            }
+            var = var->next;
+        }
 
         // Store parameter values into local variables
         param = func_node->rhs;
         for (int i = 0; i < param_count; i++) {
             LLVMValueRef arg = LLVMGetParam(func, i);
-            LLVMValueRef index =
-                LLVMConstInt(LLVMInt32Type(), param->val, false);
-            LLVMValueRef indices[] = {LLVMConstInt(LLVMInt32Type(), 0, false),
-                                      index};
-            LLVMValueRef gep = LLVMBuildInBoundsGEP2(
-                builder, array_type, local_vars, indices, 2, "arrayidx");
-            LLVMBuildStore(builder, arg, gep);
+            if (param->val < 100 && local_allocas[param->val]) {
+                LLVMBuildStore(builder, arg, local_allocas[param->val]);
+            }
             param = param->next;
         }
 
@@ -105,8 +133,7 @@ LLVMModuleRef generate_module(Context* ctx) {
         bool has_return = false;
         Node* stmt = func_node->lhs;
         while (stmt != NULL) {
-            res = codegen(stmt, builder, local_vars, array_type, &has_return,
-                          module);
+            res = codegen(stmt, builder, local_allocas, &has_return, module);
             if (has_return) {
                 break;
             }
@@ -114,7 +141,8 @@ LLVMModuleRef generate_module(Context* ctx) {
         }
         if (!has_return) {
             // For void functions, use RetVoid; for int functions, return value
-            if (func_node->val == TY_VOID) {
+            if (func_node->type && func_node->type->ty == 1 &&
+                func_node->type->ptr_to == NULL) { // void hack
                 LLVMBuildRetVoid(builder);
             } else {
                 LLVMBuildRet(builder, res);
@@ -144,8 +172,8 @@ LLVMModuleRef generate_module(Context* ctx) {
  * @return LLVMValueRef Generated value
  */
 static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
-                            LLVMValueRef local_vars, LLVMTypeRef array_type,
-                            bool* has_return, LLVMModuleRef module) {
+                            LLVMValueRef* local_allocas, bool* has_return,
+                            LLVMModuleRef module) {
     if (node == NULL) {
         return LLVMConstInt(LLVMInt32Type(), 0, 0);
     }
@@ -155,116 +183,107 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         return LLVMConstInt(LLVMInt32Type(), node->val, 0);
     }
     case ND_LVAR: {
-        LLVMValueRef index = LLVMConstInt(LLVMInt32Type(), node->val, false);
-        LLVMValueRef indices[] = {LLVMConstInt(LLVMInt32Type(), 0, false),
-                                  index};
-        LLVMValueRef gep = LLVMBuildInBoundsGEP2(
-            builder, array_type, local_vars, indices, 2, "arrayidx");
-
-        return LLVMBuildLoad2(builder, LLVMInt32Type(), gep, "loadtmp");
+        if (node->val < 100 && local_allocas[node->val]) {
+            LLVMValueRef alloca_ptr = local_allocas[node->val];
+            LLVMTypeRef var_type = to_llvm_type(node->type);
+            return LLVMBuildLoad2(builder, var_type, alloca_ptr, "loadtmp");
+        }
+        return LLVMConstInt(LLVMInt32Type(), 0, 0);
     }
     case ND_ASSIGN: {
-        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type,
-                                   has_return, module);
+        LLVMValueRef rhs =
+            codegen(node->rhs, builder, local_allocas, has_return, module);
 
         if (node->lhs->kind == ND_DEREF) {
-            // *ptr = value - store through pointer (using variable index)
-            LLVMValueRef addr_int = codegen(node->lhs->lhs, builder, local_vars,
-                                            array_type, has_return, module);
-            // The "address" is actually a variable index
-            LLVMValueRef indices[] = {LLVMConstInt(LLVMInt32Type(), 0, false),
-                                      addr_int};
-            LLVMValueRef gep = LLVMBuildInBoundsGEP2(
-                builder, array_type, local_vars, indices, 2, "derefgep");
-            LLVMBuildStore(builder, rhs, gep);
-        } else {
+            // *ptr = value - store through pointer
+            LLVMValueRef ptr = codegen(node->lhs->lhs, builder, local_allocas,
+                                       has_return, module);
+            LLVMBuildStore(builder, rhs, ptr);
+        } else if (node->lhs->kind == ND_LVAR) {
             // Regular variable assignment
-            LLVMValueRef index =
-                LLVMConstInt(LLVMInt32Type(), node->lhs->val, false);
-            LLVMValueRef indices[] = {LLVMConstInt(LLVMInt32Type(), 0, false),
-                                      index};
-            LLVMValueRef gep = LLVMBuildInBoundsGEP2(
-                builder, array_type, local_vars, indices, 2, "arrayidx");
-            LLVMBuildStore(builder, rhs, gep);
+            if (node->lhs->val < 100 && local_allocas[node->lhs->val]) {
+                LLVMValueRef alloca_ptr = local_allocas[node->lhs->val];
+                LLVMBuildStore(builder, rhs, alloca_ptr);
+            }
         }
         return rhs; // assignment returns the assigned value
     }
     case ND_ADD: {
-        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type,
-                                   has_return, module);
-        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type,
-                                   has_return, module);
+        LLVMValueRef lhs =
+            codegen(node->lhs, builder, local_allocas, has_return, module);
+        LLVMValueRef rhs =
+            codegen(node->rhs, builder, local_allocas, has_return, module);
         return LLVMBuildAdd(builder, lhs, rhs, "addtmp");
     }
     case ND_SUB: {
-        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type,
-                                   has_return, module);
-        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type,
-                                   has_return, module);
+        LLVMValueRef lhs =
+            codegen(node->lhs, builder, local_allocas, has_return, module);
+        LLVMValueRef rhs =
+            codegen(node->rhs, builder, local_allocas, has_return, module);
         return LLVMBuildSub(builder, lhs, rhs, "subtmp");
     }
     case ND_MUL: {
-        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type,
-                                   has_return, module);
-        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type,
-                                   has_return, module);
+        LLVMValueRef lhs =
+            codegen(node->lhs, builder, local_allocas, has_return, module);
+        LLVMValueRef rhs =
+            codegen(node->rhs, builder, local_allocas, has_return, module);
         return LLVMBuildMul(builder, lhs, rhs, "multmp");
     }
     case ND_DIV: {
-        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type,
-                                   has_return, module);
-        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type,
-                                   has_return, module);
+        LLVMValueRef lhs =
+            codegen(node->lhs, builder, local_allocas, has_return, module);
+        LLVMValueRef rhs =
+            codegen(node->rhs, builder, local_allocas, has_return, module);
         return LLVMBuildSDiv(builder, lhs, rhs, "divtmp");
     }
     case ND_LT: {
-        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type,
-                                   has_return, module);
-        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type,
-                                   has_return, module);
+        LLVMValueRef lhs =
+            codegen(node->lhs, builder, local_allocas, has_return, module);
+        LLVMValueRef rhs =
+            codegen(node->rhs, builder, local_allocas, has_return, module);
         LLVMValueRef res =
             LLVMBuildICmp(builder, LLVMIntSLT, lhs, rhs, "lttmp");
         return LLVMBuildZExt(builder, res, LLVMInt32Type(), "zexttmp");
     }
     case ND_LE: {
-        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type,
-                                   has_return, module);
-        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type,
-                                   has_return, module);
+        LLVMValueRef lhs =
+            codegen(node->lhs, builder, local_allocas, has_return, module);
+        LLVMValueRef rhs =
+            codegen(node->rhs, builder, local_allocas, has_return, module);
         LLVMValueRef res =
             LLVMBuildICmp(builder, LLVMIntSLE, lhs, rhs, "letmp");
         return LLVMBuildZExt(builder, res, LLVMInt32Type(), "zexttmp");
     }
     case ND_EQ: {
-        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type,
-                                   has_return, module);
-        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type,
-                                   has_return, module);
+        LLVMValueRef lhs =
+            codegen(node->lhs, builder, local_allocas, has_return, module);
+        LLVMValueRef rhs =
+            codegen(node->rhs, builder, local_allocas, has_return, module);
         LLVMValueRef res = LLVMBuildICmp(builder, LLVMIntEQ, lhs, rhs, "eqtmp");
         return LLVMBuildZExt(builder, res, LLVMInt32Type(), "zexttmp");
     }
     case ND_NE: {
-        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type,
-                                   has_return, module);
-        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type,
-                                   has_return, module);
+        LLVMValueRef lhs =
+            codegen(node->lhs, builder, local_allocas, has_return, module);
+        LLVMValueRef rhs =
+            codegen(node->rhs, builder, local_allocas, has_return, module);
         LLVMValueRef res = LLVMBuildICmp(builder, LLVMIntNE, lhs, rhs, "netmp");
         return LLVMBuildZExt(builder, res, LLVMInt32Type(), "zexttmp");
     }
     case ND_GE: {
-        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type,
-                                   has_return, module);
-        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type,
-                                   has_return, module);
+        LLVMValueRef lhs =
+            codegen(node->lhs, builder, local_allocas, has_return, module);
+        LLVMValueRef rhs =
+            codegen(node->rhs, builder, local_allocas, has_return, module);
         LLVMValueRef res =
             LLVMBuildICmp(builder, LLVMIntSGE, lhs, rhs, "getmp");
         return LLVMBuildZExt(builder, res, LLVMInt32Type(), "zexttmp");
     }
     case ND_GT: {
-        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type,
-                                   has_return, module);
-        LLVMValueRef rhs = codegen(node->rhs, builder, local_vars, array_type,
-                                   has_return, module);
+        LLVMValueRef lhs =
+            codegen(node->lhs, builder, local_allocas, has_return, module);
+        LLVMValueRef rhs =
+            codegen(node->rhs, builder, local_allocas, has_return, module);
         LLVMValueRef res =
             LLVMBuildICmp(builder, LLVMIntSGT, lhs, rhs, "gttmp");
         return LLVMBuildZExt(builder, res, LLVMInt32Type(), "zexttmp");
@@ -289,8 +308,8 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
             args = malloc(arg_count * sizeof(LLVMValueRef));
             arg = node->lhs;
             for (int i = 0; i < arg_count; i++) {
-                args[i] = codegen(arg, builder, local_vars, array_type,
-                                  has_return, module);
+                args[i] =
+                    codegen(arg, builder, local_allocas, has_return, module);
                 arg = arg->next;
             }
         }
@@ -324,15 +343,15 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         return result;
     }
     case ND_RETURN: {
-        LLVMValueRef lhs = codegen(node->lhs, builder, local_vars, array_type,
-                                   has_return, module);
+        LLVMValueRef lhs =
+            codegen(node->lhs, builder, local_allocas, has_return, module);
         *has_return = true;
         return LLVMBuildRet(builder, lhs);
     }
     case ND_IF: {
         // Generate condition
-        LLVMValueRef cond_val = codegen(node->cond, builder, local_vars,
-                                        array_type, has_return, module);
+        LLVMValueRef cond_val =
+            codegen(node->cond, builder, local_allocas, has_return, module);
 
         // Compare with 0 (condition != 0)
         LLVMValueRef zero = LLVMConstInt(LLVMInt32Type(), 0, false);
@@ -351,16 +370,15 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         // Generate then block
         LLVMPositionBuilderAtEnd(builder, then_bb);
         bool then_has_return = false;
-        codegen(node->lhs, builder, local_vars, array_type, &then_has_return,
-                module);
+        codegen(node->lhs, builder, local_allocas, &then_has_return, module);
         LLVMBasicBlockRef then_end = LLVMGetInsertBlock(builder);
 
         // Generate else block
         LLVMPositionBuilderAtEnd(builder, else_bb);
         bool else_has_return = false;
         if (node->rhs) {
-            codegen(node->rhs, builder, local_vars, array_type,
-                    &else_has_return, module);
+            codegen(node->rhs, builder, local_allocas, &else_has_return,
+                    module);
         }
         LLVMBasicBlockRef else_end = LLVMGetInsertBlock(builder);
 
@@ -405,8 +423,8 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         LLVMPositionBuilderAtEnd(builder, cond_bb);
         LLVMValueRef cond_val = LLVMConstInt(LLVMInt32Type(), 1, 0);
         if (node->cond) {
-            cond_val = codegen(node->cond, builder, local_vars, array_type,
-                               has_return, module);
+            cond_val =
+                codegen(node->cond, builder, local_allocas, has_return, module);
         }
         LLVMValueRef zero = LLVMConstInt(LLVMInt32Type(), 0, false);
         LLVMValueRef cond_bool =
@@ -415,7 +433,7 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
 
         // Generate body block
         LLVMPositionBuilderAtEnd(builder, body_bb);
-        codegen(node->lhs, builder, local_vars, array_type, has_return, module);
+        codegen(node->lhs, builder, local_allocas, has_return, module);
         if (!*has_return) {
             LLVMBuildBr(builder, cond_bb); // Loop back
         }
@@ -438,8 +456,7 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
 
         // Generate init if present
         if (node->init) {
-            codegen(node->init, builder, local_vars, array_type, has_return,
-                    module);
+            codegen(node->init, builder, local_allocas, has_return, module);
         }
 
         // Jump to condition
@@ -449,8 +466,8 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         LLVMPositionBuilderAtEnd(builder, cond_bb);
         LLVMValueRef cond_val = LLVMConstInt(LLVMInt32Type(), 1, 0);
         if (node->cond) {
-            cond_val = codegen(node->cond, builder, local_vars, array_type,
-                               has_return, module);
+            cond_val =
+                codegen(node->cond, builder, local_allocas, has_return, module);
         }
         LLVMValueRef zero = LLVMConstInt(LLVMInt32Type(), 0, false);
         LLVMValueRef cond_bool =
@@ -459,7 +476,7 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
 
         // Generate body block
         LLVMPositionBuilderAtEnd(builder, body_bb);
-        codegen(node->lhs, builder, local_vars, array_type, has_return, module);
+        codegen(node->lhs, builder, local_allocas, has_return, module);
         if (!*has_return) {
             LLVMBuildBr(builder, inc_bb);
         }
@@ -467,8 +484,7 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         // Generate increment block
         LLVMPositionBuilderAtEnd(builder, inc_bb);
         if (node->rhs) {
-            codegen(node->rhs, builder, local_vars, array_type, has_return,
-                    module);
+            codegen(node->rhs, builder, local_allocas, has_return, module);
         }
         LLVMBuildBr(builder, cond_bb); // Loop back to condition
 
@@ -482,8 +498,7 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         LLVMValueRef result = LLVMConstInt(LLVMInt32Type(), 0, 0);
         Node* stmt = node->lhs;
         while (stmt != NULL) {
-            result = codegen(stmt, builder, local_vars, array_type, has_return,
-                             module);
+            result = codegen(stmt, builder, local_allocas, has_return, module);
             if (*has_return) {
                 break; // Stop if we hit a return
             }
@@ -492,30 +507,23 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         return result;
     }
     case ND_DEREF: {
-        // *expr - load from address (where address is stored as variable index)
-        LLVMValueRef addr_int = codegen(node->lhs, builder, local_vars,
-                                        array_type, has_return, module);
-        // The "address" is actually a variable index, use it to get the actual
-        // address
-        LLVMValueRef index = addr_int;
-        LLVMValueRef indices[] = {LLVMConstInt(LLVMInt32Type(), 0, false),
-                                  index};
-        LLVMValueRef gep = LLVMBuildInBoundsGEP2(
-            builder, array_type, local_vars, indices, 2, "derefgep");
-        return LLVMBuildLoad2(builder, LLVMInt32Type(), gep, "deref");
+        // *expr - load from address
+        LLVMValueRef ptr =
+            codegen(node->lhs, builder, local_allocas, has_return, module);
+        LLVMTypeRef loaded_type = to_llvm_type(node->type);
+        return LLVMBuildLoad2(builder, loaded_type, ptr, "deref");
     }
     case ND_ADDR: {
-        // &expr - get address of local variable (store as variable index)
+        // &expr - get address of local variable
         if (node->lhs->kind == ND_LVAR) {
-            // Return the variable index as the "address"
-            return LLVMConstInt(LLVMInt32Type(), node->lhs->val, false);
+            if (node->lhs->val < 100 && local_allocas[node->lhs->val]) {
+                return local_allocas[node->lhs->val];
+            }
         }
-        // For non-LVAR, return 0 for now
-        return LLVMConstInt(LLVMInt32Type(), 0, 0);
+        // For non-LVAR, return null for now
+        return LLVMConstPointerNull(LLVMPointerType(LLVMInt32Type(), 0));
     }
     case ND_DECL: {
-        // Local variable declaration - already allocated space
-        // Just return 0 (no effect on execution)
         return LLVMConstInt(LLVMInt32Type(), 0, 0);
     }
     default:

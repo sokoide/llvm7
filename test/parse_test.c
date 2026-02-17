@@ -388,7 +388,7 @@ char* test_new_node_ident() {
 
     // First declare the variable
     Token* tok = new_token(TK_IDENT, &head, "a", 1);
-    add_lvar(&ctx, tok);
+    add_lvar(&ctx, tok, new_type_int());
 
     // Then use it
     Node* node = new_node_ident(&ctx, tok);
@@ -410,11 +410,11 @@ char* test_new_node_ident_abc() {
 
     // First declare variables
     Token* tok = new_token(TK_IDENT, &head, "a1", 2);
-    add_lvar(&ctx, tok);
+    add_lvar(&ctx, tok, new_type_int());
     Token* tok2 = new_token(TK_IDENT, tok, "a2", 2);
-    add_lvar(&ctx, tok2);
+    add_lvar(&ctx, tok2, new_type_int());
     Token* tok3 = new_token(TK_IDENT, tok2, "a3", 2);
-    add_lvar(&ctx, tok3);
+    add_lvar(&ctx, tok3, new_type_int());
 
     // Then use them
     Node* node = new_node_ident(&ctx, tok);
@@ -440,7 +440,7 @@ char* test_primary_ident() {
     Context ctx = {0};
     // First declare the variable
     Token* tok = tokenize("a");
-    add_lvar(&ctx, tok);
+    add_lvar(&ctx, tok, new_type_int());
     ctx.current_token = tok;
 
     Node* node = parse_primary(&ctx);
@@ -458,7 +458,7 @@ char* test_assign() {
     // First declare variable 'a'
     Token* tok = tokenize("a=42");
     Token* tok_a = tok; // 'a' token
-    add_lvar(&ctx, tok_a);
+    add_lvar(&ctx, tok_a, new_type_int());
     ctx.current_token = tok;
 
     Node* node = parse_assign(&ctx);
@@ -479,8 +479,8 @@ char* test_assign_chain() {
     Token* tok = tokenize("a=b=5");
     Token* tok_a = tok;             // 'a' token
     Token* tok_b = tok->next->next; // 'b' token (skip '=')
-    add_lvar(&ctx, tok_a);
-    add_lvar(&ctx, tok_b);
+    add_lvar(&ctx, tok_a, new_type_int());
+    add_lvar(&ctx, tok_b, new_type_int());
     ctx.current_token = tok;
 
     Node* node = parse_assign(&ctx);
@@ -516,7 +516,7 @@ char* test_stmt_assign() {
     // First declare variable 'a'
     Token* tok = tokenize("a=5;");
     Token* tok_a = tok; // 'a' token
-    add_lvar(&ctx, tok_a);
+    add_lvar(&ctx, tok_a, new_type_int());
     ctx.current_token = tok;
 
     Node* node = parse_stmt(&ctx);
@@ -549,7 +549,7 @@ char* test_stmt_return_ident() {
     // First declare variable 'a'
     Token* tok = tokenize("return a;");
     Token* tok_a = tok->next; // 'a' token
-    add_lvar(&ctx, tok_a);
+    add_lvar(&ctx, tok_a, new_type_int());
     ctx.current_token = tok;
 
     Node* node = parse_stmt(&ctx);
@@ -569,8 +569,8 @@ char* test_stmt_return_expr() {
     Token* tok_a = tok->next; // 'a' token (after 'return')
     Token* tok_b =
         tok->next->next->next; // 'b' token (after 'return', 'a', '+')
-    add_lvar(&ctx, tok_a);
-    add_lvar(&ctx, tok_b);
+    add_lvar(&ctx, tok_a, new_type_int());
+    add_lvar(&ctx, tok_b, new_type_int());
     ctx.current_token = tok;
 
     Node* node = parse_stmt(&ctx);
@@ -595,8 +595,8 @@ char* test_stmt_if() {
     Token* tok_b =
         tok->next->next->next->next
             ->next; // 'b' token (after 'if', '(', 'a', ')', 'return')
-    add_lvar(&ctx, tok_a);
-    add_lvar(&ctx, tok_b);
+    add_lvar(&ctx, tok_a, new_type_int());
+    add_lvar(&ctx, tok_b, new_type_int());
     ctx.current_token = tok;
 
     Node* node = parse_stmt(&ctx);
@@ -621,9 +621,9 @@ char* test_stmt_if_else() {
     Token* tok_b = tok->next->next->next->next->next; // 'b'
     Token* tok_c =
         tok->next->next->next->next->next->next->next->next->next; // 'c'
-    add_lvar(&ctx, tok_a);
-    add_lvar(&ctx, tok_b);
-    add_lvar(&ctx, tok_c);
+    add_lvar(&ctx, tok_a, new_type_int());
+    add_lvar(&ctx, tok_b, new_type_int());
+    add_lvar(&ctx, tok_c, new_type_int());
     ctx.current_token = tok;
 
     Node* node = parse_stmt(&ctx);
@@ -642,8 +642,8 @@ char* test_stmt_if_with_block() {
     Token* tok = tokenize("if (a) { return b; }");
     Token* tok_a = tok->next->next;                         // 'a'
     Token* tok_b = tok->next->next->next->next->next->next; // 'b'
-    add_lvar(&ctx, tok_a);
-    add_lvar(&ctx, tok_b);
+    add_lvar(&ctx, tok_a, new_type_int());
+    add_lvar(&ctx, tok_b, new_type_int());
     ctx.current_token = tok;
 
     Node* node = parse_stmt(&ctx);
@@ -665,9 +665,9 @@ char* test_stmt_if_complex_cond() {
     Token* tok_a = tok->next->next;                               // 'a'
     Token* tok_b = tok->next->next->next->next;                   // 'b'
     Token* tok_c = tok->next->next->next->next->next->next->next; // 'c'
-    add_lvar(&ctx, tok_a);
-    add_lvar(&ctx, tok_b);
-    add_lvar(&ctx, tok_c);
+    add_lvar(&ctx, tok_a, new_type_int());
+    add_lvar(&ctx, tok_b, new_type_int());
+    add_lvar(&ctx, tok_c, new_type_int());
     ctx.current_token = tok;
 
     Node* node = parse_stmt(&ctx);
@@ -685,8 +685,8 @@ char* test_stmt_while() {
     Token* tok = tokenize("while (a) return b;");
     Token* tok_a = tok->next->next;                   // 'a'
     Token* tok_b = tok->next->next->next->next->next; // 'b'
-    add_lvar(&ctx, tok_a);
-    add_lvar(&ctx, tok_b);
+    add_lvar(&ctx, tok_a, new_type_int());
+    add_lvar(&ctx, tok_b, new_type_int());
     ctx.current_token = tok;
 
     Node* node = parse_stmt(&ctx);
@@ -706,8 +706,8 @@ char* test_stmt_while_complex_cond() {
     Token* tok = tokenize("while (a < b) a = a + 1;");
     Token* tok_a = tok->next->next;             // 'a'
     Token* tok_b = tok->next->next->next->next; // 'b'
-    add_lvar(&ctx, tok_a);
-    add_lvar(&ctx, tok_b);
+    add_lvar(&ctx, tok_a, new_type_int());
+    add_lvar(&ctx, tok_b, new_type_int());
     ctx.current_token = tok;
 
     Node* node = parse_stmt(&ctx);
@@ -724,7 +724,7 @@ char* test_stmt_for() {
     Context ctx = {0};
     Token* tok = tokenize("for (a = 0; a < 10; a = a + 1) return 42;");
     Token* tok_a = tok->next->next; // 'a'
-    add_lvar(&ctx, tok_a);
+    add_lvar(&ctx, tok_a, new_type_int());
     ctx.current_token = tok;
 
     Node* node = parse_stmt(&ctx);
@@ -746,8 +746,8 @@ char* test_stmt_for_no_init() {
     Token* tok_a = tok->next->next->next; // 'a' (after 'for', '(', ';')
     Token* tok_b =
         tok->next->next->next->next->next->next->next->next->next; // 'b'
-    add_lvar(&ctx, tok_a);
-    add_lvar(&ctx, tok_b);
+    add_lvar(&ctx, tok_a, new_type_int());
+    add_lvar(&ctx, tok_b, new_type_int());
     ctx.current_token = tok;
 
     Node* node = parse_stmt(&ctx);
@@ -998,7 +998,8 @@ char* test_unary_deref() {
     Context ctx = {0};
     Token* tok = tokenize("*p");
     Token* tok_p = tok->next; // 'p'
-    add_lvar(&ctx, tok_p);
+    // p is a pointer type (int*)
+    add_lvar(&ctx, tok_p, new_type_ptr(new_type_int()));
     ctx.current_token = tok;
 
     Node* node = parse_unary(&ctx);
@@ -1014,7 +1015,7 @@ char* test_unary_addr() {
     Context ctx = {0};
     Token* tok = tokenize("&x");
     Token* tok_x = tok->next; // 'x'
-    add_lvar(&ctx, tok_x);
+    add_lvar(&ctx, tok_x, new_type_int());
     ctx.current_token = tok;
 
     Node* node = parse_unary(&ctx);
@@ -1030,7 +1031,9 @@ char* test_unary_deref_complex() {
     Context ctx = {0};
     Token* tok = tokenize("**p");
     Token* tok_p = tok->next->next; // 'p' (after '*', '*')
-    add_lvar(&ctx, tok_p);
+    // p is a pointer to pointer (int**)
+    Type* int_ptr = new_type_ptr(new_type_int());
+    add_lvar(&ctx, tok_p, new_type_ptr(int_ptr));
     ctx.current_token = tok;
 
     Node* node = parse_unary(&ctx);
@@ -1048,7 +1051,8 @@ char* test_expr_with_deref() {
     Context ctx = {0};
     Token* tok = tokenize("*p + 1");
     Token* tok_p = tok->next; // 'p'
-    add_lvar(&ctx, tok_p);
+    // p is a pointer type (int*)
+    add_lvar(&ctx, tok_p, new_type_ptr(new_type_int()));
     ctx.current_token = tok;
 
     Node* node = parse_expr(&ctx);

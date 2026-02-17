@@ -6,6 +6,6 @@
 #include <stdio.h>
 
 extern LVar* find_lvar(Context* ctx, Token* tok);
-extern LVar* add_lvar(Context* ctx, Token* tok);
+extern LVar* add_lvar(Context* ctx, Token* tok, Type* type);
 
 #endif
