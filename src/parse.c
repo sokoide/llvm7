@@ -288,6 +288,9 @@ Node* parse_assign(Context* ctx) {
     Node* node = parse_equality(ctx);
     if (consume(ctx, "=")) {
         node = new_node(ND_ASSIGN, node, parse_assign(ctx));
+        if (node->lhs) {
+            node->type = node->lhs->type;
+        }
     }
     return node;
 }
@@ -297,8 +300,10 @@ Node* parse_equality(Context* ctx) {
     while (1) {
         if (consume(ctx, "==")) {
             node = new_node(ND_EQ, node, parse_relational(ctx));
+            node->type = new_type_int();
         } else if (consume(ctx, "!=")) {
             node = new_node(ND_NE, node, parse_relational(ctx));
+            node->type = new_type_int();
         } else {
             return node;
         }
@@ -310,12 +315,16 @@ Node* parse_relational(Context* ctx) {
     while (1) {
         if (consume(ctx, "<=")) {
             node = new_node(ND_LE, node, parse_add(ctx));
+            node->type = new_type_int();
         } else if (consume(ctx, ">=")) {
             node = new_node(ND_GE, node, parse_add(ctx));
+            node->type = new_type_int();
         } else if (consume(ctx, "<")) {
             node = new_node(ND_LT, node, parse_add(ctx));
+            node->type = new_type_int();
         } else if (consume(ctx, ">")) {
             node = new_node(ND_GT, node, parse_add(ctx));
+            node->type = new_type_int();
         } else {
             return node;
         }
@@ -356,19 +365,50 @@ Node* parse_mul(Context* ctx) {
     while (1) {
         if (consume(ctx, "*")) {
             node = new_node(ND_MUL, node, parse_unary(ctx));
+            node->type = new_type_int();
         } else if (consume(ctx, "/")) {
             node = new_node(ND_DIV, node, parse_unary(ctx));
+            node->type = new_type_int();
         } else {
             return node;
         }
     }
 }
 
+static int type_size(Type* ty) {
+    if (ty == NULL)
+        return 4;
+    if (ty->ty == PTR)
+        return 8;
+    return 4;
+}
+
 Node* parse_unary(Context* ctx) {
     if (consume(ctx, "+")) {
         return parse_primary(ctx);
     } else if (consume(ctx, "-")) {
-        return new_node(ND_SUB, new_node_num(0), parse_primary(ctx));
+        Node* node = new_node(ND_SUB, new_node_num(0), parse_primary(ctx));
+        node->type = new_type_int();
+        return node;
+    } else if (consume(ctx, "sizeof")) {
+        if (consume(ctx, "(")) {
+            // Check if it's a type name
+            Type* ty = try_parse_type(ctx);
+            if (ty) {
+                expect(ctx, ")");
+                return new_node_num(type_size(ty));
+            }
+            // If not a type name, backtrack?
+            // Wait, currently we don't have backtrack.
+            // But if try_parse_type fails it will return NULL.
+            // If it returns NULL, then it must be an expression.
+            Node* node = parse_expr(ctx);
+            expect(ctx, ")");
+            return new_node_num(type_size(node->type));
+        } else {
+            Node* node = parse_unary(ctx);
+            return new_node_num(type_size(node->type));
+        }
     } else if (consume(ctx, "*")) {
         Node* operand = parse_unary(ctx);
         Node* node = new_node(ND_DEREF, operand, NULL);
@@ -411,6 +451,7 @@ Node* parse_primary(Context* ctx) {
             // function call
             Node* node_func = new_node(ND_CALL, node_args, NULL);
             node_func->tok = tok;
+            node_func->type = new_type_int();
             return node_func;
         }
         // ident

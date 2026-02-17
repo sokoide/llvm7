@@ -310,3 +310,57 @@ char* test_generate_pointer_arithmetic_sub() {
     mu_assert(msg, result == 4);
     return NULL;
 }
+
+char* test_generate_sizeof() {
+    Context ctx = {0};
+    // int x; int *y; return sizeof(x) + sizeof(y); // 4 + 8 = 12
+    Token* head =
+        tokenize("int main() { int x; int *y; return sizeof(x) + sizeof(y); }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+
+    static char msg[64];
+    snprintf(msg, sizeof(msg), "Expected 12, got %d", result);
+    mu_assert(msg, result == 12);
+    return NULL;
+}
+
+char* test_generate_sizeof_expr() {
+    Context ctx = {0};
+    // int x; int *y; return sizeof(x + 3) + sizeof(y + 3) + sizeof(*y) +
+    // sizeof(1) + sizeof(sizeof(1)); 4 + 8 + 4 + 4 + 4 = 24
+    Token* head =
+        tokenize("int main() { int x; int *y; return sizeof(x + 3) + sizeof(y "
+                 "+ 3) + sizeof(*y) + sizeof(1) + sizeof(sizeof(1)); }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+
+    static char msg[64];
+    snprintf(msg, sizeof(msg), "Expected 24, got %d", result);
+    mu_assert(msg, result == 24);
+    return NULL;
+}

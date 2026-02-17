@@ -21,5 +21,7 @@ char* test_generate_main_required();
 char* test_generate_pointer_example();
 char* test_generate_pointer_arithmetic();
 char* test_generate_pointer_arithmetic_sub();
+char* test_generate_sizeof();
+char* test_generate_sizeof_expr();
 
 #endif

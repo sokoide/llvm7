@@ -40,7 +40,7 @@ Token* tokenize(const char* p) {
         char* str;
         int len;
     } keywords[] = {{"return", 6}, {"if", 2},  {"else", 4}, {"while", 5},
-                    {"for", 3},    {"int", 3}, {"void", 4}};
+                    {"for", 3},    {"int", 3}, {"void", 4}, {"sizeof", 6}};
 
     // Iterate through the input string until null terminator
     while (*p) {
