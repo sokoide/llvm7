@@ -589,3 +589,110 @@ char* test_generate_string_literal() {
     mu_assert("Expected 65 (ASCII A)", result == 65);
     return NULL;
 }
+
+char* test_generate_struct() {
+    Context ctx = {0};
+    // struct { int a; int b; int* c; } s; s.a = 1; s.b = 2; s.c = &s.a; return
+    // s.a + s.b + *s.c; -> 4
+    Token* head = tokenize("int main() { struct { int a; int b; int* c; } s; "
+                           "s.a = 1; s.b = 2; s.c "
+                           "= &s.a; return s.a + s.b + *s.c; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+    mu_assert("Expected 4", result == 4);
+    return NULL;
+}
+
+char* test_generate_struct_simple() {
+    Context ctx = {0};
+    // struct { int a; } s; s.a = 42; return s.a; -> 42
+    Token* head =
+        tokenize("int main() { struct { int a; } s; s.a = 42; return s.a; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+    mu_assert("Expected 42", result == 42);
+    return NULL;
+}
+
+char* test_generate_struct_assign() {
+    Context ctx = {0};
+    // struct { int a; int b; } s; s.a = 1; s.b = 2; return s.a + s.b; -> 3
+    Token* head = tokenize("int main() { struct { int a; int b; } s; s.a = 1; "
+                           "s.b = 2; return s.a + s.b; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+    mu_assert("Expected 3", result == 3);
+    return NULL;
+}
+
+char* test_generate_char_simple() {
+    Context ctx = {0};
+    // char x; x = 127; return x; -> 127
+    Token* head = tokenize("int main() { char x; x = 127; return x; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+    mu_assert("Expected 127", result == 127);
+    return NULL;
+}
+
+char* test_generate_comments() {
+    Context ctx = {0};
+    // return 1; // comment\n /* comment */ return 2; -> 1 (if first return hit)
+    // or 2 Actually testing that comments don't break parsing.
+    Token* head =
+        tokenize("int main() { // comment\n return /* block */ 42; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+    mu_assert("Expected 42", result == 42);
+    return NULL;
+}

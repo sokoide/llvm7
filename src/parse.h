@@ -6,26 +6,29 @@
 // program = function*
 // function = type ident "(" params? ")" "{" stmt* "}"
 // params = type ident ("," type ident)*
-// type = "int" | "void" | type "*"
+// type = ("int" | "char" | "void" | struct_decl) "*"*
+// struct_decl = "struct" "{" (type ident ";")* "}"
 // stmt = expr ";"
 //      | "{" stmt* "}"
 //      | "return" expr ";"
 //      | "if" "(" expr ")" stmt ("else" stmt)?
 //      | "while" "(" expr ")" stmt
-//      | "for" "(" stmt expr ";" expr ")" stmt
-//      | type ident ";"
+//      | "for" "(" expr? ";" expr? ";" expr? ")" stmt
+//      | type ident ("[" num "]")? ";"
 // expr = assign
-// assign = equality("=" assign)?
-// equality = relational("==" relational | "!=" relational)*
-// relational = add("<" add | "<=" add | ">" add | ">=" add)*
-// add = mul("+" mul | "-" mul)*
-// mul = unary("*" unary | "/" unary)*
+// assign = equality ("=" assign)?
+// equality = relational ("==" relational | "!=" relational)*
+// relational = add ("<" add | "<=" add | ">" add | ">=" add)*
+// add = mul ("+" mul | "-" mul)*
+// mul = unary ("*" unary | "/" unary)*
 // unary = "sizeof" unary
-//       | ("+" | "-")? primary
+//       | ("+" | "-")? postfix
 //       | "*" unary
 //       | "&" unary
+// postfix = primary ("[" expr "]" | "." ident)*
 // primary = num
 //         | ident ("(" args? ")")?
+//         | string
 //         | "(" expr ")"
 // args = expr ("," expr)*
 

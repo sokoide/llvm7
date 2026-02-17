@@ -41,11 +41,17 @@ static char* run_all_tests() {
                 "codegen: global ptr return func");
     mu_run_test(test_generate_char_array, "codegen: char array");
     mu_run_test(test_generate_string_literal, "codegen: string literal");
+    mu_run_test(test_generate_struct, "codegen: struct");
+    mu_run_test(test_generate_struct_simple, "codegen: struct simple");
+    mu_run_test(test_generate_struct_assign, "codegen: struct assign");
+    mu_run_test(test_generate_char_simple, "codegen: char simple");
+    mu_run_test(test_generate_comments, "codegen: comments");
     mu_run_test(test_lex_tokenize, "lex: tokenize");
 
     mu_run_test(test_consume_operator, "lex: consume operator");
     mu_run_test(test_expect_operator, "lex: expect operator");
     mu_run_test(test_expect_number, "lex: expect number");
+    mu_run_test(test_lex_comments, "lex: comments");
     mu_run_test(test_new_node_num, "parse: new_node_num");
     mu_run_test(test_new_node, "parse: new_node");
     mu_run_test(test_unary_num, "parse: unary num");

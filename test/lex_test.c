@@ -95,3 +95,22 @@ char* test_expect_number() {
     free_tokens(ctx.current_token);
     return NULL;
 }
+
+char* test_lex_comments() {
+    Token* head = tokenize("1 // line comment\n + /* block \n comment */ 2");
+    Token* curr = head;
+
+    mu_assert("First token should be 1",
+              curr->kind == TK_NUM && curr->val == 1);
+    curr = curr->next;
+    mu_assert("Second token should be +",
+              curr->kind == TK_RESERVED && curr->str[0] == '+');
+    curr = curr->next;
+    mu_assert("Third token should be 2",
+              curr->kind == TK_NUM && curr->val == 2);
+    curr = curr->next;
+    mu_assert("Last token should be EOF", curr->kind == TK_EOF);
+
+    free_tokens(head);
+    return NULL;
+}

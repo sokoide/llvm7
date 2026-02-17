@@ -21,6 +21,21 @@ static LLVMTypeRef to_llvm_type(Type* ty) {
     if (ty->ty == CHAR) {
         return LLVMInt8Type();
     }
+    if (ty->ty == STRUCT) {
+        // Count members
+        int count = 0;
+        for (Member* m = ty->members; m; m = m->next)
+            count++;
+
+        LLVMTypeRef* types = malloc(sizeof(LLVMTypeRef) * count);
+        int i = 0;
+        for (Member* m = ty->members; m; m = m->next) {
+            types[i++] = to_llvm_type(m->type);
+        }
+        LLVMTypeRef struct_type = LLVMStructType(types, count, false);
+        free(types);
+        return struct_type;
+    }
     if (ty->ty == PTR) {
         if (ty->array_size > 0) {
             return LLVMArrayType(to_llvm_type(ty->ptr_to), ty->array_size);
@@ -280,6 +295,22 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
                     LLVMBuildTrunc(builder, rhs, LLVMInt8Type(), "trunc_char");
             }
             LLVMBuildStore(builder, deref_store, ptr);
+        } else if (node->lhs->kind == ND_MEMBER) {
+            // member access: s.a = value
+            // We need the address of the member.
+            // ND_ADDR handles this logic.
+            Node* addr_node = new_node(ND_ADDR, node->lhs, NULL);
+            addr_node->type = new_type_ptr(node->lhs->type);
+            LLVMValueRef ptr =
+                codegen(addr_node, builder, local_allocas, has_return, module);
+            free(addr_node);
+
+            LLVMValueRef member_store = rhs;
+            if (node->lhs->type && node->lhs->type->ty == CHAR) {
+                member_store =
+                    LLVMBuildTrunc(builder, rhs, LLVMInt8Type(), "trunc_char");
+            }
+            LLVMBuildStore(builder, member_store, ptr);
         } else if (node->lhs->kind == ND_LVAR) {
             // Regular variable assignment
             if (node->lhs->val < 100 && local_allocas[node->lhs->val]) {
@@ -634,6 +665,24 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         }
         return loaded;
     }
+    case ND_MEMBER: {
+        // member access: s.a
+        Node* addr_node = new_node(ND_ADDR, node, NULL);
+        addr_node->type = new_type_ptr(node->type);
+        LLVMValueRef ptr =
+            codegen(addr_node, builder, local_allocas, has_return, module);
+        free(addr_node);
+
+        LLVMTypeRef member_type = to_llvm_type(node->type);
+        LLVMValueRef loaded =
+            LLVMBuildLoad2(builder, member_type, ptr, "mload");
+        // Sign-extend char (i8) to int (i32) for use in expressions
+        if (node->type && node->type->ty == CHAR) {
+            loaded =
+                LLVMBuildSExt(builder, loaded, LLVMInt32Type(), "sext_char");
+        }
+        return loaded;
+    }
     case ND_ADDR: {
         // &expr - get address of variable
         if (node->lhs->kind == ND_LVAR) {
@@ -650,6 +699,36 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
                 }
                 return ptr;
             }
+        } else if (node->lhs->kind == ND_MEMBER) {
+            // &s.a
+            // Get base address
+            LLVMValueRef base_addr;
+            if (node->lhs->lhs->kind == ND_LVAR) {
+                base_addr = local_allocas[node->lhs->lhs->val];
+            } else if (node->lhs->lhs->kind == ND_GVAR) {
+                // handle global struct if needed
+                char var_name[64];
+                int len = node->lhs->lhs->tok->len < 63
+                              ? node->lhs->lhs->tok->len
+                              : 63;
+                strncpy(var_name, node->lhs->lhs->tok->str, len);
+                var_name[len] = '\0';
+                base_addr = LLVMGetNamedGlobal(module, var_name);
+            } else if (node->lhs->lhs->kind == ND_MEMBER) {
+                // recursive nested struct: &s.a.b
+                Node* nested_addr = new_node(ND_ADDR, node->lhs->lhs, NULL);
+                nested_addr->type = new_type_ptr(node->lhs->lhs->type);
+                base_addr = codegen(nested_addr, builder, local_allocas,
+                                    has_return, module);
+                free(nested_addr);
+            } else {
+                fprintf(stderr, "Unsupported base for member access\n");
+                exit(1);
+            }
+
+            LLVMTypeRef struct_type = to_llvm_type(node->lhs->lhs->type);
+            return LLVMBuildStructGEP2(builder, struct_type, base_addr,
+                                       node->lhs->member->index, "mgep");
         } else if (node->lhs->kind == ND_GVAR) {
             char var_name[64];
             int len = node->lhs->tok->len < 63 ? node->lhs->tok->len : 63;

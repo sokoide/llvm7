@@ -14,6 +14,16 @@ typedef enum {
     TK_EOF,
 } TokenKind;
 
+typedef struct Type Type;
+typedef struct Member Member;
+struct Member {
+    Member* next;
+    Type* type;
+    const char* name;
+    int len;
+    int index; // Member index for GEP
+};
+
 typedef struct Token Token;
 struct Token {
     TokenKind kind;
@@ -25,9 +35,10 @@ struct Token {
 
 typedef struct Type Type;
 struct Type {
-    enum { INT, CHAR, PTR } ty;
+    enum { INT, CHAR, PTR, STRUCT } ty;
     Type* ptr_to; // For PTR, points to the type being pointed to
     size_t array_size;
+    Member* members; // For STRUCT
 };
 
 typedef enum {
@@ -56,6 +67,7 @@ typedef enum {
     ND_ADDR,     // & (address-of)
     ND_DECL,     // local variable declaration
     ND_STR,      // string literal
+    ND_MEMBER,   // struct member access (.)
 } NodeKind;
 
 typedef struct LVar LVar;
@@ -77,8 +89,9 @@ struct Node {
     Node* init; // Initialization for for loop
     Token* tok; // Function name or token for the node
     int val;
-    Type* type;   // Type of the node (for ND_DECL, ND_LVAR, etc.)
-    LVar* locals; // Local variables (for ND_FUNCTION)
+    Type* type;     // Type of the node (for ND_DECL, ND_LVAR, etc.)
+    LVar* locals;   // Local variables (for ND_FUNCTION)
+    Member* member; // for ND_MEMBER
 };
 
 typedef struct Context Context;

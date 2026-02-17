@@ -33,5 +33,10 @@ char* test_generate_global_array_subscript();
 char* test_generate_global_ptr_return_func();
 char* test_generate_char_array();
 char* test_generate_string_literal();
+char* test_generate_struct();
+char* test_generate_struct_simple();
+char* test_generate_struct_assign();
+char* test_generate_char_simple();
+char* test_generate_comments();
 
 #endif

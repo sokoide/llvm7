@@ -39,9 +39,9 @@ Token* tokenize(const char* p) {
     struct {
         char* str;
         int len;
-    } keywords[] = {{"return", 6}, {"if", 2},   {"else", 4},
-                    {"while", 5},  {"for", 3},  {"int", 3},
-                    {"char", 4},   {"void", 4}, {"sizeof", 6}};
+    } keywords[] = {{"return", 6}, {"if", 2},    {"else", 4}, {"while", 5},
+                    {"for", 3},    {"int", 3},   {"char", 4}, {"void", 4},
+                    {"sizeof", 6}, {"struct", 6}};
 
     // Iterate through the input string until null terminator
     while (*p) {
@@ -101,7 +101,7 @@ Token* tokenize(const char* p) {
         }
 
         // Check for single-character operators and delimiters
-        char* single_char_ops = "+-*/()<>;={},&[]";
+        char* single_char_ops = "+-*/()<>;={},&[].";
         if (strchr(single_char_ops, *p)) {
             cur = new_token(TK_RESERVED, cur, p++, 1);
             continue;

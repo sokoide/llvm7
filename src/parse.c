@@ -113,6 +113,37 @@ Type* try_parse_type(Context* ctx) {
     } else if (consume(ctx, "void")) {
         base = new_type_int();
         base->ty = 1; // Use 1 for void (not INT)
+    } else if (consume(ctx, "struct")) {
+        expect(ctx, "{");
+        base = calloc(1, sizeof(Type));
+        base->ty = STRUCT;
+        Member head = {0};
+        Member* cur = &head;
+        int index = 0;
+        while (!consume(ctx, "}")) {
+            Type* mty = parse_type(ctx);
+            Token* mtok = consume_ident(ctx);
+            if (!mtok) {
+                fprintf(stderr, "Expected member name\n");
+                exit(1);
+            }
+            // Check for array in struct members if needed, but for now simple
+            if (consume(ctx, "[")) {
+                int size = expect_number(ctx);
+                expect(ctx, "]");
+                mty = new_type_array(mty, (size_t)size);
+            }
+            expect(ctx, ";");
+
+            Member* m = calloc(1, sizeof(Member));
+            m->type = mty;
+            m->name = mtok->str;
+            m->len = mtok->len;
+            m->index = index++;
+            cur->next = m;
+            cur = m;
+        }
+        base->members = head.next;
     } else {
         return NULL; // Not a type
     }
@@ -408,20 +439,10 @@ void parse_program(Context* ctx) {
 Node* parse_stmt(Context* ctx) {
     Node* node;
 
-    // Check for type declaration: (int|char) ident ";"
+    // Check for type declaration: e.g. int x; struct { ... } s;
     {
-        Type* ty = NULL;
-        if (consume(ctx, "int")) {
-            ty = new_type_int();
-        } else if (consume(ctx, "char")) {
-            ty = new_type_char();
-        }
+        Type* ty = try_parse_type(ctx);
         if (ty) {
-            // Check for pointers (e.g., int* x, char* s)
-            while (consume(ctx, "*")) {
-                ty = new_type_ptr(ty);
-            }
-
             Token* tok = consume_ident(ctx);
             if (!tok) {
                 fprintf(stderr, "Expected variable name after type\n");
@@ -619,11 +640,80 @@ static int type_size(Type* ty) {
         return 1;
     if (ty->ty == INT)
         return 4;
+    if (ty->ty == STRUCT) {
+        int size = 0;
+        for (Member* m = ty->members; m; m = m->next) {
+            size += type_size(m->type);
+        }
+        return size;
+    }
     if (ty->array_size > 0)
         return type_size(ty->ptr_to) * ty->array_size;
     if (ty->ty == PTR)
         return 8;
     return 4;
+}
+
+static Member* find_member(Type* ty, Token* tok) {
+    for (Member* m = ty->members; m; m = m->next) {
+        if (m->len == tok->len && memcmp(m->name, tok->str, tok->len) == 0) {
+            return m;
+        }
+    }
+    return NULL;
+}
+
+static Node* parse_postfix(Context* ctx) {
+    Node* node = parse_primary(ctx);
+
+    for (;;) {
+        if (consume(ctx, "[")) {
+            // x[y] -> *(x+y)
+            Node* index = parse_expr(ctx);
+            expect(ctx, "]");
+            Node* base = convert_array_to_ptr(node);
+            Node* add_node = new_node(ND_ADD, base, index);
+            if (base->type && base->type->ty == PTR) {
+                add_node->type = base->type;
+            } else if (index->type && index->type->ty == PTR) {
+                add_node->type = index->type;
+            } else {
+                add_node->type = new_type_int();
+            }
+            node = new_node(ND_DEREF, add_node, NULL);
+            if (add_node->type && add_node->type->ty == PTR) {
+                node->type = add_node->type->ptr_to;
+            } else {
+                node->type = new_type_int();
+            }
+            continue;
+        }
+
+        if (consume(ctx, ".")) {
+            Token* tok = consume_ident(ctx);
+            if (!tok) {
+                fprintf(stderr, "Expected member name after '.'\n");
+                exit(1);
+            }
+            if (!node->type || node->type->ty != STRUCT) {
+                fprintf(stderr, "Left side of '.' is not a struct\n");
+                exit(1);
+            }
+            Member* m = find_member(node->type, tok);
+            if (!m) {
+                fprintf(stderr, "Member '%.*s' not found\n", tok->len,
+                        tok->str);
+                exit(1);
+            }
+            Node* n = new_node(ND_MEMBER, node, NULL);
+            n->type = m->type;
+            n->member = m;
+            node = n;
+            continue;
+        }
+
+        return node;
+    }
 }
 
 static Node* convert_array_to_ptr(Node* node) {
@@ -678,7 +768,7 @@ Node* parse_unary(Context* ctx) {
             new_type_ptr(operand->type ? operand->type : new_type_int());
         return node;
     } else {
-        return convert_array_to_ptr(parse_primary(ctx));
+        return convert_array_to_ptr(parse_postfix(ctx));
     }
 }
 
