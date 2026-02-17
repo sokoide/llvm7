@@ -19,6 +19,9 @@ static LLVMTypeRef to_llvm_type(Type* ty) {
         return LLVMInt32Type();
     }
     if (ty->ty == PTR) {
+        if (ty->array_size > 0) {
+            return LLVMArrayType(to_llvm_type(ty->ptr_to), ty->array_size);
+        }
         if (ty->ptr_to == NULL) {
             return LLVMPointerType(LLVMInt32Type(), 0);
         }
@@ -539,7 +542,17 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         // &expr - get address of local variable
         if (node->lhs->kind == ND_LVAR) {
             if (node->lhs->val < 100 && local_allocas[node->lhs->val]) {
-                return local_allocas[node->lhs->val];
+                LLVMValueRef ptr = local_allocas[node->lhs->val];
+                if (node->lhs->type->array_size > 0) {
+                    // Implicit conversion or &a
+                    LLVMValueRef indices[] = {
+                        LLVMConstInt(LLVMInt32Type(), 0, false),
+                        LLVMConstInt(LLVMInt32Type(), 0, false)};
+                    LLVMTypeRef array_type = to_llvm_type(node->lhs->type);
+                    return LLVMBuildInBoundsGEP2(builder, array_type, ptr,
+                                                 indices, 2, "array_to_ptr");
+                }
+                return ptr;
             }
         }
         // For non-LVAR, return null for now

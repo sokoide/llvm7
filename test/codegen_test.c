@@ -364,3 +364,30 @@ char* test_generate_sizeof_expr() {
     mu_assert(msg, result == 24);
     return NULL;
 }
+
+char* test_generate_array() {
+    Context ctx = {0};
+    // int a[2]; *a = 1; *(a + 1) = 2; int *p; p = a; return *p + *(p + 1); // 1
+    // + 2 = 3
+    Token* head = tokenize("int main() { int a[2]; *a = 1; *(a + 1) = 2; int "
+                           "*p; p = a; return *p + *(p + 1); }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+
+    static char msg[64];
+    snprintf(msg, sizeof(msg), "Expected 3, got %d", result);
+    mu_assert(msg, result == 3);
+    return NULL;
+}

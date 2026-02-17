@@ -2,6 +2,7 @@
 #define __COMMON_H__
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #define MAX_NODES 128
 
@@ -25,6 +26,7 @@ typedef struct Type Type;
 struct Type {
     enum { INT, PTR } ty;
     Type* ptr_to; // For PTR, points to the type being pointed to
+    size_t array_size;
 };
 
 typedef enum {

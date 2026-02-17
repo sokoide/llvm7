@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+static Node* convert_array_to_ptr(Node* node);
+
 Node* new_node(NodeKind kind, Node* lhs, Node* rhs) {
     Node* node = calloc(1, sizeof(Node));
     node->kind = kind;
@@ -75,6 +77,15 @@ Type* new_type_ptr(Type* base) {
     return t;
 }
 
+// Helper to create an array type
+Type* new_type_array(Type* base, size_t size) {
+    Type* t = calloc(1, sizeof(Type));
+    t->ty = PTR;
+    t->ptr_to = base;
+    t->array_size = size;
+    return t;
+}
+
 // Try to parse a type, returns NULL if not a type
 Type* try_parse_type(Context* ctx) {
     // Parse base type
@@ -114,6 +125,14 @@ Node* parse_params(Context* ctx) {
         exit(1);
     }
 
+    if (consume(ctx, "[")) {
+        if (!consume(ctx, "]")) {
+            expect_number(ctx);
+            expect(ctx, "]");
+        }
+        ty = new_type_ptr(ty);
+    }
+
     // Add parameter to locals before creating node
     add_lvar(ctx, tok, ty);
     Node* head = new_node_ident(ctx, tok);
@@ -127,6 +146,15 @@ Node* parse_params(Context* ctx) {
             fprintf(stderr, "Expected parameter name\n");
             exit(1);
         }
+
+        if (consume(ctx, "[")) {
+            if (!consume(ctx, "]")) {
+                expect_number(ctx);
+                expect(ctx, "]");
+            }
+            ty = new_type_ptr(ty);
+        }
+
         // Add parameter to locals before creating node
         add_lvar(ctx, tok, ty);
         tail->next = new_node_ident(ctx, tok);
@@ -210,6 +238,13 @@ Node* parse_stmt(Context* ctx) {
             exit(1);
         }
 
+        // Check for array definitions (e.g., int a[10])
+        if (consume(ctx, "[")) {
+            int size = expect_number(ctx);
+            expect(ctx, "]");
+            ty = new_type_array(ty, size);
+        }
+
         expect(ctx, ";");
 
         // Add variable to locals
@@ -222,10 +257,10 @@ Node* parse_stmt(Context* ctx) {
     }
 
     if (consume(ctx, "return")) {
-        node = new_node(ND_RETURN, parse_expr(ctx), NULL);
+        node = new_node(ND_RETURN, convert_array_to_ptr(parse_expr(ctx)), NULL);
     } else if (consume(ctx, "if")) {
         expect(ctx, "(");
-        Node* cond = parse_expr(ctx);
+        Node* cond = convert_array_to_ptr(parse_expr(ctx));
         expect(ctx, ")");
         Node* then = parse_stmt(ctx);
         Node* els = NULL;
@@ -237,7 +272,7 @@ Node* parse_stmt(Context* ctx) {
         return node;
     } else if (consume(ctx, "while")) {
         expect(ctx, "(");
-        Node* cond = parse_expr(ctx);
+        Node* cond = convert_array_to_ptr(parse_expr(ctx));
         expect(ctx, ")");
         Node* body = parse_stmt(ctx);
         node = new_node(ND_WHILE, body, NULL);
@@ -247,17 +282,17 @@ Node* parse_stmt(Context* ctx) {
         expect(ctx, "(");
         Node* init = NULL;
         if (!consume(ctx, ";")) {
-            init = parse_expr(ctx);
+            init = convert_array_to_ptr(parse_expr(ctx));
             expect(ctx, ";");
         }
         Node* cond = NULL;
         if (!consume(ctx, ";")) {
-            cond = parse_expr(ctx);
+            cond = convert_array_to_ptr(parse_expr(ctx));
             expect(ctx, ";");
         }
         Node* inc = NULL;
         if (!consume(ctx, ")")) {
-            inc = parse_expr(ctx);
+            inc = convert_array_to_ptr(parse_expr(ctx));
             expect(ctx, ")");
         }
         Node* body = parse_stmt(ctx);
@@ -287,7 +322,8 @@ Node* parse_expr(Context* ctx) { return parse_assign(ctx); }
 Node* parse_assign(Context* ctx) {
     Node* node = parse_equality(ctx);
     if (consume(ctx, "=")) {
-        node = new_node(ND_ASSIGN, node, parse_assign(ctx));
+        node =
+            new_node(ND_ASSIGN, node, convert_array_to_ptr(parse_assign(ctx)));
         if (node->lhs) {
             node->type = node->lhs->type;
         }
@@ -299,10 +335,12 @@ Node* parse_equality(Context* ctx) {
     Node* node = parse_relational(ctx);
     while (1) {
         if (consume(ctx, "==")) {
-            node = new_node(ND_EQ, node, parse_relational(ctx));
+            node = new_node(ND_EQ, convert_array_to_ptr(node),
+                            convert_array_to_ptr(parse_relational(ctx)));
             node->type = new_type_int();
         } else if (consume(ctx, "!=")) {
-            node = new_node(ND_NE, node, parse_relational(ctx));
+            node = new_node(ND_NE, convert_array_to_ptr(node),
+                            convert_array_to_ptr(parse_relational(ctx)));
             node->type = new_type_int();
         } else {
             return node;
@@ -314,16 +352,20 @@ Node* parse_relational(Context* ctx) {
     Node* node = parse_add(ctx);
     while (1) {
         if (consume(ctx, "<=")) {
-            node = new_node(ND_LE, node, parse_add(ctx));
+            node = new_node(ND_LE, convert_array_to_ptr(node),
+                            convert_array_to_ptr(parse_add(ctx)));
             node->type = new_type_int();
         } else if (consume(ctx, ">=")) {
-            node = new_node(ND_GE, node, parse_add(ctx));
+            node = new_node(ND_GE, convert_array_to_ptr(node),
+                            convert_array_to_ptr(parse_add(ctx)));
             node->type = new_type_int();
         } else if (consume(ctx, "<")) {
-            node = new_node(ND_LT, node, parse_add(ctx));
+            node = new_node(ND_LT, convert_array_to_ptr(node),
+                            convert_array_to_ptr(parse_add(ctx)));
             node->type = new_type_int();
         } else if (consume(ctx, ">")) {
-            node = new_node(ND_GT, node, parse_add(ctx));
+            node = new_node(ND_GT, convert_array_to_ptr(node),
+                            convert_array_to_ptr(parse_add(ctx)));
             node->type = new_type_int();
         } else {
             return node;
@@ -335,7 +377,8 @@ Node* parse_add(Context* ctx) {
     Node* node = parse_mul(ctx);
     while (1) {
         if (consume(ctx, "+")) {
-            Node* rhs = parse_mul(ctx);
+            Node* rhs = convert_array_to_ptr(parse_mul(ctx));
+            node = convert_array_to_ptr(node);
             Node* newNode = new_node(ND_ADD, node, rhs);
             if (node->type && node->type->ty == PTR) {
                 newNode->type = node->type;
@@ -346,7 +389,8 @@ Node* parse_add(Context* ctx) {
             }
             node = newNode;
         } else if (consume(ctx, "-")) {
-            Node* rhs = parse_mul(ctx);
+            Node* rhs = convert_array_to_ptr(parse_mul(ctx));
+            node = convert_array_to_ptr(node);
             Node* newNode = new_node(ND_SUB, node, rhs);
             if (node->type && node->type->ty == PTR) {
                 newNode->type = node->type;
@@ -364,10 +408,12 @@ Node* parse_mul(Context* ctx) {
     Node* node = parse_unary(ctx);
     while (1) {
         if (consume(ctx, "*")) {
-            node = new_node(ND_MUL, node, parse_unary(ctx));
+            node = new_node(ND_MUL, convert_array_to_ptr(node),
+                            convert_array_to_ptr(parse_unary(ctx)));
             node->type = new_type_int();
         } else if (consume(ctx, "/")) {
-            node = new_node(ND_DIV, node, parse_unary(ctx));
+            node = new_node(ND_DIV, convert_array_to_ptr(node),
+                            convert_array_to_ptr(parse_unary(ctx)));
             node->type = new_type_int();
         } else {
             return node;
@@ -378,16 +424,28 @@ Node* parse_mul(Context* ctx) {
 static int type_size(Type* ty) {
     if (ty == NULL)
         return 4;
+    if (ty->array_size > 0)
+        return type_size(ty->ptr_to) * ty->array_size;
     if (ty->ty == PTR)
         return 8;
     return 4;
 }
 
+static Node* convert_array_to_ptr(Node* node) {
+    if (node->type && node->type->array_size > 0) {
+        Node* n = new_node(ND_ADDR, node, NULL);
+        n->type = new_type_ptr(node->type->ptr_to);
+        return n;
+    }
+    return node;
+}
+
 Node* parse_unary(Context* ctx) {
     if (consume(ctx, "+")) {
-        return parse_primary(ctx);
+        return convert_array_to_ptr(parse_primary(ctx));
     } else if (consume(ctx, "-")) {
-        Node* node = new_node(ND_SUB, new_node_num(0), parse_primary(ctx));
+        Node* node = new_node(ND_SUB, new_node_num(0),
+                              convert_array_to_ptr(parse_primary(ctx)));
         node->type = new_type_int();
         return node;
     } else if (consume(ctx, "sizeof")) {
@@ -410,7 +468,7 @@ Node* parse_unary(Context* ctx) {
             return new_node_num(type_size(node->type));
         }
     } else if (consume(ctx, "*")) {
-        Node* operand = parse_unary(ctx);
+        Node* operand = convert_array_to_ptr(parse_unary(ctx));
         Node* node = new_node(ND_DEREF, operand, NULL);
         if (operand->type && operand->type->ty == PTR) {
             node->type = operand->type->ptr_to;
@@ -425,7 +483,7 @@ Node* parse_unary(Context* ctx) {
             new_type_ptr(operand->type ? operand->type : new_type_int());
         return node;
     } else {
-        return parse_primary(ctx);
+        return convert_array_to_ptr(parse_primary(ctx));
     }
 }
 
@@ -463,10 +521,10 @@ Node* parse_primary(Context* ctx) {
 }
 
 Node* parse_args(Context* ctx) {
-    Node* node = parse_expr(ctx);
+    Node* node = convert_array_to_ptr(parse_expr(ctx));
     Node* head = node;
     while (consume(ctx, ",")) {
-        node->next = parse_expr(ctx);
+        node->next = convert_array_to_ptr(parse_expr(ctx));
         node = node->next;
     }
     return head;
