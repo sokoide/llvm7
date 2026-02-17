@@ -1,4 +1,6 @@
-main() {
+int main() {
+    int a;
+    int b;
     a = 0;
     b = 2;
     if (a < 5) {

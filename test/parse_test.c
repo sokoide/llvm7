@@ -1,5 +1,6 @@
 #include "parse_test.h"
 #include "../src/lex.h"
+#include "../src/variable.h"
 #include "test_common.h"
 #include <stdio.h>
 #include <string.h>
@@ -35,7 +36,7 @@ char* test_unary_num() {
     Context ctx = {0};
     ctx.current_token = tokenize("42");
 
-    Node* node = unary(&ctx);
+    Node* node = parse_unary(&ctx);
 
     mu_assert("Node kind should be ND_NUM", node->kind == ND_NUM);
     mu_assert("Node value should be 42", node->val == 42);
@@ -48,7 +49,7 @@ char* test_unary_plus() {
     Context ctx = {0};
     ctx.current_token = tokenize("+42");
 
-    Node* node = unary(&ctx);
+    Node* node = parse_unary(&ctx);
 
     mu_assert("Node kind should be ND_NUM", node->kind == ND_NUM);
     mu_assert("Node value should be 42", node->val == 42);
@@ -61,7 +62,7 @@ char* test_unary_minus() {
     Context ctx = {0};
     ctx.current_token = tokenize("-5");
 
-    Node* node = unary(&ctx);
+    Node* node = parse_unary(&ctx);
 
     mu_assert("Node kind should be ND_SUB", node->kind == ND_SUB);
     mu_assert("Left value should be 0", node->lhs->val == 0);
@@ -75,7 +76,7 @@ char* test_unary_plus_num() {
     Context ctx = {0};
     ctx.current_token = tokenize("+5+3");
 
-    Node* node = expr(&ctx);
+    Node* node = parse_expr(&ctx);
 
     mu_assert("Node kind should be ND_ADD", node->kind == ND_ADD);
     mu_assert("Left value should be 5", node->lhs->val == 5);
@@ -89,7 +90,7 @@ char* test_unary_minus_mul() {
     Context ctx = {0};
     ctx.current_token = tokenize("-3*4");
 
-    Node* node = mul(&ctx);
+    Node* node = parse_mul(&ctx);
 
     mu_assert("Node kind should be ND_MUL", node->kind == ND_MUL);
     mu_assert("Right value should be 4", node->rhs->val == 4);
@@ -105,7 +106,7 @@ char* test_primary_num() {
     Context ctx = {0};
     ctx.current_token = tokenize("42");
 
-    Node* node = primary(&ctx);
+    Node* node = parse_primary(&ctx);
 
     mu_assert("Node kind should be ND_NUM", node->kind == ND_NUM);
     mu_assert("Node value should be 42", node->val == 42);
@@ -119,7 +120,7 @@ char* test_primary_paren() {
     Context ctx = {0};
     ctx.current_token = tokenize("(42)");
 
-    Node* node = primary(&ctx);
+    Node* node = parse_primary(&ctx);
 
     mu_assert("Node kind should be ND_NUM", node->kind == ND_NUM);
     mu_assert("Node value should be 42", node->val == 42);
@@ -133,7 +134,7 @@ char* test_mul_single_num() {
     Context ctx = {0};
     ctx.current_token = tokenize("5");
 
-    Node* node = mul(&ctx);
+    Node* node = parse_mul(&ctx);
 
     mu_assert("Node kind should be ND_NUM", node->kind == ND_NUM);
     mu_assert("Node value should be 5", node->val == 5);
@@ -146,7 +147,7 @@ char* test_mul_multiply() {
     Context ctx = {0};
     ctx.current_token = tokenize("2*3");
 
-    Node* node = mul(&ctx);
+    Node* node = parse_mul(&ctx);
 
     mu_assert("Node kind should be ND_MUL", node->kind == ND_MUL);
     mu_assert("Left value should be 2", node->lhs->val == 2);
@@ -160,7 +161,7 @@ char* test_mul_divide() {
     Context ctx = {0};
     ctx.current_token = tokenize("6/2");
 
-    Node* node = mul(&ctx);
+    Node* node = parse_mul(&ctx);
 
     mu_assert("Node kind should be ND_DIV", node->kind == ND_DIV);
     mu_assert("Left value should be 6", node->lhs->val == 6);
@@ -174,7 +175,7 @@ char* test_mul_chain() {
     Context ctx = {0};
     ctx.current_token = tokenize("2*3*4");
 
-    Node* node = mul(&ctx);
+    Node* node = parse_mul(&ctx);
 
     mu_assert("Root node kind should be ND_MUL", node->kind == ND_MUL);
     mu_assert("Right value should be 4", node->rhs->val == 4);
@@ -190,7 +191,7 @@ char* test_expr_single_num() {
     Context ctx = {0};
     ctx.current_token = tokenize("42");
 
-    Node* node = expr(&ctx);
+    Node* node = parse_expr(&ctx);
 
     mu_assert("Node kind should be ND_NUM", node->kind == ND_NUM);
     mu_assert("Node value should be 42", node->val == 42);
@@ -203,7 +204,7 @@ char* test_expr_add() {
     Context ctx = {0};
     ctx.current_token = tokenize("1+2");
 
-    Node* node = expr(&ctx);
+    Node* node = parse_expr(&ctx);
 
     mu_assert("Node kind should be ND_ADD", node->kind == ND_ADD);
     mu_assert("Left value should be 1", node->lhs->val == 1);
@@ -217,7 +218,7 @@ char* test_expr_subtract() {
     Context ctx = {0};
     ctx.current_token = tokenize("5-3");
 
-    Node* node = expr(&ctx);
+    Node* node = parse_expr(&ctx);
 
     mu_assert("Node kind should be ND_SUB", node->kind == ND_SUB);
     mu_assert("Left value should be 5", node->lhs->val == 5);
@@ -231,7 +232,7 @@ char* test_expr_add_sub_chain() {
     Context ctx = {0};
     ctx.current_token = tokenize("1-2+3");
 
-    Node* node = expr(&ctx);
+    Node* node = parse_expr(&ctx);
 
     mu_assert("Root node kind should be ND_ADD", node->kind == ND_ADD);
     mu_assert("Right value should be 3", node->rhs->val == 3);
@@ -247,7 +248,7 @@ char* test_expr_precedence() {
     Context ctx = {0};
     ctx.current_token = tokenize("1+2*3");
 
-    Node* node = expr(&ctx);
+    Node* node = parse_expr(&ctx);
 
     mu_assert("Root node kind should be ND_ADD", node->kind == ND_ADD);
     mu_assert("Left value should be 1", node->lhs->val == 1);
@@ -263,7 +264,7 @@ char* test_expr_complex_precedence() {
     Context ctx = {0};
     ctx.current_token = tokenize("1+2*3-4");
 
-    Node* node = expr(&ctx);
+    Node* node = parse_expr(&ctx);
 
     mu_assert("Root node kind should be ND_SUB", node->kind == ND_SUB);
     mu_assert("Right value should be 4", node->rhs->val == 4);
@@ -284,7 +285,7 @@ char* test_relational_lt() {
     Context ctx = {0};
     ctx.current_token = tokenize("1<2");
 
-    Node* node = relational(&ctx);
+    Node* node = parse_relational(&ctx);
 
     mu_assert("Node kind should be ND_LT", node->kind == ND_LT);
     mu_assert("Left value should be 1", node->lhs->val == 1);
@@ -298,7 +299,7 @@ char* test_relational_le() {
     Context ctx = {0};
     ctx.current_token = tokenize("1<=2");
 
-    Node* node = relational(&ctx);
+    Node* node = parse_relational(&ctx);
 
     mu_assert("Node kind should be ND_LE", node->kind == ND_LE);
     mu_assert("Left value should be 1", node->lhs->val == 1);
@@ -312,7 +313,7 @@ char* test_relational_gt() {
     Context ctx = {0};
     ctx.current_token = tokenize("1>2");
 
-    Node* node = relational(&ctx);
+    Node* node = parse_relational(&ctx);
 
     mu_assert("Node kind should be ND_GT", node->kind == ND_GT);
     mu_assert("Left value should be 1", node->lhs->val == 1);
@@ -326,7 +327,7 @@ char* test_relational_ge() {
     Context ctx = {0};
     ctx.current_token = tokenize("1>=2");
 
-    Node* node = relational(&ctx);
+    Node* node = parse_relational(&ctx);
 
     mu_assert("Node kind should be ND_GE", node->kind == ND_GE);
     mu_assert("Left value should be 1", node->lhs->val == 1);
@@ -340,7 +341,7 @@ char* test_equality_eq() {
     Context ctx = {0};
     ctx.current_token = tokenize("1==2");
 
-    Node* node = equality(&ctx);
+    Node* node = parse_equality(&ctx);
 
     mu_assert("Node kind should be ND_EQ", node->kind == ND_EQ);
     mu_assert("Left value should be 1", node->lhs->val == 1);
@@ -354,7 +355,7 @@ char* test_equality_ne() {
     Context ctx = {0};
     ctx.current_token = tokenize("1!=2");
 
-    Node* node = equality(&ctx);
+    Node* node = parse_equality(&ctx);
 
     mu_assert("Node kind should be ND_NE", node->kind == ND_NE);
     mu_assert("Left value should be 1", node->lhs->val == 1);
@@ -368,7 +369,7 @@ char* test_expr_combined_precedence() {
     Context ctx = {0};
     ctx.current_token = tokenize("1+2==3");
 
-    Node* node = expr(&ctx);
+    Node* node = parse_expr(&ctx);
 
     mu_assert("Root node kind should be ND_EQ", node->kind == ND_EQ);
     mu_assert("Left node kind should be ND_ADD", node->lhs->kind == ND_ADD);
@@ -385,7 +386,11 @@ char* test_new_node_ident() {
     Token head;
     head.next = NULL;
 
+    // First declare the variable
     Token* tok = new_token(TK_IDENT, &head, "a", 1);
+    add_lvar(&ctx, tok);
+
+    // Then use it
     Node* node = new_node_ident(&ctx, tok);
 
     mu_assert("Node kind should be ND_LVAR", node->kind == ND_LVAR);
@@ -403,11 +408,17 @@ char* test_new_node_ident_abc() {
     Token head;
     head.next = NULL;
 
+    // First declare variables
     Token* tok = new_token(TK_IDENT, &head, "a1", 2);
-    Node* node = new_node_ident(&ctx, tok);
+    add_lvar(&ctx, tok);
     Token* tok2 = new_token(TK_IDENT, tok, "a2", 2);
-    Node* node2 = new_node_ident(&ctx, tok2);
+    add_lvar(&ctx, tok2);
     Token* tok3 = new_token(TK_IDENT, tok2, "a3", 2);
+    add_lvar(&ctx, tok3);
+
+    // Then use them
+    Node* node = new_node_ident(&ctx, tok);
+    Node* node2 = new_node_ident(&ctx, tok2);
     Node* node3 = new_node_ident(&ctx, tok3);
 
     printf("node2 value %d\n", node2->val);
@@ -427,23 +438,30 @@ char* test_new_node_ident_abc() {
 
 char* test_primary_ident() {
     Context ctx = {0};
-    ctx.current_token = tokenize("a");
+    // First declare the variable
+    Token* tok = tokenize("a");
+    add_lvar(&ctx, tok);
+    ctx.current_token = tok;
 
-    Node* node = primary(&ctx);
+    Node* node = parse_primary(&ctx);
 
     mu_assert("Node kind should be ND_LVAR", node->kind == ND_LVAR);
     mu_assert("Node val should be 0", node->val == 0);
     mu_assert("Token should be EOF", ctx.current_token->kind == TK_EOF);
     free_ast(node);
-    free_tokens(ctx.current_token);
+    free_tokens(tok);
     return NULL;
 }
 
 char* test_assign() {
     Context ctx = {0};
-    ctx.current_token = tokenize("a=42");
+    // First declare variable 'a'
+    Token* tok = tokenize("a=42");
+    Token* tok_a = tok; // 'a' token
+    add_lvar(&ctx, tok_a);
+    ctx.current_token = tok;
 
-    Node* node = assign(&ctx);
+    Node* node = parse_assign(&ctx);
 
     mu_assert("Node kind should be ND_ASSIGN", node->kind == ND_ASSIGN);
     mu_assert("Left node kind should be ND_LVAR", node->lhs->kind == ND_LVAR);
@@ -451,15 +469,21 @@ char* test_assign() {
     mu_assert("Right node kind should be ND_NUM", node->rhs->kind == ND_NUM);
     mu_assert("Right value should be 42", node->rhs->val == 42);
     free_ast(node);
-    free_tokens(ctx.current_token);
+    free_tokens(tok);
     return NULL;
 }
 
 char* test_assign_chain() {
     Context ctx = {0};
-    ctx.current_token = tokenize("a=b=5");
+    // First declare variables 'a' and 'b'
+    Token* tok = tokenize("a=b=5");
+    Token* tok_a = tok;             // 'a' token
+    Token* tok_b = tok->next->next; // 'b' token (skip '=')
+    add_lvar(&ctx, tok_a);
+    add_lvar(&ctx, tok_b);
+    ctx.current_token = tok;
 
-    Node* node = assign(&ctx);
+    Node* node = parse_assign(&ctx);
 
     mu_assert("Root node kind should be ND_ASSIGN", node->kind == ND_ASSIGN);
     mu_assert("Left node kind should be ND_LVAR", node->lhs->kind == ND_LVAR);
@@ -469,7 +493,7 @@ char* test_assign_chain() {
     mu_assert("Right-left val should be 1", node->rhs->lhs->val == 1);
     mu_assert("Right-right value should be 5", node->rhs->rhs->val == 5);
     free_ast(node);
-    free_tokens(ctx.current_token);
+    free_tokens(tok);
     return NULL;
 }
 
@@ -477,7 +501,7 @@ char* test_stmt() {
     Context ctx = {0};
     ctx.current_token = tokenize("42;");
 
-    Node* node = stmt(&ctx);
+    Node* node = parse_stmt(&ctx);
 
     mu_assert("Node kind should be ND_NUM", node->kind == ND_NUM);
     mu_assert("Node value should be 42", node->val == 42);
@@ -489,15 +513,19 @@ char* test_stmt() {
 
 char* test_stmt_assign() {
     Context ctx = {0};
-    ctx.current_token = tokenize("a=5;");
+    // First declare variable 'a'
+    Token* tok = tokenize("a=5;");
+    Token* tok_a = tok; // 'a' token
+    add_lvar(&ctx, tok_a);
+    ctx.current_token = tok;
 
-    Node* node = stmt(&ctx);
+    Node* node = parse_stmt(&ctx);
 
     mu_assert("Node kind should be ND_ASSIGN", node->kind == ND_ASSIGN);
     mu_assert("Left node kind should be ND_LVAR", node->lhs->kind == ND_LVAR);
     mu_assert("Right node kind should be ND_NUM", node->rhs->kind == ND_NUM);
     free_ast(node);
-    free_tokens(ctx.current_token);
+    free_tokens(tok);
     return NULL;
 }
 
@@ -505,7 +533,7 @@ char* test_stmt_return_num() {
     Context ctx = {0};
     ctx.current_token = tokenize("return 42;");
 
-    Node* node = stmt(&ctx);
+    Node* node = parse_stmt(&ctx);
 
     mu_assert("Node kind should be ND_RETURN", node->kind == ND_RETURN);
     mu_assert("Left node kind should be ND_NUM", node->lhs->kind == ND_NUM);
@@ -518,23 +546,34 @@ char* test_stmt_return_num() {
 
 char* test_stmt_return_ident() {
     Context ctx = {0};
-    ctx.current_token = tokenize("return a;");
+    // First declare variable 'a'
+    Token* tok = tokenize("return a;");
+    Token* tok_a = tok->next; // 'a' token
+    add_lvar(&ctx, tok_a);
+    ctx.current_token = tok;
 
-    Node* node = stmt(&ctx);
+    Node* node = parse_stmt(&ctx);
 
     mu_assert("Node kind should be ND_RETURN", node->kind == ND_RETURN);
     mu_assert("Left node kind should be ND_LVAR", node->lhs->kind == ND_LVAR);
     mu_assert("Right node should be NULL", node->rhs == NULL);
     free_ast(node);
-    free_tokens(ctx.current_token);
+    free_tokens(tok);
     return NULL;
 }
 
 char* test_stmt_return_expr() {
     Context ctx = {0};
-    ctx.current_token = tokenize("return a + b;");
+    // First declare variables 'a' and 'b'
+    Token* tok = tokenize("return a + b;");
+    Token* tok_a = tok->next; // 'a' token (after 'return')
+    Token* tok_b =
+        tok->next->next->next; // 'b' token (after 'return', 'a', '+')
+    add_lvar(&ctx, tok_a);
+    add_lvar(&ctx, tok_b);
+    ctx.current_token = tok;
 
-    Node* node = stmt(&ctx);
+    Node* node = parse_stmt(&ctx);
 
     mu_assert("Node kind should be ND_RETURN", node->kind == ND_RETURN);
     mu_assert("Left node kind should be ND_ADD", node->lhs->kind == ND_ADD);
@@ -544,15 +583,23 @@ char* test_stmt_return_expr() {
               node->lhs->rhs->kind == ND_LVAR);
     mu_assert("Right node should be NULL", node->rhs == NULL);
     free_ast(node);
-    free_tokens(ctx.current_token);
+    free_tokens(tok);
     return NULL;
 }
 
 char* test_stmt_if() {
     Context ctx = {0};
-    ctx.current_token = tokenize("if (a) return b;");
+    // First declare variables 'a' and 'b'
+    Token* tok = tokenize("if (a) return b;");
+    Token* tok_a = tok->next->next; // 'a' token (after 'if', '(')
+    Token* tok_b =
+        tok->next->next->next->next
+            ->next; // 'b' token (after 'if', '(', 'a', ')', 'return')
+    add_lvar(&ctx, tok_a);
+    add_lvar(&ctx, tok_b);
+    ctx.current_token = tok;
 
-    Node* node = stmt(&ctx);
+    Node* node = parse_stmt(&ctx);
 
     mu_assert("Node kind should be ND_IF", node->kind == ND_IF);
     mu_assert("Condition kind should be ND_LVAR", node->cond->kind == ND_LVAR);
@@ -561,30 +608,45 @@ char* test_stmt_if() {
               node->lhs->lhs->kind == ND_LVAR);
     mu_assert("Else should be NULL", node->rhs == NULL);
     free_ast(node);
-    free_tokens(ctx.current_token);
+    free_tokens(tok);
     return NULL;
 }
 
 char* test_stmt_if_else() {
     Context ctx = {0};
-    ctx.current_token = tokenize("if (a) return b; else return c;");
+    Token* tok = tokenize("if (a) return b; else return c;");
+    // Declare variables 'a', 'b', 'c'
+    // Tokens: if, (, a, ), return, b, ;, else, return, c, ;
+    Token* tok_a = tok->next->next;                   // 'a'
+    Token* tok_b = tok->next->next->next->next->next; // 'b'
+    Token* tok_c =
+        tok->next->next->next->next->next->next->next->next->next; // 'c'
+    add_lvar(&ctx, tok_a);
+    add_lvar(&ctx, tok_b);
+    add_lvar(&ctx, tok_c);
+    ctx.current_token = tok;
 
-    Node* node = stmt(&ctx);
+    Node* node = parse_stmt(&ctx);
 
     mu_assert("Node kind should be ND_IF", node->kind == ND_IF);
     mu_assert("Condition kind should be ND_LVAR", node->cond->kind == ND_LVAR);
     mu_assert("Then kind should be ND_RETURN", node->lhs->kind == ND_RETURN);
     mu_assert("Else kind should be ND_RETURN", node->rhs->kind == ND_RETURN);
     free_ast(node);
-    free_tokens(ctx.current_token);
+    free_tokens(tok);
     return NULL;
 }
 
 char* test_stmt_if_with_block() {
     Context ctx = {0};
-    ctx.current_token = tokenize("if (a) { return b; }");
+    Token* tok = tokenize("if (a) { return b; }");
+    Token* tok_a = tok->next->next;                         // 'a'
+    Token* tok_b = tok->next->next->next->next->next->next; // 'b'
+    add_lvar(&ctx, tok_a);
+    add_lvar(&ctx, tok_b);
+    ctx.current_token = tok;
 
-    Node* node = stmt(&ctx);
+    Node* node = parse_stmt(&ctx);
 
     mu_assert("Node kind should be ND_IF", node->kind == ND_IF);
     mu_assert("Condition kind should be ND_LVAR", node->cond->kind == ND_LVAR);
@@ -593,29 +655,41 @@ char* test_stmt_if_with_block() {
               node->lhs->lhs->kind == ND_RETURN);
     mu_assert("Else should be NULL", node->rhs == NULL);
     free_ast(node);
-    free_tokens(ctx.current_token);
+    free_tokens(tok);
     return NULL;
 }
 
 char* test_stmt_if_complex_cond() {
     Context ctx = {0};
-    ctx.current_token = tokenize("if (a == b) return c;");
+    Token* tok = tokenize("if (a == b) return c;");
+    Token* tok_a = tok->next->next;                               // 'a'
+    Token* tok_b = tok->next->next->next->next;                   // 'b'
+    Token* tok_c = tok->next->next->next->next->next->next->next; // 'c'
+    add_lvar(&ctx, tok_a);
+    add_lvar(&ctx, tok_b);
+    add_lvar(&ctx, tok_c);
+    ctx.current_token = tok;
 
-    Node* node = stmt(&ctx);
+    Node* node = parse_stmt(&ctx);
 
     mu_assert("Node kind should be ND_IF", node->kind == ND_IF);
     mu_assert("Condition kind should be ND_EQ", node->cond->kind == ND_EQ);
     mu_assert("Then kind should be ND_RETURN", node->lhs->kind == ND_RETURN);
     free_ast(node);
-    free_tokens(ctx.current_token);
+    free_tokens(tok);
     return NULL;
 }
 
 char* test_stmt_while() {
     Context ctx = {0};
-    ctx.current_token = tokenize("while (a) return b;");
+    Token* tok = tokenize("while (a) return b;");
+    Token* tok_a = tok->next->next;                   // 'a'
+    Token* tok_b = tok->next->next->next->next->next; // 'b'
+    add_lvar(&ctx, tok_a);
+    add_lvar(&ctx, tok_b);
+    ctx.current_token = tok;
 
-    Node* node = stmt(&ctx);
+    Node* node = parse_stmt(&ctx);
 
     mu_assert("Node kind should be ND_WHILE", node->kind == ND_WHILE);
     mu_assert("Condition kind should be ND_LVAR", node->cond->kind == ND_LVAR);
@@ -623,29 +697,37 @@ char* test_stmt_while() {
     mu_assert("Body lhs kind should be ND_LVAR",
               node->lhs->lhs->kind == ND_LVAR);
     free_ast(node);
-    free_tokens(ctx.current_token);
+    free_tokens(tok);
     return NULL;
 }
 
 char* test_stmt_while_complex_cond() {
     Context ctx = {0};
-    ctx.current_token = tokenize("while (a < b) a = a + 1;");
+    Token* tok = tokenize("while (a < b) a = a + 1;");
+    Token* tok_a = tok->next->next;             // 'a'
+    Token* tok_b = tok->next->next->next->next; // 'b'
+    add_lvar(&ctx, tok_a);
+    add_lvar(&ctx, tok_b);
+    ctx.current_token = tok;
 
-    Node* node = stmt(&ctx);
+    Node* node = parse_stmt(&ctx);
 
     mu_assert("Node kind should be ND_WHILE", node->kind == ND_WHILE);
     mu_assert("Condition kind should be ND_LT", node->cond->kind == ND_LT);
     mu_assert("Body kind should be ND_ASSIGN", node->lhs->kind == ND_ASSIGN);
     free_ast(node);
-    free_tokens(ctx.current_token);
+    free_tokens(tok);
     return NULL;
 }
 
 char* test_stmt_for() {
     Context ctx = {0};
-    ctx.current_token = tokenize("for (a = 0; a < 10; a = a + 1) return b;");
+    Token* tok = tokenize("for (a = 0; a < 10; a = a + 1) return 42;");
+    Token* tok_a = tok->next->next; // 'a'
+    add_lvar(&ctx, tok_a);
+    ctx.current_token = tok;
 
-    Node* node = stmt(&ctx);
+    Node* node = parse_stmt(&ctx);
 
     mu_assert("Node kind should be ND_FOR", node->kind == ND_FOR);
     mu_assert("Init kind should be ND_ASSIGN", node->init->kind == ND_ASSIGN);
@@ -653,30 +735,37 @@ char* test_stmt_for() {
     mu_assert("Inc kind should be ND_ASSIGN", node->rhs->kind == ND_ASSIGN);
     mu_assert("Body kind should be ND_RETURN", node->lhs->kind == ND_RETURN);
     free_ast(node);
-    free_tokens(ctx.current_token);
+    free_tokens(tok);
     return NULL;
 }
 
 char* test_stmt_for_no_init() {
     Context ctx = {0};
-    ctx.current_token = tokenize("for (; a < 10;) return b;");
+    Token* tok = tokenize("for (; a < 10;) return b;");
+    // Tokens: for, (, ;, a, <, 10, ;, ), return, b, ;
+    Token* tok_a = tok->next->next->next; // 'a' (after 'for', '(', ';')
+    Token* tok_b =
+        tok->next->next->next->next->next->next->next->next->next; // 'b'
+    add_lvar(&ctx, tok_a);
+    add_lvar(&ctx, tok_b);
+    ctx.current_token = tok;
 
-    Node* node = stmt(&ctx);
+    Node* node = parse_stmt(&ctx);
 
     mu_assert("Node kind should be ND_FOR", node->kind == ND_FOR);
     mu_assert("Init should be NULL", node->init == NULL);
     mu_assert("Condition kind should be ND_LT", node->cond->kind == ND_LT);
     mu_assert("Inc should be NULL", node->rhs == NULL);
     free_ast(node);
-    free_tokens(ctx.current_token);
+    free_tokens(tok);
     return NULL;
 }
 
 char* test_program_single_stmt() {
     Context ctx = {0};
-    ctx.current_token = tokenize("main() { 42; }");
+    ctx.current_token = tokenize("int main() { 42; }");
 
-    program(&ctx);
+    parse_program(&ctx);
 
     mu_assert("ctx.code[0] should not be NULL", ctx.code[0] != NULL);
     mu_assert("ctx.code[0] kind should be ND_FUNCTION",
@@ -692,9 +781,9 @@ char* test_program_single_stmt() {
 
 char* test_program_multiple_stmts() {
     Context ctx = {0};
-    ctx.current_token = tokenize("main() { 1; 2; 3; }");
+    ctx.current_token = tokenize("int main() { 1; 2; 3; }");
 
-    program(&ctx);
+    parse_program(&ctx);
 
     mu_assert("ctx.code[0] should not be NULL", ctx.code[0] != NULL);
     mu_assert("ctx.code[0] kind should be ND_FUNCTION",
@@ -713,17 +802,21 @@ char* test_program_multiple_stmts() {
 
 char* test_program_assign_stmts() {
     Context ctx = {0};
-    ctx.current_token = tokenize("main() { a=1; b=2; }");
+    ctx.current_token = tokenize("int main() { int a; int b; a=1; b=2; }");
 
-    program(&ctx);
+    parse_program(&ctx);
 
     mu_assert("ctx.code[0] should not be NULL", ctx.code[0] != NULL);
     mu_assert("ctx.code[0] kind should be ND_FUNCTION",
               ctx.code[0]->kind == ND_FUNCTION);
-    mu_assert("ctx.code[0] body first stmt kind should be ND_ASSIGN",
-              ctx.code[0]->lhs->kind == ND_ASSIGN);
-    mu_assert("ctx.code[0] body second stmt kind should be ND_ASSIGN",
-              ctx.code[0]->lhs->next->kind == ND_ASSIGN);
+    mu_assert("ctx.code[0] body first stmt kind should be ND_DECL",
+              ctx.code[0]->lhs->kind == ND_DECL);
+    mu_assert("ctx.code[0] body second stmt kind should be ND_DECL",
+              ctx.code[0]->lhs->next->kind == ND_DECL);
+    mu_assert("ctx.code[0] body third stmt kind should be ND_ASSIGN",
+              ctx.code[0]->lhs->next->next->kind == ND_ASSIGN);
+    mu_assert("ctx.code[0] body fourth stmt kind should be ND_ASSIGN",
+              ctx.code[0]->lhs->next->next->next->kind == ND_ASSIGN);
     mu_assert("ctx.code[1] should be NULL", ctx.code[1] == NULL);
     free_ast(ctx.code[0]);
     free_tokens(ctx.current_token);
@@ -734,7 +827,7 @@ char* test_stmt_call() {
     Context ctx = {0};
     ctx.current_token = tokenize("foo();");
 
-    Node* node = stmt(&ctx);
+    Node* node = parse_stmt(&ctx);
 
     mu_assert("Node kind should be ND_CALL", node->kind == ND_CALL);
     mu_assert("tok should not be NULL", node->tok != NULL);
@@ -748,7 +841,7 @@ char* test_stmt_call_with_args() {
     Context ctx = {0};
     ctx.current_token = tokenize("foo(40, 2);");
 
-    Node* node = stmt(&ctx);
+    Node* node = parse_stmt(&ctx);
 
     mu_assert("Node kind should be ND_CALL", node->kind == ND_CALL);
     mu_assert("tok should not be NULL", node->tok != NULL);
@@ -765,9 +858,9 @@ char* test_stmt_call_with_args() {
 
 char* test_function_simple() {
     Context ctx = {0};
-    ctx.current_token = tokenize("main() { return 42; }");
+    ctx.current_token = tokenize("int main() { return 42; }");
 
-    Node* node = function(&ctx);
+    Node* node = parse_function(&ctx);
 
     mu_assert("Node kind should be ND_FUNCTION", node->kind == ND_FUNCTION);
     mu_assert("Function name should be 'main'",
@@ -784,17 +877,19 @@ char* test_function_simple() {
 
 char* test_function_multiple_stmts() {
     Context ctx = {0};
-    ctx.current_token = tokenize("main() { a=1; return a; }");
+    ctx.current_token = tokenize("int main() { int a; a=1; return a; }");
 
-    Node* node = function(&ctx);
+    Node* node = parse_function(&ctx);
 
     mu_assert("Node kind should be ND_FUNCTION", node->kind == ND_FUNCTION);
     mu_assert("Body should not be NULL", node->lhs != NULL);
-    mu_assert("First stmt kind should be ND_ASSIGN",
-              node->lhs->kind == ND_ASSIGN);
+    mu_assert("First stmt kind should be ND_DECL", node->lhs->kind == ND_DECL);
     mu_assert("Second stmt should exist", node->lhs->next != NULL);
-    mu_assert("Second stmt kind should be ND_RETURN",
-              node->lhs->next->kind == ND_RETURN);
+    mu_assert("Second stmt kind should be ND_ASSIGN",
+              node->lhs->next->kind == ND_ASSIGN);
+    mu_assert("Third stmt should exist", node->lhs->next->next != NULL);
+    mu_assert("Third stmt kind should be ND_RETURN",
+              node->lhs->next->next->kind == ND_RETURN);
     free_ast(node);
     free_tokens(ctx.current_token);
     return NULL;
@@ -802,9 +897,9 @@ char* test_function_multiple_stmts() {
 
 char* test_program_single_function() {
     Context ctx = {0};
-    ctx.current_token = tokenize("main() { return 42; }");
+    ctx.current_token = tokenize("int main() { return 42; }");
 
-    program(&ctx);
+    parse_program(&ctx);
 
     mu_assert("ctx.code[0] should not be NULL", ctx.code[0] != NULL);
     mu_assert("ctx.code[0] kind should be ND_FUNCTION",
@@ -820,9 +915,10 @@ char* test_program_single_function() {
 
 char* test_program_multiple_functions() {
     Context ctx = {0};
-    ctx.current_token = tokenize("foo() { return 1; } main() { return 42; }");
+    ctx.current_token =
+        tokenize("int foo() { return 1; } int main() { return 42; }");
 
-    program(&ctx);
+    parse_program(&ctx);
 
     mu_assert("ctx.code[0] should not be NULL", ctx.code[0] != NULL);
     mu_assert("ctx.code[0] kind should be ND_FUNCTION",
@@ -844,9 +940,9 @@ char* test_program_multiple_functions() {
 
 char* test_function_with_block() {
     Context ctx = {0};
-    ctx.current_token = tokenize("main() { if (1) { return 42; } }");
+    ctx.current_token = tokenize("int main() { if (1) { return 42; } }");
 
-    Node* node = function(&ctx);
+    Node* node = parse_function(&ctx);
 
     mu_assert("Node kind should be ND_FUNCTION", node->kind == ND_FUNCTION);
     mu_assert("Body should not be NULL", node->lhs != NULL);
@@ -860,9 +956,9 @@ char* test_function_with_block() {
 
 char* test_function_with_params() {
     Context ctx = {0};
-    ctx.current_token = tokenize("foo(a, b) { return a + b; }");
+    ctx.current_token = tokenize("int foo(int a, int b) { return a + b; }");
 
-    Node* node = function(&ctx);
+    Node* node = parse_function(&ctx);
 
     mu_assert("Node kind should be ND_FUNCTION", node->kind == ND_FUNCTION);
     mu_assert("Function name should be 'foo'",
@@ -882,9 +978,9 @@ char* test_function_with_params() {
 
 char* test_function_with_single_param() {
     Context ctx = {0};
-    ctx.current_token = tokenize("bar(x) { return x; }");
+    ctx.current_token = tokenize("int bar(int x) { return x; }");
 
-    Node* node = function(&ctx);
+    Node* node = parse_function(&ctx);
 
     mu_assert("Node kind should be ND_FUNCTION", node->kind == ND_FUNCTION);
     mu_assert("Function name should be 'bar'",
@@ -900,22 +996,28 @@ char* test_function_with_single_param() {
 
 char* test_unary_deref() {
     Context ctx = {0};
-    ctx.current_token = tokenize("*p");
+    Token* tok = tokenize("*p");
+    Token* tok_p = tok->next; // 'p'
+    add_lvar(&ctx, tok_p);
+    ctx.current_token = tok;
 
-    Node* node = unary(&ctx);
+    Node* node = parse_unary(&ctx);
 
     mu_assert("Node kind should be ND_DEREF", node->kind == ND_DEREF);
     mu_assert("Operand should be ND_LVAR", node->lhs->kind == ND_LVAR);
     free_ast(node);
-    free_tokens(ctx.current_token);
+    free_tokens(tok);
     return NULL;
 }
 
 char* test_unary_addr() {
     Context ctx = {0};
-    ctx.current_token = tokenize("&x");
+    Token* tok = tokenize("&x");
+    Token* tok_x = tok->next; // 'x'
+    add_lvar(&ctx, tok_x);
+    ctx.current_token = tok;
 
-    Node* node = unary(&ctx);
+    Node* node = parse_unary(&ctx);
 
     mu_assert("Node kind should be ND_ADDR", node->kind == ND_ADDR);
     mu_assert("Operand should be ND_LVAR", node->lhs->kind == ND_LVAR);
@@ -926,24 +1028,30 @@ char* test_unary_addr() {
 
 char* test_unary_deref_complex() {
     Context ctx = {0};
-    ctx.current_token = tokenize("**p");
+    Token* tok = tokenize("**p");
+    Token* tok_p = tok->next->next; // 'p' (after '*', '*')
+    add_lvar(&ctx, tok_p);
+    ctx.current_token = tok;
 
-    Node* node = unary(&ctx);
+    Node* node = parse_unary(&ctx);
 
     mu_assert("Node kind should be ND_DEREF", node->kind == ND_DEREF);
     mu_assert("Operand should be ND_DEREF", node->lhs->kind == ND_DEREF);
     mu_assert("Inner operand should be ND_LVAR",
               node->lhs->lhs->kind == ND_LVAR);
     free_ast(node);
-    free_tokens(ctx.current_token);
+    free_tokens(tok);
     return NULL;
 }
 
 char* test_expr_with_deref() {
     Context ctx = {0};
-    ctx.current_token = tokenize("*p + 1");
+    Token* tok = tokenize("*p + 1");
+    Token* tok_p = tok->next; // 'p'
+    add_lvar(&ctx, tok_p);
+    ctx.current_token = tok;
 
-    Node* node = expr(&ctx);
+    Node* node = parse_expr(&ctx);
 
     mu_assert("Root kind should be ND_ADD", node->kind == ND_ADD);
     mu_assert("Left should be ND_DEREF", node->lhs->kind == ND_DEREF);

@@ -1,6 +1,7 @@
-foo(a, b) { return a + b; }
+int foo(int a, int b) { return a + b; }
 
-main() {
+int main() {
+    int a;
     a = foo(40, 2);
     return a;
 }

@@ -54,8 +54,13 @@ LLVMModuleRef generate_module(Context* ctx) {
             param = param->next;
         }
 
-        // Create function type with parameters
-        LLVMTypeRef ret_type = LLVMInt32Type();
+        // Determine return type from function node
+        LLVMTypeRef ret_type;
+        if (func_node->val == TY_VOID) {
+            ret_type = LLVMVoidType();
+        } else {
+            ret_type = LLVMInt32Type();
+        }
         LLVMTypeRef* param_types = NULL;
         if (param_count > 0) {
             param_types = malloc(param_count * sizeof(LLVMTypeRef));
@@ -108,7 +113,12 @@ LLVMModuleRef generate_module(Context* ctx) {
             stmt = stmt->next;
         }
         if (!has_return) {
-            LLVMBuildRet(builder, res);
+            // For void functions, use RetVoid; for int functions, return value
+            if (func_node->val == TY_VOID) {
+                LLVMBuildRetVoid(builder);
+            } else {
+                LLVMBuildRet(builder, res);
+            }
         }
     }
 
@@ -501,6 +511,11 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
             return LLVMConstInt(LLVMInt32Type(), node->lhs->val, false);
         }
         // For non-LVAR, return 0 for now
+        return LLVMConstInt(LLVMInt32Type(), 0, 0);
+    }
+    case ND_DECL: {
+        // Local variable declaration - already allocated space
+        // Just return 0 (no effect on execution)
         return LLVMConstInt(LLVMInt32Type(), 0, 0);
     }
     default:

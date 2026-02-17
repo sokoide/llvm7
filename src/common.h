@@ -22,6 +22,11 @@ struct Token {
 };
 
 typedef enum {
+    TY_INT,
+    TY_VOID,
+} Type;
+
+typedef enum {
     ND_ADD,      // +
     ND_SUB,      // -
     ND_MUL,      // *
@@ -44,6 +49,7 @@ typedef enum {
     ND_FUNCTION, // function definition
     ND_DEREF,    // * (pointer dereference)
     ND_ADDR,     // & (address-of)
+    ND_DECL,     // local variable declaration
 } NodeKind;
 
 typedef struct Node Node;

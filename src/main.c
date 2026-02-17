@@ -44,7 +44,7 @@ int main(int argc, const char** argv) {
     ctx.current_token = tokenize(source);
 
     // Parse AST
-    program(&ctx);
+    parse_program(&ctx);
 
     // Generate LLVM IR to file
     if (generate_code_to_file(&ctx, output_file) != 0) {
