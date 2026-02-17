@@ -29,19 +29,27 @@ Node* new_node_num(int val) {
 
 Node* new_node_ident(Context* ctx, Token* tok) {
     Node* node = calloc(1, sizeof(Node));
-    node->kind = ND_LVAR;
     LVar* lvar = find_lvar(ctx, tok);
-    if (!lvar) {
-        // Undeclared variable - error
-        fprintf(stderr, "Error: undeclared variable '");
-        fwrite(tok->str, 1, tok->len, stderr);
-        fprintf(stderr, "'\n");
-        exit(1);
+    if (lvar) {
+        node->kind = ND_LVAR;
+        node->val = lvar->offset;
+        node->type = lvar->type;
+        return node;
     }
-    node->val = lvar->offset;
-    node->type = lvar->type; // Store type
 
-    return node;
+    LVar* gvar = find_gvar(ctx, tok);
+    if (gvar) {
+        node->kind = ND_GVAR;
+        node->tok = tok;
+        node->type = gvar->type;
+        return node;
+    }
+
+    // Undeclared variable - error
+    fprintf(stderr, "Error: undeclared variable '");
+    fwrite(tok->str, 1, tok->len, stderr);
+    fprintf(stderr, "'\n");
+    exit(1);
 }
 
 void free_ast(Node* ast) {
@@ -213,10 +221,176 @@ Node* parse_function(Context* ctx) {
     return node;
 }
 
+// global_var = ty ident ("[" num "]")? ";"
+Node* parse_global_var(Context* ctx) {
+    Type* ty = parse_type(ctx);
+    Token* tok = consume_ident(ctx);
+    if (!tok) {
+        fprintf(stderr, "Expected variable name\n");
+        exit(1);
+    }
+
+    // Check for array definition
+    if (consume(ctx, "[")) {
+        int size = expect_number(ctx);
+        expect(ctx, "]");
+        ty = new_type_array(ty, size);
+    }
+
+    expect(ctx, ";");
+
+    // Add to globals
+    LVar* lvar = calloc(1, sizeof(LVar));
+    lvar->name = tok->str;
+    lvar->len = tok->len;
+    lvar->type = ty;
+    lvar->next = ctx->globals;
+    ctx->globals = lvar;
+
+    // Create global variable node
+    Node* node = new_node(ND_GVAR, NULL, NULL);
+    node->tok = tok;
+    node->type = ty;
+    return node;
+}
+
 void parse_program(Context* ctx) {
     int i = 0;
     while (!at_eof(ctx)) {
-        ctx->code[i++] = parse_function(ctx);
+        // Try to parse type first to distinguish function from global var
+        Type* ty = try_parse_type(ctx);
+        if (!ty) {
+            fprintf(stderr, "Expected type or function definition\n");
+            exit(1);
+        }
+
+        Token* tok = consume_ident(ctx);
+        if (!tok) {
+            fprintf(stderr, "Expected identifier\n");
+            exit(1);
+        }
+
+        // Check if this is a function definition (followed by "(")
+        if (consume(ctx, "(")) {
+            // This is a function - parse the rest
+            // Put the token back by recreating the state
+            // Actually, we need to call parse_function but we've already
+            // consumed type and name Let's use a different approach: peek for
+            // the "("
+
+            // Reconstruct the parse state for parse_function
+            // We need to reset and call parse_function
+            // Since we can't easily put tokens back, let's restructure
+
+            // Actually, let's just parse the function directly from here
+            // Reset locals for each function
+            ctx->locals = NULL;
+
+            // Parse parameters
+            Node* func_params = NULL;
+            if (!consume(ctx, ")")) {
+                // We need to parse params but parse_type already consumed the
+                // first param's type So we need to handle this carefully Let's
+                // use parse_params but it expects to parse type first We need
+                // to add the first param manually
+
+                // First param type was already parsed as ty
+                // But we don't have the name yet
+                Token* param_tok = consume_ident(ctx);
+                if (!param_tok) {
+                    fprintf(stderr, "Expected parameter name\n");
+                    exit(1);
+                }
+
+                if (consume(ctx, "[")) {
+                    if (!consume(ctx, "]")) {
+                        expect_number(ctx);
+                        expect(ctx, "]");
+                    }
+                    ty = new_type_ptr(ty);
+                }
+
+                add_lvar(ctx, param_tok, ty);
+                Node* head = new_node_ident(ctx, param_tok);
+                head->type = ty;
+                Node* tail = head;
+
+                while (consume(ctx, ",")) {
+                    Type* param_ty = parse_type(ctx);
+                    param_tok = consume_ident(ctx);
+                    if (!param_tok) {
+                        fprintf(stderr, "Expected parameter name\n");
+                        exit(1);
+                    }
+
+                    if (consume(ctx, "[")) {
+                        if (!consume(ctx, "]")) {
+                            expect_number(ctx);
+                            expect(ctx, "]");
+                        }
+                        param_ty = new_type_ptr(param_ty);
+                    }
+
+                    add_lvar(ctx, param_tok, param_ty);
+                    tail->next = new_node_ident(ctx, param_tok);
+                    tail->next->type = param_ty;
+                    tail = tail->next;
+                }
+                func_params = head;
+                expect(ctx, ")");
+            }
+
+            expect(ctx, "{");
+
+            // Create function node with return type
+            Node* node = new_node(ND_FUNCTION, NULL, NULL);
+            node->tok = tok;
+            node->type = ty;
+            node->rhs = func_params;
+
+            // Parse function body (statements)
+            Node* head = NULL;
+            Node* tail = NULL;
+            while (!consume(ctx, "}")) {
+                Node* stmt_node = parse_stmt(ctx);
+                if (head == NULL) {
+                    head = stmt_node;
+                    tail = stmt_node;
+                } else {
+                    tail->next = stmt_node;
+                    tail = stmt_node;
+                }
+            }
+            node->lhs = head;
+            node->locals = ctx->locals;
+
+            ctx->code[i++] = node;
+        } else {
+            // This is a global variable
+            // Put back the "[" or ";" token
+            // Since we've already consumed the ident, we need to check for "["
+            // or ";"
+            if (consume(ctx, "[")) {
+                int size = expect_number(ctx);
+                expect(ctx, "]");
+                ty = new_type_array(ty, size);
+            }
+            expect(ctx, ";");
+
+            // Add to globals
+            LVar* lvar = calloc(1, sizeof(LVar));
+            lvar->name = tok->str;
+            lvar->len = tok->len;
+            lvar->type = ty;
+            lvar->next = ctx->globals;
+            ctx->globals = lvar;
+
+            // Create global variable node
+            Node* node = new_node(ND_GVAR, NULL, NULL);
+            node->tok = tok;
+            node->type = ty;
+            ctx->code[i++] = node;
+        }
     }
     ctx->node_count = i;
 }

@@ -42,6 +42,22 @@ LLVMModuleRef generate_module(Context* ctx) {
     // Create an LLVM builder for constructing instructions
     LLVMBuilderRef builder = LLVMCreateBuilder();
 
+    // First pass: generate global variables
+    for (int i = 0; i < ctx->node_count; i++) {
+        Node* node = ctx->code[i];
+        if (node->kind == ND_GVAR) {
+            char var_name[64];
+            int len = node->tok->len < 63 ? node->tok->len : 63;
+            strncpy(var_name, node->tok->str, len);
+            var_name[len] = '\0';
+
+            LLVMTypeRef var_type = to_llvm_type(node->type);
+            LLVMValueRef gvar = LLVMAddGlobal(module, var_type, var_name);
+            LLVMSetInitializer(gvar, LLVMConstNull(var_type));
+            LLVMSetLinkage(gvar, LLVMExternalLinkage);
+        }
+    }
+
     // Track if main function exists
     bool has_main = false;
 
@@ -50,7 +66,6 @@ LLVMModuleRef generate_module(Context* ctx) {
         Node* func_node = ctx->code[i];
 
         if (func_node->kind != ND_FUNCTION) {
-            fprintf(stderr, "Expected function definition\n");
             continue;
         }
 
@@ -193,6 +208,20 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         }
         return LLVMConstInt(LLVMInt32Type(), 0, 0);
     }
+    case ND_GVAR: {
+        // Global variable access
+        char var_name[64];
+        int len = node->tok->len < 63 ? node->tok->len : 63;
+        strncpy(var_name, node->tok->str, len);
+        var_name[len] = '\0';
+
+        LLVMValueRef gvar = LLVMGetNamedGlobal(module, var_name);
+        if (gvar) {
+            LLVMTypeRef var_type = to_llvm_type(node->type);
+            return LLVMBuildLoad2(builder, var_type, gvar, "gload");
+        }
+        return LLVMConstInt(LLVMInt32Type(), 0, 0);
+    }
     case ND_ASSIGN: {
         LLVMValueRef rhs =
             codegen(node->rhs, builder, local_allocas, has_return, module);
@@ -207,6 +236,17 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
             if (node->lhs->val < 100 && local_allocas[node->lhs->val]) {
                 LLVMValueRef alloca_ptr = local_allocas[node->lhs->val];
                 LLVMBuildStore(builder, rhs, alloca_ptr);
+            }
+        } else if (node->lhs->kind == ND_GVAR) {
+            // Global variable assignment
+            char var_name[64];
+            int len = node->lhs->tok->len < 63 ? node->lhs->tok->len : 63;
+            strncpy(var_name, node->lhs->tok->str, len);
+            var_name[len] = '\0';
+
+            LLVMValueRef gvar = LLVMGetNamedGlobal(module, var_name);
+            if (gvar) {
+                LLVMBuildStore(builder, rhs, gvar);
             }
         }
         return rhs; // assignment returns the assigned value
@@ -539,7 +579,7 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
         return LLVMBuildLoad2(builder, loaded_type, ptr, "deref");
     }
     case ND_ADDR: {
-        // &expr - get address of local variable
+        // &expr - get address of variable
         if (node->lhs->kind == ND_LVAR) {
             if (node->lhs->val < 100 && local_allocas[node->lhs->val]) {
                 LLVMValueRef ptr = local_allocas[node->lhs->val];
@@ -554,8 +594,26 @@ static LLVMValueRef codegen(Node* node, LLVMBuilderRef builder,
                 }
                 return ptr;
             }
+        } else if (node->lhs->kind == ND_GVAR) {
+            char var_name[64];
+            int len = node->lhs->tok->len < 63 ? node->lhs->tok->len : 63;
+            strncpy(var_name, node->lhs->tok->str, len);
+            var_name[len] = '\0';
+
+            LLVMValueRef gvar = LLVMGetNamedGlobal(module, var_name);
+            if (gvar) {
+                if (node->lhs->type && node->lhs->type->array_size > 0) {
+                    LLVMValueRef indices[] = {
+                        LLVMConstInt(LLVMInt32Type(), 0, false),
+                        LLVMConstInt(LLVMInt32Type(), 0, false)};
+                    LLVMTypeRef array_type = to_llvm_type(node->lhs->type);
+                    return LLVMBuildInBoundsGEP2(builder, array_type, gvar,
+                                                 indices, 2, "garray_to_ptr");
+                }
+                return gvar;
+            }
         }
-        // For non-LVAR, return null for now
+        // For other nodes, return null for now
         return LLVMConstPointerNull(LLVMPointerType(LLVMInt32Type(), 0));
     }
     case ND_DECL: {

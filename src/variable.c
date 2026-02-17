@@ -12,6 +12,16 @@ LVar* find_lvar(Context* ctx, Token* tok) {
     return NULL;
 }
 
+LVar* find_gvar(Context* ctx, Token* tok) {
+    for (LVar* var = ctx->globals; var != NULL; var = var->next) {
+        if (var->len == tok->len &&
+            memcmp(var->name, tok->str, tok->len) == 0) {
+            return var;
+        }
+    }
+    return NULL;
+}
+
 LVar* add_lvar(Context* ctx, Token* tok, Type* type) {
     LVar* new_var = calloc(1, sizeof(LVar));
     new_var->name = tok->str;

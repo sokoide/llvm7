@@ -42,6 +42,7 @@ typedef enum {
     ND_GT,       // >
     ND_ASSIGN,   // = (assignment)
     ND_LVAR,     // local var
+    ND_GVAR,     // global var
     ND_NUM,      // Integer
     ND_RETURN,   // return
     ND_IF,       // if
@@ -83,6 +84,7 @@ struct Context {
     Token* current_token;  // Current token being processed
     Node* code[MAX_NODES]; // Generated AST nodes (statements)
     LVar* locals;          // local variables
+    LVar* globals;         // global variables
     int node_count;        // Number of statements
 };
 

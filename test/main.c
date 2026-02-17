@@ -32,7 +32,15 @@ static char* run_all_tests() {
     mu_run_test(test_generate_array_subscript, "codegen: array subscript");
     mu_run_test(test_generate_array_subscript_reversed,
                 "codegen: array subscript reversed");
+    mu_run_test(test_generate_global_var, "codegen: global var");
+    mu_run_test(test_generate_global_ptr_var, "codegen: global ptr var");
+    mu_run_test(test_generate_global_array, "codegen: global array");
+    mu_run_test(test_generate_global_array_subscript,
+                "codegen: global array subscript");
+    mu_run_test(test_generate_global_ptr_return_func,
+                "codegen: global ptr return func");
     mu_run_test(test_lex_tokenize, "lex: tokenize");
+
     mu_run_test(test_consume_operator, "lex: consume operator");
     mu_run_test(test_expect_operator, "lex: expect operator");
     mu_run_test(test_expect_number, "lex: expect number");

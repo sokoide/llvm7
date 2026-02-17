@@ -26,5 +26,10 @@ char* test_generate_sizeof_expr();
 char* test_generate_array();
 char* test_generate_array_subscript();
 char* test_generate_array_subscript_reversed();
+char* test_generate_global_var();
+char* test_generate_global_ptr_var();
+char* test_generate_global_array();
+char* test_generate_global_array_subscript();
+char* test_generate_global_ptr_return_func();
 
 #endif
