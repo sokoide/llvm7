@@ -1,9 +1,13 @@
+// line comment
 int g;
 int main() {
-    int x;
+    int x; // comment
     int* y;
     int ar[10];
 
+    /*
+     * comment
+     */
     x = 3;
     y = &x;
     *y = 5;

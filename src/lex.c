@@ -50,6 +50,25 @@ Token* tokenize(const char* p) {
             continue;
         }
 
+        // Skip line comments
+        if (strncmp(p, "//", 2) == 0) {
+            p += 2;
+            while (*p && *p != '\n')
+                p++;
+            continue;
+        }
+
+        // Skip block comments
+        if (strncmp(p, "/*", 2) == 0) {
+            char* q = strstr(p + 2, "*/");
+            if (!q) {
+                fprintf(stderr, "lex error: unterminated block comment\n");
+                return NULL;
+            }
+            p = q + 2;
+            continue;
+        }
+
         // Check for keywords
         bool keyword_matched = false;
         for (size_t i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++) {
