@@ -201,6 +201,7 @@ LLVMModuleRef generate_module(Context* ctx) {
     // Declare standard library functions
     LLVMTypeRef i8_ptr_type = LLVMPointerType(LLVMInt8Type(), 0);
     LLVMTypeRef i32_type = LLVMInt32Type();
+    LLVMTypeRef i64_type = LLVMInt64Type(); // size_t on 64-bit
 
     // int printf(const char*, ...)
     LLVMTypeRef printf_args[] = {i8_ptr_type};
@@ -218,17 +219,17 @@ LLVMModuleRef generate_module(Context* ctx) {
                     LLVMFunctionType(LLVMVoidType(), exit_args, 1, false));
 
     // void* malloc(size_t)
-    LLVMTypeRef malloc_args[] = {i32_type}; // size_t as i32
+    LLVMTypeRef malloc_args[] = {i64_type};
     LLVMAddFunction(module, "malloc",
                     LLVMFunctionType(i8_ptr_type, malloc_args, 1, false));
 
     // void* calloc(size_t, size_t)
-    LLVMTypeRef calloc_args[] = {i32_type, i32_type};
+    LLVMTypeRef calloc_args[] = {i64_type, i64_type};
     LLVMAddFunction(module, "calloc",
                     LLVMFunctionType(i8_ptr_type, calloc_args, 2, false));
 
     // void* realloc(void*, size_t)
-    LLVMTypeRef realloc_args[] = {i8_ptr_type, i32_type};
+    LLVMTypeRef realloc_args[] = {i8_ptr_type, i64_type};
     LLVMAddFunction(module, "realloc",
                     LLVMFunctionType(i8_ptr_type, realloc_args, 2, false));
 
@@ -246,25 +247,25 @@ LLVMModuleRef generate_module(Context* ctx) {
     // size_t strlen(const char*)
     LLVMTypeRef strlen_args[] = {i8_ptr_type};
     LLVMAddFunction(module, "strlen",
-                    LLVMFunctionType(i32_type, strlen_args, 1, false));
+                    LLVMFunctionType(i64_type, strlen_args, 1, false));
 
     // int strncmp(const char*, const char*, size_t)
-    LLVMTypeRef strncmp_args[] = {i8_ptr_type, i8_ptr_type, i32_type};
+    LLVMTypeRef strncmp_args[] = {i8_ptr_type, i8_ptr_type, i64_type};
     LLVMAddFunction(module, "strncmp",
                     LLVMFunctionType(i32_type, strncmp_args, 3, false));
 
     // char* strncpy(char*, const char*, size_t)
-    LLVMTypeRef strncpy_args[] = {i8_ptr_type, i8_ptr_type, i32_type};
+    LLVMTypeRef strncpy_args[] = {i8_ptr_type, i8_ptr_type, i64_type};
     LLVMAddFunction(module, "strncpy",
                     LLVMFunctionType(i8_ptr_type, strncpy_args, 3, false));
 
     // int memcmp(const void*, const void*, size_t)
-    LLVMTypeRef memcmp_args[] = {i8_ptr_type, i8_ptr_type, i32_type};
+    LLVMTypeRef memcmp_args[] = {i8_ptr_type, i8_ptr_type, i64_type};
     LLVMAddFunction(module, "memcmp",
                     LLVMFunctionType(i32_type, memcmp_args, 3, false));
 
     // void* memcpy(void*, const void*, size_t)
-    LLVMTypeRef memcpy_args[] = {i8_ptr_type, i8_ptr_type, i32_type};
+    LLVMTypeRef memcpy_args[] = {i8_ptr_type, i8_ptr_type, i64_type};
     LLVMAddFunction(module, "memcpy",
                     LLVMFunctionType(i8_ptr_type, memcpy_args, 3, false));
 
@@ -334,13 +335,9 @@ LLVMModuleRef generate_module(Context* ctx) {
 
         // Count parameters (excluding ellipsis)
         int param_count = 0;
-        bool is_variadic = false;
+        bool is_variadic = func_node->is_vararg;
         Node* param = func_node->rhs;
-        while (param != NULL) {
-            if (param->kind == ND_ELLIPSIS) {
-                is_variadic = true;
-                break;
-            }
+        while (param) {
             param_count++;
             param = param->next;
         }
@@ -728,8 +725,44 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             func_type = LLVMFunctionType(i32_type, param_types, arg_count,
                                          1); // Variadic=true
             func = LLVMAddFunction(module, func_name, func_type);
+
+            // Register function type for calls
+            FuncType* ft = calloc(1, sizeof(FuncType));
+            ft->name = strdup(func_name);
+            ft->len = strlen(func_name);
+            ft->llvm_type = func_type;
+            ft->next = ctx->func_types;
+            ctx->func_types = ft;
         } else {
-            func_type = LLVMGlobalGetValueType(func);
+            // Lookup function type in our context
+            func_type = NULL;
+            for (FuncType* ft = ctx->func_types; ft; ft = ft->next) {
+                if (strlen(func_name) == (size_t)ft->len &&
+                    strncmp(func_name, ft->name, ft->len) == 0) {
+                    func_type = ft->llvm_type;
+                    break;
+                }
+            }
+
+            if (!func_type) {
+                // Fallback for external functions not seen yet?
+                // Or try global value type (might start working if not opaque)
+                func_type = LLVMGlobalGetValueType(func);
+                // Maybe it returns PointerType, let's try to handle it if so
+                if (LLVMGetTypeKind(func_type) == LLVMPointerTypeKind) {
+                    // Try GetElementType if reachable
+                    // func_type = LLVMGetElementType(func_type);
+                    // If opaque, we are stuck without declaration.
+                    // But printf should be declared in main.i
+                }
+            }
+
+            // Debug
+            // fprintf(stderr, "DEBUG: call %s type=%d vararg=%d\n", func_name,
+            // LLVMGetTypeKind(func_type), (func_type &&
+            // LLVMGetTypeKind(func_type)==LLVMFunctionTypeKind) ?
+            // LLVMIsFunctionVarArg(func_type) : -1);
+
             dest_param_count = LLVMCountParamTypes(func_type);
             if (dest_param_count > 0) {
                 dest_param_types =

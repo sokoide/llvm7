@@ -7,14 +7,11 @@
 #include "lex.h"
 #include "parse.h"
 
-// Declare stdio initialization function
-extern void init_stdio(void);
-extern FILE* stderr;
-extern FILE* stdout;
+// Declare stdio initialization function (Removed)
 
 int main(int argc, const char** argv) {
     // Initialize stdio before any I/O
-    init_stdio();
+    // init_stdio();
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <input_file> [-o <output_file>]\n", argv[0]);
         fprintf(stderr, "  Default output: tmp.ll\n");

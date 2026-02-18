@@ -135,6 +135,7 @@ struct Node {
     bool is_default;  // for ND_DEFAULT
     bool is_extern;   // for extern global var
     bool is_variadic; // for ND_FUNCTION: variadic function
+    bool is_vararg;   // Variadic function default: false
     void* llvm_label; // LLVMBasicBlockRef for ND_CASE/ND_BREAK/etc.
 };
 
@@ -144,6 +145,14 @@ struct StructTag {
     const char* name;
     int len;
     Type* type;
+};
+
+typedef struct FuncType FuncType;
+struct FuncType {
+    FuncType* next;
+    const char* name;
+    int len;
+    void* llvm_type; // LLVMTypeRef
 };
 
 typedef struct Context Context;
@@ -164,6 +173,7 @@ struct Context {
     int string_lens[MAX_NODES];     // string literal lengths
     int string_count;               // number of string literals
     Type* current_func_type; // Return type of current function being generated
+    FuncType* func_types;    // Function types for opaque pointers support
 };
 
 #endif

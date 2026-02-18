@@ -144,8 +144,9 @@ static int expect_const_int(Context* ctx) {
     // ctx->current_token->kind);
 
     // Print context backwards unsafely but hopefully usefully
-    const char* p = ctx->current_token->str;
-    // fprintf(stderr, "Context around error: '%.100s'\n", p - 50);
+    // const char* p = ctx->current_token->str;
+    fprintf(stderr, "Context around error: '%.100s'\n",
+            ctx->current_token->str - 50);
 
     return expect_number(ctx);
 }
@@ -309,7 +310,8 @@ Type* parse_type(Context* ctx) {
 }
 
 // params = ty ident ("," ty ident)*
-Node* parse_params(Context* ctx) {
+Node* parse_params(Context* ctx, bool* is_vararg) {
+    *is_vararg = false;
     Type* ty = parse_type(ctx);
     Token* tok = consume_ident(ctx);
 
@@ -347,10 +349,8 @@ Node* parse_params(Context* ctx) {
     while (consume(ctx, ",")) {
         // Check for ellipsis (variadic arguments)
         if (consume(ctx, "...")) {
-            // Add ellipsis marker node to parameter list
-            Node* ellipsis = new_node(ND_ELLIPSIS, NULL, NULL);
-            tail->next = ellipsis;
-            break;
+            *is_vararg = true;
+            return head;
         }
 
         ty = parse_type(ctx);
@@ -398,8 +398,9 @@ Node* parse_function(Context* ctx) {
 
     // Parse parameters
     Node* func_params = NULL;
+    bool is_vararg = false;
     if (!consume(ctx, ")")) {
-        func_params = parse_params(ctx);
+        func_params = parse_params(ctx, &is_vararg);
         expect(ctx, ")");
     }
 
@@ -410,6 +411,7 @@ Node* parse_function(Context* ctx) {
     node->tok = tok;
     node->type = return_ty;  // Store return type
     node->rhs = func_params; // Store parameters in rhs
+    node->is_vararg = is_vararg;
 
     // Parse function body (statements)
     Node* head = NULL;
@@ -532,8 +534,9 @@ void parse_program(Context* ctx) {
 
             // Parse parameters
             Node* func_params = NULL;
+            bool is_vararg = false;
             if (!consume(ctx, ")")) {
-                func_params = parse_params(ctx);
+                func_params = parse_params(ctx, &is_vararg);
                 expect(ctx, ")");
             }
 
@@ -544,6 +547,7 @@ void parse_program(Context* ctx) {
                 node->type = ty;
                 node->rhs = func_params;
                 node->is_extern = is_extern;
+                node->is_vararg = is_vararg;
                 ctx->code[i++] = node;
                 continue;
             }
@@ -624,7 +628,7 @@ void parse_program(Context* ctx) {
     ctx->node_count = i;
 }
 
-static Node* parse_declaration(Context* ctx, Type* ty) {
+Node* parse_declaration(Context* ctx, Type* ty) {
     Token* tok = consume_ident(ctx);
     if (!tok) {
         fprintf(stderr, "Expected variable name after type\n");
@@ -1144,12 +1148,13 @@ static Node* convert_array_to_ptr(Node* node) {
     return node;
 }
 
+static char* type_keywords[13] = {
+    "int",    "char",  "void",   "long",   "bool",   "size_t",  "enum",
+    "struct", "const", "static", "extern", "signed", "unsigned"};
+
 static bool is_type(Context* ctx) {
     Token* tok = ctx->current_token;
     if (tok->kind == TK_RESERVED) {
-        char* type_keywords[13] = {
-            "int",    "char",  "void",   "long",   "bool",   "size_t",  "enum",
-            "struct", "const", "static", "extern", "signed", "unsigned"};
         int num_type_kw = 13;
         for (int i = 0; i < num_type_kw; i++) {
             if ((size_t)tok->len == strlen(type_keywords[i]) &&

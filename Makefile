@@ -4,7 +4,7 @@ TARGET2 = ./build/tmp
 DEMO ?= ./demo/example02.c
 
 CC = clang
-CFLAGS = -Wall -Wextra -O2 -std=c99 -Isrc -MMD -MP `llvm-config --cflags`
+CFLAGS = -Wall -Wextra -O2 -g -std=c99 -Isrc -MMD -MP `llvm-config --cflags`
 LDFLAGS = `llvm-config --ldflags --libs --system-libs`
 
 # Directory structure
@@ -63,7 +63,7 @@ test:
 
 .PHONY: clean
 clean:
-	rm -rf $(BUILD_DIR) $(TMP_DIR) $(TARGET)
+	rm -rf $(BUILD_DIR) $(TMP_DIR) $(TARGET) $(BOOTSTRAP_DIR)
 	$(MAKE) -C test clean
 
 .PHONY: format
@@ -109,3 +109,90 @@ $(TMP_DIR):
 .PHONY: clean_deps
 clean_deps:
 	rm -f $(DEPS)
+
+# Self-hosting: compile the compiler with itself
+SELFHOST_DIR = selfhost
+SELFHOST_BUILD = $(SELFHOST_DIR)/build
+SELFHOST_INC = $(SELFHOST_DIR)/include
+SELFHOST_TARGET = $(BUILD_DIR)/llvm7_selfhost
+SELFHOST_SRCS = stdio.c main.c lex.c parse.c codegen.c file.c variable.c
+BOOTSTRAP_DIR = $(SELFHOST_DIR)/bootstrap
+BOOTSTRAP_INPUT_DIR = $(BOOTSTRAP_DIR)/input
+BOOTSTRAP_TC1_DIR = $(BOOTSTRAP_DIR)/tc1
+BOOTSTRAP_TC2_DIR = $(BOOTSTRAP_DIR)/tc2
+BOOTSTRAP_CASES = $(SELFHOST_SRCS) $(notdir $(wildcard demo/*.c))
+
+.PHONY: selfhost
+selfhost: $(TARGET) $(SELFHOST_BUILD)
+	@echo "=== Self-hosting: compiling with own compiler ==="
+	@for src in $(SELFHOST_SRCS); do \
+		echo "  CPP+COMPILE: src/$$src"; \
+		clang -E -nostdinc -I$(SELFHOST_INC) -Isrc -P src/$$src `llvm-config --cflags` -o $(SELFHOST_BUILD)/$${src%.c}.i || exit 1; \
+		$(TARGET) $(SELFHOST_BUILD)/$${src%.c}.i -o $(SELFHOST_BUILD)/$${src%.c}.ll || exit 1; \
+	done
+	@echo "  LLVM-LINK..."
+	llvm-link $(patsubst %.c,$(SELFHOST_BUILD)/%.ll,$(SELFHOST_SRCS)) -o $(SELFHOST_BUILD)/combined.bc
+	@echo "  CLANG LINK..."
+	clang $(SELFHOST_BUILD)/combined.bc -o $(SELFHOST_TARGET) $(LDFLAGS) -lc
+	@chmod +x $(SELFHOST_TARGET)
+	@echo "=== Self-host build complete: $(SELFHOST_TARGET) ==="
+
+.PHONY: selfhost_test
+selfhost_test: selfhost
+	@echo "=== Verifying selfhost binary ==="
+	$(SELFHOST_TARGET) $(DEMO) -o $(SELFHOST_BUILD)/verify.ll
+	$(TARGET) $(DEMO) -o $(SELFHOST_BUILD)/original.ll
+	@diff $(SELFHOST_BUILD)/original.ll $(SELFHOST_BUILD)/verify.ll && echo "PASS: Output matches" || echo "FAIL: Output differs"
+
+$(SELFHOST_BUILD):
+	mkdir -p $(SELFHOST_BUILD)
+
+.PHONY: bootstrap_prepare
+bootstrap_prepare:
+	@mkdir -p $(BOOTSTRAP_INPUT_DIR) $(BOOTSTRAP_TC1_DIR) $(BOOTSTRAP_TC2_DIR)
+	@echo "=== bootstrap: preprocess inputs ==="
+	@for src in $(SELFHOST_SRCS); do \
+		echo "  preprocess src/$$src"; \
+		clang -E -nostdinc -I$(SELFHOST_INC) -Isrc -P src/$$src `llvm-config --cflags` -o $(BOOTSTRAP_INPUT_DIR)/$${src%.c}.i || exit 1; \
+	done
+	@for src in $(wildcard demo/*.c); do \
+		base=$$(basename $$src .c); \
+		echo "  preprocess $$src"; \
+		clang -E -nostdinc -I$(SELFHOST_INC) -Isrc -P $$src `llvm-config --cflags` -o $(BOOTSTRAP_INPUT_DIR)/$$base.i || exit 1; \
+	done
+
+.PHONY: bootstrap_tc1_outputs
+bootstrap_tc1_outputs: $(TARGET) bootstrap_prepare
+	@echo "=== bootstrap: tc1 outputs ==="
+	@for c in $(BOOTSTRAP_CASES); do \
+		base=$${c%.c}; \
+		echo "  tc1 compile $$base.i"; \
+		$(TARGET) $(BOOTSTRAP_INPUT_DIR)/$$base.i -o $(BOOTSTRAP_TC1_DIR)/$$base.ll || exit 1; \
+	done
+
+.PHONY: bootstrap_tc2
+bootstrap_tc2: selfhost
+	@echo "=== bootstrap: tc2 ready ($(SELFHOST_TARGET)) ==="
+
+.PHONY: bootstrap_tc2_outputs
+bootstrap_tc2_outputs: bootstrap_tc2 bootstrap_prepare
+	@echo "=== bootstrap: tc2 outputs ==="
+	@for c in $(BOOTSTRAP_CASES); do \
+		base=$${c%.c}; \
+		echo "  tc2 compile $$base.i"; \
+		$(SELFHOST_TARGET) $(BOOTSTRAP_INPUT_DIR)/$$base.i -o $(BOOTSTRAP_TC2_DIR)/$$base.ll || exit 1; \
+	done
+
+.PHONY: bootstrap_compare
+bootstrap_compare: bootstrap_tc1_outputs bootstrap_tc2_outputs
+	@echo "=== bootstrap: compare tc1 vs tc2 ==="
+	@for c in $(BOOTSTRAP_CASES); do \
+		base=$${c%.c}; \
+		echo "  diff $$base.ll"; \
+		diff -u $(BOOTSTRAP_TC1_DIR)/$$base.ll $(BOOTSTRAP_TC2_DIR)/$$base.ll || exit 1; \
+	done
+	@echo "PASS: tc1 and tc2 outputs are identical on bootstrap cases"
+
+.PHONY: bootstrap_check
+bootstrap_check: test bootstrap_compare
+	@echo "PASS: tests + bootstrap compare"

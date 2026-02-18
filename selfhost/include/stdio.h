@@ -2,8 +2,18 @@
 typedef struct {
     int fd;
 } FILE;
+#ifdef __APPLE__
+extern FILE* __stderrp;
+#define stderr __stderrp
+extern FILE* __stdinp;
+#define stdin __stdinp
+extern FILE* __stdoutp;
+#define stdout __stdoutp
+#else
 extern FILE* stderr;
+extern FILE* stdin;
 extern FILE* stdout;
+#endif
 #define SEEK_SET 0
 #define SEEK_END 2
 
