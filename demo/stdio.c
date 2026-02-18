@@ -1,7 +1,6 @@
 #include <stdio.h>
 
 int main() {
-    printf("answer=%d
-", 11);
+    printf("answer=%d\n", 11);
     return 11;
 }
