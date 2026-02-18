@@ -46,6 +46,8 @@ char* test_generate_typedef();
 char* test_generate_enum();
 char* test_generate_builtin_const();
 char* test_generate_switch();
+char* test_generate_switch_distinct_case_values();
+char* test_generate_switch_case_after_return_case();
 char* test_generate_inc_dec();
 char* test_generate_proto_and_init();
 

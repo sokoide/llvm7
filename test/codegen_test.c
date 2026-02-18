@@ -75,13 +75,16 @@ static int execute_module(LLVMTestContext* ctx, const char* func_name) {
 
 // Helper to run generate test
 static char* run_generate_test(Node* ast, int expected) {
+    Node* ret = new_node(ND_RETURN, ast, NULL);
+    ret->type = new_type_int();
+
     // Create function node wrapping the statement
     Token main_tok = {0};
     main_tok.kind = TK_IDENT;
     main_tok.str = "main";
     main_tok.len = 4;
 
-    Node* func = new_node(ND_FUNCTION, ast, NULL);
+    Node* func = new_node(ND_FUNCTION, ret, NULL);
     func->tok = &main_tok;
     func->type = new_type_int();
 
@@ -870,6 +873,55 @@ char* test_generate_switch() {
     cleanup_llvm_context(&llvm_ctx);
     free_tokens(head);
     mu_assert("Expected 121", result == 121);
+    return NULL;
+}
+
+char* test_generate_switch_distinct_case_values() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { "
+                           "  int x; x = 3; "
+                           "  int y; y = 0; "
+                           "  switch (x) { "
+                           "    case 1: y = 10; break; "
+                           "    case 2: y = 20; break; "
+                           "    case 3: y = 30; break; "
+                           "    default: y = 99; "
+                           "  } "
+                           "  return y; "
+                           "}");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    init_llvm_context(&llvm_ctx, module);
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+    mu_assert("Expected 30", result == 30);
+    return NULL;
+}
+
+char* test_generate_switch_case_after_return_case() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { "
+                           "  int x; x = 2; "
+                           "  int y; y = 0; "
+                           "  switch (x) { "
+                           "    case 1: return 11; "
+                           "    case 2: y = 22; break; "
+                           "    default: y = 33; "
+                           "  } "
+                           "  return y; "
+                           "}");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    init_llvm_context(&llvm_ctx, module);
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+    mu_assert("Expected 22", result == 22);
     return NULL;
 }
 

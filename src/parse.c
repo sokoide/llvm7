@@ -138,15 +138,13 @@ static int expect_const_int(Context* ctx) {
         EnumConst* ec = find_enum_const(ctx, tok);
         if (ec)
             return ec->val;
+        fprintf(stderr,
+                "Expected constant integer, but got identifier: '%.*s'\n",
+                tok->len, tok->str);
         exit(1);
     }
-    // Debug: fprintf(stderr, "expect_const_int failed: kind=%d\n",
-    // ctx->current_token->kind);
-
-    // Print context backwards unsafely but hopefully usefully
-    // const char* p = ctx->current_token->str;
-    fprintf(stderr, "Context around error: '%.100s'\n",
-            ctx->current_token->str - 50);
+    fprintf(stderr, "Expected constant integer, token kind=%d near: '%.40s'\n",
+            ctx->current_token->kind, ctx->current_token->str);
 
     return expect_number(ctx);
 }
@@ -393,6 +391,7 @@ Node* parse_function(Context* ctx) {
 
     // Reset locals for each function
     ctx->locals = NULL;
+    reset_scope();
 
     expect(ctx, "(");
 
@@ -486,6 +485,22 @@ static Node* parse_initializer(Context* ctx) {
     return node;
 }
 
+static Node* parse_block_stmt(Context* ctx) {
+    enter_scope();
+    Node* head = calloc(1, sizeof(Node));
+    Node* cur = head;
+    while (!consume(ctx, "}")) {
+        if (at_eof(ctx)) {
+            fprintf(stderr, "Unexpected EOF while parsing block\n");
+            exit(1);
+        }
+        cur->next = parse_stmt(ctx);
+        cur = cur->next;
+    }
+    leave_scope();
+    return new_node(ND_BLOCK, head->next, NULL);
+}
+
 void parse_program(Context* ctx) {
     int i = 0;
     while (!at_eof(ctx)) {
@@ -531,6 +546,7 @@ void parse_program(Context* ctx) {
         if (consume(ctx, "(")) {
             // Reconstruct the parse state for parse_function
             ctx->locals = NULL;
+            reset_scope();
 
             // Parse parameters
             Node* func_params = NULL;
@@ -542,13 +558,13 @@ void parse_program(Context* ctx) {
 
             if (consume(ctx, ";")) {
                 // Prototype (extern or regular)
-                Node* node = new_node(ND_FUNCTION, NULL, NULL);
-                node->tok = tok;
-                node->type = ty;
-                node->rhs = func_params;
-                node->is_extern = is_extern;
-                node->is_vararg = is_vararg;
-                ctx->code[i++] = node;
+                Node* proto_node = new_node(ND_FUNCTION, NULL, NULL);
+                proto_node->tok = tok;
+                proto_node->type = ty;
+                proto_node->rhs = func_params;
+                proto_node->is_extern = is_extern;
+                proto_node->is_vararg = is_vararg;
+                ctx->code[i++] = proto_node;
                 continue;
             }
 
@@ -561,10 +577,10 @@ void parse_program(Context* ctx) {
             expect(ctx, "{");
 
             // Create function node with return type
-            Node* node = new_node(ND_FUNCTION, NULL, NULL);
-            node->tok = tok;
-            node->type = ty;
-            node->rhs = func_params;
+            Node* func_node = new_node(ND_FUNCTION, NULL, NULL);
+            func_node->tok = tok;
+            func_node->type = ty;
+            func_node->rhs = func_params;
 
             // Parse function body (statements)
             Node* head = NULL;
@@ -579,10 +595,10 @@ void parse_program(Context* ctx) {
                     tail = stmt_node;
                 }
             }
-            node->lhs = head;
-            node->locals = ctx->locals;
+            func_node->lhs = head;
+            func_node->locals = ctx->locals;
 
-            ctx->code[i++] = node;
+            ctx->code[i++] = func_node;
         } else {
             // This is a global variable
             // Put back the "[" or ";" token
@@ -603,25 +619,25 @@ void parse_program(Context* ctx) {
             ctx->globals = lvar;
 
             // Create global variable node
-            Node* node = new_node(ND_GVAR, NULL, NULL);
-            node->tok = tok;
-            node->type = ty;
-            node->is_extern = is_extern;
+            Node* gvar_node = new_node(ND_GVAR, NULL, NULL);
+            gvar_node->tok = tok;
+            gvar_node->type = ty;
+            gvar_node->is_extern = is_extern;
 
             // extern declarations cannot have initializers
             if (!is_extern && consume(ctx, "=")) {
                 // Check if next token is '{'
                 Token* t = ctx->current_token;
                 if (t->kind == TK_RESERVED && t->len == 1 && t->str[0] == '{') {
-                    node->init = parse_initializer(ctx);
-                    node->init->type = ty; // Set type for codegen
+                    gvar_node->init = parse_initializer(ctx);
+                    gvar_node->init->type = ty; // Set type for codegen
                 } else {
-                    node->init = parse_expr(ctx);
+                    gvar_node->init = parse_expr(ctx);
                 }
             }
             expect(ctx, ";");
 
-            ctx->code[i++] = node;
+            ctx->code[i++] = gvar_node;
             continue; // Ensure we move to next token!
         }
     }
@@ -647,33 +663,34 @@ Node* parse_declaration(Context* ctx, Type* ty) {
 
     // Add variable to locals
     LVar* lvar = add_lvar(ctx, tok, ty);
-    Node* decl = new_node(ND_DECL, NULL, NULL);
-    decl->tok = tok;
-    decl->val = lvar->offset;
-    decl->type = ty;
+    Node* node = new_node(ND_DECL, NULL, NULL);
+    node->tok = tok;
+    node->val = lvar->offset;
+    node->type = ty;
 
     if (consume(ctx, "=")) {
         if (ctx->current_token->kind == TK_RESERVED &&
             ctx->current_token->len == 1 && ctx->current_token->str[0] == '{') {
-            decl->init = parse_initializer(ctx);
+            node->init = parse_initializer(ctx);
             // If array size was 0, count elements
-            if (decl->type->ty == PTR && decl->type->array_size == 0) {
+            if (node->type->ty == PTR && node->type->array_size == 0) {
                 int count = 0;
-                for (Node* n = decl->init->lhs; n; n = n->next)
+                for (Node* init_node = node->init->lhs; init_node;
+                     init_node = init_node->next)
                     count++;
-                decl->type->array_size = count;
+                node->type->array_size = count;
             }
         } else {
-            decl->init = parse_expr(ctx);
+            node->init = parse_expr(ctx);
         }
     }
     expect(ctx, ";");
 
-    return decl;
+    return node;
 }
 
 Node* parse_stmt(Context* ctx) {
-    Node* node;
+    Node* stmt_node;
 
     // Check for type declaration: e.g. int x; struct { ... } s;
     {
@@ -693,7 +710,7 @@ Node* parse_stmt(Context* ctx) {
         if (!(t->kind == TK_RESERVED && t->len == 1 && t->str[0] == ';')) {
             retval = convert_array_to_ptr(parse_expr(ctx));
         }
-        node = new_node(ND_RETURN, retval, NULL);
+        stmt_node = new_node(ND_RETURN, retval, NULL);
     } else if (consume(ctx, "if")) {
         expect(ctx, "(");
         Node* cond = convert_array_to_ptr(parse_expr(ctx));
@@ -703,56 +720,58 @@ Node* parse_stmt(Context* ctx) {
         if (consume(ctx, "else")) {
             els = parse_stmt(ctx);
         }
-        node = new_node(ND_IF, then, els);
-        node->cond = cond;
-        return node;
+        Node* if_node = new_node(ND_IF, then, els);
+        if_node->cond = cond;
+        return if_node;
     } else if (consume(ctx, "while")) {
         expect(ctx, "(");
         Node* cond = convert_array_to_ptr(parse_expr(ctx));
         expect(ctx, ")");
         Node* body = parse_stmt(ctx);
-        node = new_node(ND_WHILE, body, NULL);
-        node->cond = cond;
-        return node;
+        Node* while_node = new_node(ND_WHILE, body, NULL);
+        while_node->cond = cond;
+        return while_node;
     } else if (consume(ctx, "for")) {
         expect(ctx, "(");
-        Node* node = new_node(ND_FOR, NULL, NULL);
+        Node* for_node = new_node(ND_FOR, NULL, NULL);
+        enter_scope();
 
         Type* ty = try_parse_type(ctx);
         if (ty) {
-            node->init = parse_declaration(ctx, ty);
+            for_node->init = parse_declaration(ctx, ty);
         } else {
             if (!consume(ctx, ";")) {
-                node->init = convert_array_to_ptr(parse_expr(ctx));
+                for_node->init = convert_array_to_ptr(parse_expr(ctx));
                 expect(ctx, ";");
             }
         }
 
         if (!consume(ctx, ";")) {
-            node->cond = convert_array_to_ptr(parse_expr(ctx));
+            for_node->cond = convert_array_to_ptr(parse_expr(ctx));
             expect(ctx, ";");
         }
         if (!consume(ctx, ")")) {
-            node->rhs = convert_array_to_ptr(parse_expr(ctx));
+            for_node->rhs = convert_array_to_ptr(parse_expr(ctx));
             expect(ctx, ")");
         }
-        node->lhs = parse_stmt(ctx);
-        return node;
+        for_node->lhs = parse_stmt(ctx);
+        leave_scope();
+        return for_node;
     } else if (consume(ctx, "switch")) {
         expect(ctx, "(");
         Node* cond = convert_array_to_ptr(parse_expr(ctx));
         expect(ctx, ")");
 
-        Node* node = new_node(ND_SWITCH, NULL, NULL);
-        node->cond = cond;
+        Node* switch_node = new_node(ND_SWITCH, NULL, NULL);
+        switch_node->cond = cond;
 
         Node* old_switch = ctx->current_switch;
-        ctx->current_switch = node;
+        ctx->current_switch = switch_node;
 
-        node->lhs = parse_stmt(ctx);
+        switch_node->lhs = parse_stmt(ctx);
 
         ctx->current_switch = old_switch;
-        return node;
+        return switch_node;
     } else if (consume(ctx, "case")) {
         if (!ctx->current_switch) {
             fprintf(stderr, "case outside switch\n");
@@ -761,22 +780,23 @@ Node* parse_stmt(Context* ctx) {
         int val = expect_const_int(ctx);
         expect(ctx, ":");
 
-        Node* node = new_node(ND_CASE, NULL, NULL);
-        node->val = val;
-        node->next_case = ctx->current_switch->cases;
-        ctx->current_switch->cases = node;
-        return node;
+        Node* case_node = new_node(ND_CASE, NULL, NULL);
+        case_node->val = val;
+        case_node->case_val = val;
+        case_node->next_case = ctx->current_switch->cases;
+        ctx->current_switch->cases = case_node;
+        return case_node;
     } else if (consume(ctx, "default")) {
         if (!ctx->current_switch) {
             fprintf(stderr, "default outside switch\n");
             exit(1);
         }
         expect(ctx, ":");
-        Node* node = new_node(ND_CASE, NULL, NULL);
-        node->is_default = true;
-        node->next_case = ctx->current_switch->cases;
-        ctx->current_switch->cases = node;
-        return node;
+        Node* default_node = new_node(ND_CASE, NULL, NULL);
+        default_node->is_default = true;
+        default_node->next_case = ctx->current_switch->cases;
+        ctx->current_switch->cases = default_node;
+        return default_node;
     } else if (consume(ctx, "break")) {
         expect(ctx, ";");
         return new_node(ND_BREAK, NULL, NULL);
@@ -784,24 +804,13 @@ Node* parse_stmt(Context* ctx) {
         expect(ctx, ";");
         return new_node(ND_CONTINUE, NULL, NULL);
     } else if (consume(ctx, "{")) {
-        Node head;
-        head.next = NULL;
-        Node* cur = &head;
-        while (!consume(ctx, "}")) {
-            if (at_eof(ctx)) {
-                fprintf(stderr, "Unexpected EOF while parsing block\n");
-                exit(1);
-            }
-            cur->next = parse_stmt(ctx);
-            cur = cur->next;
-        }
-        return new_node(ND_BLOCK, head.next, NULL);
+        return parse_block_stmt(ctx);
     } else {
-        node = parse_expr(ctx);
+        stmt_node = parse_expr(ctx);
     }
     expect(ctx, ";");
 
-    return node;
+    return stmt_node;
 }
 
 Node* parse_expr(Context* ctx) { return parse_assign(ctx); }

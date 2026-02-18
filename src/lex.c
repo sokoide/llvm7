@@ -11,6 +11,35 @@ static int is_alnum(char c) {
            ('0' <= c && c <= '9') || c == '_';
 }
 
+static char decode_escape_char(const char** pp) {
+    const char* p = *pp;
+    if (*p == 'n') {
+        *pp = p + 1;
+        return '\n';
+    }
+    if (*p == 'r') {
+        *pp = p + 1;
+        return '\r';
+    }
+    if (*p == 't') {
+        *pp = p + 1;
+        return '\t';
+    }
+    if (*p == '0') {
+        *pp = p + 1;
+        return '\0';
+    }
+    if (*p == '\\' || *p == '"' || *p == '\'') {
+        *pp = p + 1;
+        return *p;
+    }
+    if (*p == '\0') {
+        return '\0';
+    }
+    *pp = p + 1;
+    return *p;
+}
+
 // Keyword table (selfhost-compatible: no anonymous struct)
 char* kw_str[28] = {
     "return", "if",     "else",    "while",   "for",      "int",      "char",
@@ -131,17 +160,24 @@ Token* tokenize(const char* p) {
 
         // String literal
         if (*p == '"') {
-            const char* start = p + 1; // skip opening quote
-            p++;
+            p++; // skip opening quote
+            size_t cap = strlen(p) + 1;
+            char* decoded = calloc(cap, 1);
+            size_t len = 0;
             while (*p && *p != '"') {
+                if (*p == '\\') {
+                    p++;
+                    decoded[len++] = decode_escape_char(&p);
+                    continue;
+                }
+                decoded[len++] = *p;
                 p++;
             }
             if (*p != '"') {
                 fprintf(stderr, "lex error: unterminated string literal\n");
                 return NULL;
             }
-            int len = p - start; // length without quotes
-            cur = new_token(TK_STR, cur, start, len);
+            cur = new_token(TK_STR, cur, decoded, (int)len);
             p++; // skip closing quote
             continue;
         }
@@ -152,17 +188,7 @@ Token* tokenize(const char* p) {
             int val;
             if (*p == '\\') {
                 p++;
-                if (*p == 'n')
-                    val = '\n';
-                else if (*p == 'r')
-                    val = '\r';
-                else if (*p == 't')
-                    val = '\t';
-                else if (*p == '0')
-                    val = '\0';
-                else
-                    val = *p;
-                p++;
+                val = decode_escape_char(&p);
             } else {
                 val = *p++;
             }

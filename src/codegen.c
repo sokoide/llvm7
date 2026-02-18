@@ -1005,15 +1005,12 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             LLVMBuildCondBr(builder, cond_bool, body_bb, merge_bb);
         }
 
-        // Track if the loop body returns
-        bool body_returns = *has_return;
-
         // Generate body block
         LLVMPositionBuilderAtEnd(builder, body_bb);
-        *has_return = false; // Reset for body
-        codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
-        body_returns = *has_return;
-        if (!*has_return) {
+        bool body_returns = false;
+        codegen(ctx, node->lhs, builder, local_allocas, &body_returns, module);
+        if (!body_returns &&
+            LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(builder)) == NULL) {
             LLVMBuildBr(builder, inc_bb);
         }
 
@@ -1028,11 +1025,6 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
 
         // Position at merge block
         LLVMPositionBuilderAtEnd(builder, merge_bb);
-
-        // For infinite loops where body returns, add unreachable
-        if (is_infinite && body_returns) {
-            LLVMBuildUnreachable(builder);
-        }
 
         ctx->current_break_label = old_break;
         ctx->current_continue_label = old_continue;
@@ -1061,7 +1053,17 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         ctx->current_break_label = break_bb;
         ctx->current_continue_label = NULL; // No continue in switch
 
-        codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
+        if (node->lhs && node->lhs->kind == ND_BLOCK) {
+            for (Node* stmt = node->lhs->lhs; stmt; stmt = stmt->next) {
+                bool stmt_has_return = false;
+                codegen(ctx, stmt, builder, local_allocas, &stmt_has_return,
+                        module);
+            }
+        } else {
+            bool stmt_has_return = false;
+            codegen(ctx, node->lhs, builder, local_allocas, &stmt_has_return,
+                    module);
+        }
 
         // Terminate the last block of the switch if not already terminated
         LLVMBasicBlockRef current_block = LLVMGetInsertBlock(builder);
@@ -1091,9 +1093,12 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             LLVMSetOperand((LLVMValueRef)ctx->current_switch_inst, 1,
                            LLVMBasicBlockAsValue(case_bb));
         } else {
+            int case_value = node->case_val;
+            if (case_value == 0 && node->val != 0) {
+                case_value = node->val;
+            }
             LLVMAddCase((LLVMValueRef)ctx->current_switch_inst,
-                        LLVMConstInt(LLVMInt32Type(), node->case_val, 0),
-                        case_bb);
+                        LLVMConstInt(LLVMInt32Type(), case_value, 0), case_bb);
         }
 
         LLVMPositionBuilderAtEnd(builder, case_bb);
