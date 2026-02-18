@@ -40,4 +40,9 @@ core.*
 *.dSYM/
 *.su
 *.idb
+
+# Generated selfhost artifacts
+selfhost/bootstrap/
+selfhost/build/
+selfhost/demo_check/
 *.pdb

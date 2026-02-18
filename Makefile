@@ -31,17 +31,6 @@ all: $(TARGET)
 # So when a header changes, make knows which .o files need rebuilding
 -include $(DEPS)
 
-# Generate LLVM IR target
-# .PHONY: llvm
-# llvm: $(LL_FILES)
-
-# # Generate .s
-# .PHONY: llc
-# llc: $(S_FILES)
-
-# .PHONY: lld
-# lld: $(TARGET)
-
 .PHONY: run
 run: $(TARGET)
 	$(TARGET) $(DEMO)
@@ -63,7 +52,7 @@ test:
 
 .PHONY: clean
 clean:
-	rm -rf $(BUILD_DIR) $(TMP_DIR) $(TARGET) $(BOOTSTRAP_DIR)
+	rm -rf $(BUILD_DIR) $(TMP_DIR) $(TARGET) $(BOOTSTRAP_DIR) $(SELFHOST_DEMO_DIR)
 	$(MAKE) -C test clean
 
 .PHONY: format
@@ -91,21 +80,6 @@ $(BUILD_DIR):
 $(TMP_DIR):
 	mkdir -p $(TMP_DIR)
 
-# TARGET
-# $(TARGET): $(S_FILES) | $(BUILD_DIR)
-# 	@echo "Generating $(TARGET)"
-# 	clang -fuse-ld=lld $(S_FILES) -o $(TARGET)
-
-# .c -> .ll
-# $(TMP_DIR)/%.ll: $(SRC_DIR)/%.c | $(TMP_DIR)
-# 	@echo "Generating LLVM IR: $@"
-# 	clang -S -emit-llvm $(CFLAGS) -Isrc $< -o $@
-
-# .ll -> .s
-# $(TMP_DIR)/%.s: $(TMP_DIR)/*.ll
-# 	@echo "Generating .s: $@"
-# 	llc $< -o $@
-
 .PHONY: clean_deps
 clean_deps:
 	rm -f $(DEPS)
@@ -121,6 +95,7 @@ BOOTSTRAP_INPUT_DIR = $(BOOTSTRAP_DIR)/input
 BOOTSTRAP_TC1_DIR = $(BOOTSTRAP_DIR)/tc1
 BOOTSTRAP_TC2_DIR = $(BOOTSTRAP_DIR)/tc2
 BOOTSTRAP_CASES = $(SELFHOST_SRCS) $(notdir $(wildcard demo/*.c))
+SELFHOST_DEMO_DIR = $(SELFHOST_DIR)/demo_check
 
 .PHONY: selfhost
 selfhost: $(TARGET) $(SELFHOST_BUILD)
@@ -196,3 +171,40 @@ bootstrap_compare: bootstrap_tc1_outputs bootstrap_tc2_outputs
 .PHONY: bootstrap_check
 bootstrap_check: test bootstrap_compare
 	@echo "PASS: tests + bootstrap compare"
+
+.PHONY: selfhost_demo_check
+selfhost_demo_check: selfhost
+	@echo "=== selfhost demo check ==="
+	@mkdir -p $(SELFHOST_DEMO_DIR)/input $(SELFHOST_DEMO_DIR)/ll $(SELFHOST_DEMO_DIR)/bin
+	@for src in demo/*.c; do \
+		base=$$(basename $$src .c); \
+		echo "  preprocess $$src"; \
+		clang -E -nostdinc -I$(SELFHOST_INC) -Isrc -P $$src `llvm-config --cflags` -o $(SELFHOST_DEMO_DIR)/input/$$base.i || exit 1; \
+		echo "  selfhost compile $$base.i"; \
+		$(SELFHOST_TARGET) $(SELFHOST_DEMO_DIR)/input/$$base.i -o $(SELFHOST_DEMO_DIR)/ll/$$base.ll || exit 1; \
+		expected=""; \
+		case $$base in \
+			example01) expected=4 ;; \
+			example02) expected=5 ;; \
+			example03) expected=42 ;; \
+			example04) expected=42 ;; \
+			example05) expected=55 ;; \
+			example06) expected=55 ;; \
+			example07) expected=3 ;; \
+			example08) expected=13 ;; \
+			example09) expected=4 ;; \
+		esac; \
+		if [ -n "$$expected" ]; then \
+			clang $(SELFHOST_DEMO_DIR)/ll/$$base.ll -o $(SELFHOST_DEMO_DIR)/bin/$$base `llvm-config --ldflags --libs --system-libs` -lc || exit 1; \
+			$(SELFHOST_DEMO_DIR)/bin/$$base >/dev/null 2>&1; \
+			actual=$$?; \
+			if [ "$$actual" -ne "$$expected" ]; then \
+				echo "FAIL: $$base expected $$expected got $$actual"; \
+				exit 1; \
+			fi; \
+			echo "  PASS $$base (exit=$$actual)"; \
+		else \
+			echo "  SKIP $$base (no expected exit check)"; \
+		fi; \
+	done
+	@echo "PASS: all demo sources compiled; checked expected exits for example01..example09"
