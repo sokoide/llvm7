@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define MAX_NODES 128
+#define MAX_NODES 1024
 
 typedef enum {
     TK_RESERVED,
@@ -34,10 +34,11 @@ struct Token {
 };
 
 struct Type {
-    enum { INT, CHAR, VOID, PTR, STRUCT } ty;
-    Type* ptr_to; // For PTR, points to the type being pointed to
+    enum { INT, CHAR, VOID, PTR, STRUCT, LONG } ty;
+    struct Type* ptr_to;
     size_t array_size;
-    Member* members; // For STRUCT
+    struct Member* members; // For STRUCT
+    void* llvm_type;        // Cache for LLVMTypeRef
 };
 
 typedef enum {
@@ -45,6 +46,7 @@ typedef enum {
     ND_SUB,          // -
     ND_MUL,          // *
     ND_DIV,          // /
+    ND_MOD,          // %
     ND_LT,           // <
     ND_LE,           // <=
     ND_EQ,           // ==
@@ -79,6 +81,14 @@ typedef enum {
     ND_PRE_DEC,      // --i
     ND_POST_DEC,     // i--
     ND_CAST,         // (type)expr
+    ND_INIT,         // Array initializer { ... }
+    ND_CONTINUE,     // continue
+    ND_ADD_ASSIGN,   // +=
+    ND_SUB_ASSIGN,   // -=
+    ND_MUL_ASSIGN,   // *=
+    ND_DIV_ASSIGN,   // /=
+    ND_COND,         // ?:
+    ND_ELLIPSIS,     // ... (variadic arguments marker)
 } NodeKind;
 
 typedef struct LVar LVar;
@@ -123,7 +133,17 @@ struct Node {
     Node* next_case;  // for case/default list in ND_SWITCH
     int case_val;     // for ND_CASE
     bool is_default;  // for ND_DEFAULT
+    bool is_extern;   // for extern global var
+    bool is_variadic; // for ND_FUNCTION: variadic function
     void* llvm_label; // LLVMBasicBlockRef for ND_CASE/ND_BREAK/etc.
+};
+
+typedef struct StructTag StructTag;
+struct StructTag {
+    StructTag* next;
+    const char* name;
+    int len;
+    Type* type;
 };
 
 typedef struct Context Context;
@@ -134,13 +154,16 @@ struct Context {
     LVar* globals;                  // global variables
     Typedef* typedefs;              // typedefs
     EnumConst* enum_consts;         // enum constants
+    StructTag* struct_tags;         // struct tags
     Node* current_switch;           // Nested switch tracking
     void* current_switch_inst;      // Switch instruction for current context
     void* current_break_label;      // Current jump target for break
+    void* current_continue_label;   // Current jump target for continue
     int node_count;                 // Number of statements
     const char* strings[MAX_NODES]; // string literal data
     int string_lens[MAX_NODES];     // string literal lengths
     int string_count;               // number of string literals
+    Type* current_func_type; // Return type of current function being generated
 };
 
 #endif

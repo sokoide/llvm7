@@ -11,11 +11,28 @@ static int is_alnum(char c) {
            ('0' <= c && c <= '9') || c == '_';
 }
 
+// Keyword table (selfhost-compatible: no anonymous struct)
+char* kw_str[28] = {
+    "return", "if",     "else",    "while",   "for",      "int",      "char",
+    "void",   "sizeof", "struct",  "typedef", "enum",     "static",   "extern",
+    "const",  "long",   "bool",    "size_t",  "NULL",     "true",     "false",
+    "switch", "case",   "default", "break",   "continue", "unsigned", "signed"};
+int kw_len[28] = {6, 2, 4, 5, 3, 3, 4, 4, 6, 6, 7, 4, 6, 6,
+                  5, 4, 4, 6, 4, 4, 5, 6, 4, 7, 5, 8, 8, 6};
+int NUM_KEYWORDS = 28;
+
+char* three_char_ops[1] = {"..."};
+int NUM_THREE_CHAR_OPS = 1;
+
+char* two_char_ops[13] = {"==", "!=", "<=", ">=", "&&", "||", "->",
+                          "++", "--", "+=", "-=", "*=", "/="};
+int NUM_TWO_CHAR_OPS = 13;
+
 Token* new_token(TokenKind kind, Token* cur, const char* str, int len) {
     Token* tok = calloc(1, sizeof(Token));
     tok->kind = kind;
     tok->val = 0;
-    if (kind == TK_NUM) {
+    if (kind == TK_NUM && len > 0) {
         tok->val = strtol(str, NULL, 10);
     }
     tok->str = str;
@@ -36,18 +53,6 @@ Token* tokenize(const char* p) {
     head.next = NULL;
     Token* cur = &head;
 
-    struct {
-        char* str;
-        int len;
-    } keywords[] = {
-        {"return", 6}, {"if", 2},     {"else", 4},    {"while", 5},
-        {"for", 3},    {"int", 3},    {"char", 4},    {"void", 4},
-        {"sizeof", 6}, {"struct", 6}, {"typedef", 7}, {"enum", 4},
-        {"static", 6}, {"extern", 6}, {"const", 5},   {"long", 4},
-        {"bool", 4},   {"size_t", 6}, {"NULL", 4},    {"true", 4},
-        {"false", 5},  {"switch", 6}, {"case", 4},    {"default", 7},
-        {"break", 5}};
-
     // Iterate through the input string until null terminator
     while (*p) {
         if (isspace(*p)) {
@@ -65,7 +70,7 @@ Token* tokenize(const char* p) {
 
         // Skip block comments
         if (strncmp(p, "/*", 2) == 0) {
-            char* q = strstr(p + 2, "*/");
+            const char* q = strstr(p + 2, "*/");
             if (!q) {
                 fprintf(stderr, "lex error: unterminated block comment\n");
                 return NULL;
@@ -76,11 +81,11 @@ Token* tokenize(const char* p) {
 
         // Check for keywords
         bool keyword_matched = false;
-        for (size_t i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++) {
-            if (strncmp(p, keywords[i].str, keywords[i].len) == 0 &&
-                !is_alnum(p[keywords[i].len])) {
-                cur = new_token(TK_RESERVED, cur, p, keywords[i].len);
-                p += keywords[i].len;
+        for (int i = 0; i < NUM_KEYWORDS; i++) {
+            if (strncmp(p, kw_str[i], kw_len[i]) == 0 &&
+                !is_alnum(p[kw_len[i]])) {
+                cur = new_token(TK_RESERVED, cur, p, kw_len[i]);
+                p += kw_len[i];
                 keyword_matched = true;
                 break;
             }
@@ -89,12 +94,23 @@ Token* tokenize(const char* p) {
             continue;
         }
 
+        // Check for three-character operators (ellipsis)
+        bool three_char_matched = false;
+        for (int i = 0; i < NUM_THREE_CHAR_OPS; i++) {
+            if (strncmp(p, three_char_ops[i], 3) == 0) {
+                cur = new_token(TK_RESERVED, cur, p, 3);
+                p += 3;
+                three_char_matched = true;
+                break;
+            }
+        }
+        if (three_char_matched) {
+            continue;
+        }
+
         // Check for two-character operators
         bool two_char_matched = false;
-        char* two_char_ops[] = {"==", "!=", "<=", ">=", "&&",
-                                "||", "->", "++", "--"};
-        for (size_t i = 0; i < sizeof(two_char_ops) / sizeof(two_char_ops[0]);
-             i++) {
+        for (int i = 0; i < NUM_TWO_CHAR_OPS; i++) {
             if (strncmp(p, two_char_ops[i], 2) == 0) {
                 cur = new_token(TK_RESERVED, cur, p, 2);
                 p += 2;
@@ -107,7 +123,7 @@ Token* tokenize(const char* p) {
         }
 
         // Check for single-character operators and delimiters
-        char* single_char_ops = "+-*/()<>;={},&[].!:";
+        char* single_char_ops = "+-*/()<>;={},&[].!:=?%.\0";
         if (strchr(single_char_ops, *p)) {
             cur = new_token(TK_RESERVED, cur, p++, 1);
             continue;
@@ -156,8 +172,15 @@ Token* tokenize(const char* p) {
                 return NULL;
             }
             p++; // skip closing '
-            cur = new_token(TK_NUM, cur, p, 0);
+            cur = new_token(TK_NUM, cur, p - 2, 1);
             cur->val = val;
+            cur->len =
+                0; // Still use 0 to avoid consume() matching, but wait...
+            // Let's use actual length 1 and pointed at the char but it's
+            // complex. Actually, the best way is to not use len=0 if it's a
+            // valid token. For TK_NUM, expect_number() uses cur->val. So
+            // kind=TK_NUM, len=0 is fine IF nobody uses len to match it. Wait,
+            // the previous logic was creating a SECOND token!
             continue;
         }
 
@@ -251,7 +274,8 @@ void expect(Context* ctx, char* op) {
     if (!consume(ctx, op)) {
         // If the operator doesn't match, print an error message to stderr
         fprintf(stderr, "lex error: Expected '%s'\n", op);
-        // Exit the program with an error status
+        // Context: fprintf(stderr, "Context: '%.20s'\n",
+        // ctx->current_token->str); Exit the program with an error status
         exit(1);
     }
 }
@@ -260,8 +284,7 @@ int expect_number(Context* ctx) {
     // Check if the current token is a number
     if (ctx->current_token->kind != TK_NUM) {
         // If it's not a number, print an error message to stderr
-        fprintf(stderr, "lex error: Expected a number, got kind=%d\n",
-                ctx->current_token->kind);
+        fprintf(stderr, "lex error: Expected a number\n");
         // Exit the program with an error status
         exit(1);
     }

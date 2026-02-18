@@ -5,6 +5,7 @@
 #include <string.h>
 
 static Node* parse_logor(Context* ctx);
+static Node* parse_conditional(Context* ctx);
 static Node* parse_logand(Context* ctx);
 static Node* convert_array_to_ptr(Node* node);
 static Node* parse_unary_no_array_conv(Context* ctx);
@@ -66,9 +67,9 @@ void free_ast(Node* ast) {
     if (ast == NULL)
         return;
     // Don't free ast->lhs for ND_CALL (it's a Token*, not a Node*)
-    if (ast->kind != ND_CALL) {
-        free_ast(ast->lhs);
-    }
+    // if (ast->kind != ND_CALL) {
+    //     free_ast(ast->lhs);
+    // }
     free_ast(ast->rhs);
     free_ast(ast->next);
     free_ast(ast->cond);
@@ -128,12 +129,44 @@ static Typedef* find_typedef(Context* ctx, Token* tok) {
     return NULL;
 }
 
+static int expect_const_int(Context* ctx) {
+    if (ctx->current_token->kind == TK_NUM) {
+        return expect_number(ctx);
+    }
+    Token* tok = consume_ident(ctx);
+    if (tok) {
+        EnumConst* ec = find_enum_const(ctx, tok);
+        if (ec)
+            return ec->val;
+        exit(1);
+    }
+    // Debug: fprintf(stderr, "expect_const_int failed: kind=%d\n",
+    // ctx->current_token->kind);
+
+    // Print context backwards unsafely but hopefully usefully
+    const char* p = ctx->current_token->str;
+    // fprintf(stderr, "Context around error: '%.100s'\n", p - 50);
+
+    return expect_number(ctx);
+}
+
+static StructTag* find_tag(Context* ctx, Token* tok) {
+    for (StructTag* tag = ctx->struct_tags; tag; tag = tag->next) {
+        if (tag->len == tok->len && strncmp(tag->name, tok->str, tag->len) == 0)
+            return tag;
+    }
+    return NULL;
+}
+
 // Try to parse a type, returns NULL if not a type
 Type* try_parse_type(Context* ctx) {
     // Skip common qualifiers
+    bool has_qualifier = false;
     while (consume(ctx, "const") || consume(ctx, "static") ||
-           consume(ctx, "extern"))
-        ;
+           consume(ctx, "extern") || consume(ctx, "signed") ||
+           consume(ctx, "unsigned")) {
+        has_qualifier = true;
+    }
 
     // Parse base type
     Type* base = NULL;
@@ -145,7 +178,8 @@ Type* try_parse_type(Context* ctx) {
         base = calloc(1, sizeof(Type));
         base->ty = VOID;
     } else if (consume(ctx, "long")) {
-        base = new_type_int(); // long as int
+        base = calloc(1, sizeof(Type));
+        base->ty = LONG;
     } else if (consume(ctx, "bool") ||
                (ctx->current_token->kind == TK_IDENT &&
                 ctx->current_token->len == 4 &&
@@ -153,8 +187,10 @@ Type* try_parse_type(Context* ctx) {
         consume(ctx, "bool");
         base = new_type_int();
     } else if (consume(ctx, "size_t")) {
-        base = new_type_int();
+        base = calloc(1, sizeof(Type));
+        base->ty = LONG;
     } else if (consume(ctx, "enum")) {
+        // ... (keep rest of enum logic)
         consume_ident(ctx); // Ignore tag
         if (consume(ctx, "{")) {
             int val = 0;
@@ -163,7 +199,7 @@ Type* try_parse_type(Context* ctx) {
                 if (!tok)
                     break;
                 if (consume(ctx, "=")) {
-                    val = expect_number(ctx);
+                    val = expect_const_int(ctx);
                 }
                 EnumConst* ec = calloc(1, sizeof(EnumConst));
                 ec->name = tok->str;
@@ -176,46 +212,83 @@ Type* try_parse_type(Context* ctx) {
         }
         base = new_type_int();
     } else if (consume(ctx, "struct")) {
-        expect(ctx, "{");
-        base = calloc(1, sizeof(Type));
-        base->ty = STRUCT;
-        Member head = {0};
-        Member* cur = &head;
-        int index = 0;
-        while (!consume(ctx, "}")) {
-            Type* mty = parse_type(ctx);
-            Token* mtok = consume_ident(ctx);
-            if (!mtok) {
-                fprintf(stderr, "Expected member name\n");
-                exit(1);
-            }
-            // Check for array in struct members if needed, but for now simple
-            if (consume(ctx, "[")) {
-                int size = expect_number(ctx);
-                expect(ctx, "]");
-                mty = new_type_array(mty, (size_t)size);
-            }
-            expect(ctx, ";");
+        // ... (keep rest of struct logic)
+        Token* tag = consume_ident(ctx);
+        Type* str_type = NULL;
 
-            Member* m = calloc(1, sizeof(Member));
-            m->type = mty;
-            m->name = mtok->str;
-            m->len = mtok->len;
-            m->index = index++;
-            cur->next = m;
-            cur = m;
+        if (tag) {
+            StructTag* st = find_tag(ctx, tag);
+            if (st) {
+                str_type = st->type;
+            } else {
+                str_type = calloc(1, sizeof(Type));
+                str_type->ty = STRUCT;
+                StructTag* nst = calloc(1, sizeof(StructTag));
+                nst->name = tag->str;
+                nst->len = tag->len;
+                nst->type = str_type;
+                nst->next = ctx->struct_tags;
+                ctx->struct_tags = nst;
+            }
+        } else {
+            // Anonymous struct
+            str_type = calloc(1, sizeof(Type));
+            str_type->ty = STRUCT;
         }
-        base->members = head.next;
+
+        if (consume(ctx, "{")) {
+            Member head;
+            memset(&head, 0, sizeof(Member));
+            Member* cur = &head;
+            int index = 0;
+            while (!consume(ctx, "}")) {
+                Type* mty = parse_type(ctx);
+                Token* mtok = consume_ident(ctx);
+                if (!mtok) {
+                    fprintf(stderr, "Expected member name\\n");
+                    exit(1);
+                }
+                // Check for array in struct members if needed, but for now
+                // simple
+                if (consume(ctx, "[")) {
+                    int size = 0;
+                    if (!consume(ctx, "]")) {
+                        size = expect_const_int(ctx);
+                        expect(ctx, "]");
+                    }
+                    mty = new_type_array(mty, (size_t)size);
+                }
+                expect(ctx, ";");
+
+                Member* m = calloc(1, sizeof(Member));
+                m->type = mty;
+                m->name = mtok->str;
+                m->len = mtok->len;
+                m->index = index++;
+                cur->next = m;
+                cur = m;
+            }
+            str_type->members = head.next;
+        } else if (!tag) {
+            fprintf(stderr, "Expected '{' after struct\\n");
+            exit(1);
+        }
+
+        base = str_type;
     } else if (ctx->current_token->kind == TK_IDENT) {
         Typedef* td = find_typedef(ctx, ctx->current_token);
         if (td) {
             ctx->current_token = ctx->current_token->next;
             base = td->type;
-        } else {
-            return NULL;
         }
-    } else {
-        return NULL; // Not a type
+    }
+
+    if (base == NULL && has_qualifier) {
+        base = new_type_int();
+    }
+
+    if (base == NULL) {
+        return NULL;
     }
 
     // Parse pointers
@@ -239,14 +312,26 @@ Type* parse_type(Context* ctx) {
 Node* parse_params(Context* ctx) {
     Type* ty = parse_type(ctx);
     Token* tok = consume_ident(ctx);
+
     if (!tok) {
-        fprintf(stderr, "Expected parameter name\n");
-        exit(1);
+        // Handle (void)
+        if (ty->ty == VOID && ty->ptr_to == NULL) {
+            // Check if next is ')'
+            if (ctx->current_token->kind == TK_RESERVED &&
+                strncmp(ctx->current_token->str, ")", 1) == 0) {
+                return NULL;
+            }
+        }
+        // Arguments without name (prototype)
+        tok = calloc(1, sizeof(Token));
+        tok->kind = TK_IDENT;
+        tok->str = "";
+        tok->len = 0;
     }
 
     if (consume(ctx, "[")) {
         if (!consume(ctx, "]")) {
-            expect_number(ctx);
+            expect_const_int(ctx);
             expect(ctx, "]");
         }
         ty = new_type_ptr(ty);
@@ -260,27 +345,38 @@ Node* parse_params(Context* ctx) {
     Node* tail = head;
 
     while (consume(ctx, ",")) {
+        // Check for ellipsis (variadic arguments)
+        if (consume(ctx, "...")) {
+            // Add ellipsis marker node to parameter list
+            Node* ellipsis = new_node(ND_ELLIPSIS, NULL, NULL);
+            tail->next = ellipsis;
+            break;
+        }
+
         ty = parse_type(ctx);
         tok = consume_ident(ctx);
         if (!tok) {
-            fprintf(stderr, "Expected parameter name\n");
-            exit(1);
+            // Arguments without name
+            tok = calloc(1, sizeof(Token));
+            tok->kind = TK_IDENT;
+            tok->str = "";
+            tok->len = 0;
         }
 
         if (consume(ctx, "[")) {
             if (!consume(ctx, "]")) {
-                expect_number(ctx);
+                expect_const_int(ctx);
                 expect(ctx, "]");
             }
             ty = new_type_ptr(ty);
         }
 
-        // Add parameter to locals before creating node
         lvar = add_lvar(ctx, tok, ty);
-        tail->next = new_node_ident(ctx, tok);
-        tail->next->type = ty; // Store type in node
-        tail->next->val = lvar->offset;
-        tail = tail->next;
+        Node* node = new_node_ident(ctx, tok);
+        node->type = ty;
+        node->val = lvar->offset;
+        tail->next = node;
+        tail = node;
     }
 
     return head;
@@ -345,7 +441,7 @@ Node* parse_global_var(Context* ctx) {
 
     // Check for array definition
     if (consume(ctx, "[")) {
-        int size = expect_number(ctx);
+        int size = expect_const_int(ctx);
         expect(ctx, "]");
         ty = new_type_array(ty, size);
     }
@@ -367,9 +463,33 @@ Node* parse_global_var(Context* ctx) {
     return node;
 }
 
+Node* parse_expr(Context* ctx);
+
+static Node* parse_initializer(Context* ctx) {
+    expect(ctx, "{");
+    Node* node = new_node(ND_INIT, NULL, NULL);
+    Node head;
+    head.next = NULL;
+    Node* cur = &head;
+    while (!consume(ctx, "}")) {
+        if (cur != &head)
+            expect(ctx, ",");
+        if (consume(ctx, "}"))
+            break; // trailing comma
+
+        cur->next = parse_expr(ctx);
+        cur = cur->next;
+    }
+    node->lhs = head.next; // Use lhs for list body
+    return node;
+}
+
 void parse_program(Context* ctx) {
     int i = 0;
     while (!at_eof(ctx)) {
+        // Check for extern declaration
+        bool is_extern = consume(ctx, "extern");
+
         if (consume(ctx, "typedef")) {
             Type* ty = parse_type(ctx);
             Token* tok = consume_ident(ctx);
@@ -418,13 +538,20 @@ void parse_program(Context* ctx) {
             }
 
             if (consume(ctx, ";")) {
-                // Prototype
+                // Prototype (extern or regular)
                 Node* node = new_node(ND_FUNCTION, NULL, NULL);
                 node->tok = tok;
                 node->type = ty;
                 node->rhs = func_params;
+                node->is_extern = is_extern;
                 ctx->code[i++] = node;
                 continue;
+            }
+
+            // extern function must be a prototype
+            if (is_extern) {
+                fprintf(stderr, "extern function must be a prototype\n");
+                exit(1);
             }
 
             expect(ctx, "{");
@@ -458,7 +585,7 @@ void parse_program(Context* ctx) {
             // Since we've already consumed the ident, we need to check for "["
             // or ";"
             if (consume(ctx, "[")) {
-                int size = expect_number(ctx);
+                int size = expect_const_int(ctx);
                 expect(ctx, "]");
                 ty = new_type_array(ty, size);
             }
@@ -475,16 +602,70 @@ void parse_program(Context* ctx) {
             Node* node = new_node(ND_GVAR, NULL, NULL);
             node->tok = tok;
             node->type = ty;
+            node->is_extern = is_extern;
 
-            if (consume(ctx, "=")) {
-                node->init = parse_expr(ctx);
+            // extern declarations cannot have initializers
+            if (!is_extern && consume(ctx, "=")) {
+                // Check if next token is '{'
+                Token* t = ctx->current_token;
+                if (t->kind == TK_RESERVED && t->len == 1 && t->str[0] == '{') {
+                    node->init = parse_initializer(ctx);
+                    node->init->type = ty; // Set type for codegen
+                } else {
+                    node->init = parse_expr(ctx);
+                }
             }
             expect(ctx, ";");
 
             ctx->code[i++] = node;
+            continue; // Ensure we move to next token!
         }
     }
     ctx->node_count = i;
+}
+
+static Node* parse_declaration(Context* ctx, Type* ty) {
+    Token* tok = consume_ident(ctx);
+    if (!tok) {
+        fprintf(stderr, "Expected variable name after type\n");
+        exit(1);
+    }
+
+    // Check for array definitions (e.g., int a[10], char x[3], int y[])
+    if (consume(ctx, "[")) {
+        int size = 0;
+        if (!consume(ctx, "]")) {
+            size = expect_const_int(ctx);
+            expect(ctx, "]");
+        }
+        ty = new_type_array(ty, size);
+    }
+
+    // Add variable to locals
+    LVar* lvar = add_lvar(ctx, tok, ty);
+    Node* decl = new_node(ND_DECL, NULL, NULL);
+    decl->tok = tok;
+    decl->val = lvar->offset;
+    decl->type = ty;
+
+    if (consume(ctx, "=")) {
+        if (ctx->current_token->kind == TK_RESERVED &&
+            ctx->current_token->len == 1 && ctx->current_token->str[0] == '{') {
+            decl->init = parse_initializer(ctx);
+            // If array size was 0, count elements
+            if (decl->type->ty == PTR && decl->type->array_size == 0) {
+                int count = 0;
+                for (Node* n = decl->init->lhs; n; n = n->next)
+                    count++;
+                decl->type->array_size = count;
+            }
+        } else {
+            decl->init = parse_expr(ctx);
+        }
+    }
+    expect(ctx, ";");
+
+    return decl;
 }
 
 Node* parse_stmt(Context* ctx) {
@@ -494,37 +675,21 @@ Node* parse_stmt(Context* ctx) {
     {
         Type* ty = try_parse_type(ctx);
         if (ty) {
-            Token* tok = consume_ident(ctx);
-            if (!tok) {
-                fprintf(stderr, "Expected variable name after type\n");
-                exit(1);
-            }
-
-            // Check for array definitions (e.g., int a[10], char x[3])
-            if (consume(ctx, "[")) {
-                int size = expect_number(ctx);
-                expect(ctx, "]");
-                ty = new_type_array(ty, size);
-            }
-
-            // Add variable to locals
-            LVar* lvar = add_lvar(ctx, tok, ty);
-            Node* decl = new_node(ND_DECL, NULL, NULL);
-            decl->tok = tok;
-            decl->val = lvar->offset;
-            decl->type = ty;
-
-            if (consume(ctx, "=")) {
-                decl->init = parse_expr(ctx);
-            }
-            expect(ctx, ";");
-
-            return decl;
+            return parse_declaration(ctx, ty);
         }
     }
 
+    if (consume(ctx, ";")) {
+        return new_node(ND_BLOCK, NULL, NULL);
+    }
+
     if (consume(ctx, "return")) {
-        node = new_node(ND_RETURN, convert_array_to_ptr(parse_expr(ctx)), NULL);
+        Node* retval = NULL;
+        Token* t = ctx->current_token;
+        if (!(t->kind == TK_RESERVED && t->len == 1 && t->str[0] == ';')) {
+            retval = convert_array_to_ptr(parse_expr(ctx));
+        }
+        node = new_node(ND_RETURN, retval, NULL);
     } else if (consume(ctx, "if")) {
         expect(ctx, "(");
         Node* cond = convert_array_to_ptr(parse_expr(ctx));
@@ -547,25 +712,27 @@ Node* parse_stmt(Context* ctx) {
         return node;
     } else if (consume(ctx, "for")) {
         expect(ctx, "(");
-        Node* init = NULL;
+        Node* node = new_node(ND_FOR, NULL, NULL);
+
+        Type* ty = try_parse_type(ctx);
+        if (ty) {
+            node->init = parse_declaration(ctx, ty);
+        } else {
+            if (!consume(ctx, ";")) {
+                node->init = convert_array_to_ptr(parse_expr(ctx));
+                expect(ctx, ";");
+            }
+        }
+
         if (!consume(ctx, ";")) {
-            init = convert_array_to_ptr(parse_expr(ctx));
+            node->cond = convert_array_to_ptr(parse_expr(ctx));
             expect(ctx, ";");
         }
-        Node* cond = NULL;
-        if (!consume(ctx, ";")) {
-            cond = convert_array_to_ptr(parse_expr(ctx));
-            expect(ctx, ";");
-        }
-        Node* inc = NULL;
         if (!consume(ctx, ")")) {
-            inc = convert_array_to_ptr(parse_expr(ctx));
+            node->rhs = convert_array_to_ptr(parse_expr(ctx));
             expect(ctx, ")");
         }
-        Node* body = parse_stmt(ctx);
-        node = new_node(ND_FOR, body, inc);
-        node->init = init;
-        node->cond = cond;
+        node->lhs = parse_stmt(ctx);
         return node;
     } else if (consume(ctx, "switch")) {
         expect(ctx, "(");
@@ -587,10 +754,11 @@ Node* parse_stmt(Context* ctx) {
             fprintf(stderr, "case outside switch\n");
             exit(1);
         }
-        int val = expect_number(ctx);
+        int val = expect_const_int(ctx);
         expect(ctx, ":");
+
         Node* node = new_node(ND_CASE, NULL, NULL);
-        node->case_val = val;
+        node->val = val;
         node->next_case = ctx->current_switch->cases;
         ctx->current_switch->cases = node;
         return node;
@@ -608,15 +776,22 @@ Node* parse_stmt(Context* ctx) {
     } else if (consume(ctx, "break")) {
         expect(ctx, ";");
         return new_node(ND_BREAK, NULL, NULL);
+    } else if (consume(ctx, "continue")) {
+        expect(ctx, ";");
+        return new_node(ND_CONTINUE, NULL, NULL);
     } else if (consume(ctx, "{")) {
-        // Block statement: consume statements until }
-        node = parse_stmt(ctx);
-        Node* head = node;
+        Node head;
+        head.next = NULL;
+        Node* cur = &head;
         while (!consume(ctx, "}")) {
-            node->next = parse_stmt(ctx);
-            node = node->next;
+            if (at_eof(ctx)) {
+                fprintf(stderr, "Unexpected EOF while parsing block\n");
+                exit(1);
+            }
+            cur->next = parse_stmt(ctx);
+            cur = cur->next;
         }
-        return new_node(ND_BLOCK, head, NULL);
+        return new_node(ND_BLOCK, head.next, NULL);
     } else {
         node = parse_expr(ctx);
     }
@@ -655,11 +830,49 @@ static Node* parse_logand(Context* ctx) {
     }
 }
 
-Node* parse_assign(Context* ctx) {
+static Node* parse_conditional(Context* ctx) {
     Node* node = parse_logor(ctx);
+    if (consume(ctx, "?")) {
+        Node* ternary = new_node(ND_COND, NULL, NULL);
+        ternary->cond = node;
+        ternary->lhs = parse_expr(ctx);
+        expect(ctx, ":");
+        ternary->rhs = parse_conditional(ctx);
+        // Type inference: use type of lhs (simplification)
+        if (ternary->lhs && ternary->lhs->type) {
+            ternary->type = ternary->lhs->type;
+        } else {
+            ternary->type = new_type_int();
+        }
+        return ternary;
+    }
+    return node;
+}
+
+Node* parse_assign(Context* ctx) {
+    Node* node = parse_conditional(ctx);
     if (consume(ctx, "=")) {
         node =
             new_node(ND_ASSIGN, node, convert_array_to_ptr(parse_assign(ctx)));
+    } else if (consume(ctx, "+=")) {
+        node = new_node(
+            ND_ASSIGN, node,
+            new_node(ND_ADD, node, convert_array_to_ptr(parse_assign(ctx))));
+    } else if (consume(ctx, "-=")) {
+        node = new_node(
+            ND_ASSIGN, node,
+            new_node(ND_SUB, node, convert_array_to_ptr(parse_assign(ctx))));
+    } else if (consume(ctx, "*=")) {
+        node = new_node(
+            ND_ASSIGN, node,
+            new_node(ND_MUL, node, convert_array_to_ptr(parse_assign(ctx))));
+    } else if (consume(ctx, "/=")) {
+        node = new_node(
+            ND_ASSIGN, node,
+            new_node(ND_DIV, node, convert_array_to_ptr(parse_assign(ctx))));
+    }
+
+    if (node && node->kind == ND_ASSIGN) {
         if (node->lhs) {
             node->type = node->lhs->type;
         }
@@ -751,30 +964,70 @@ Node* parse_mul(Context* ctx) {
             node = new_node(ND_DIV, convert_array_to_ptr(node),
                             convert_array_to_ptr(parse_unary(ctx)));
             node->type = new_type_int();
+        } else if (consume(ctx, "%")) {
+            node = new_node(ND_MOD, convert_array_to_ptr(node),
+                            convert_array_to_ptr(parse_unary(ctx)));
+            node->type = new_type_int();
         } else {
             return node;
         }
     }
 }
 
-static int type_size(Type* ty) {
+static int type_align(Type* ty) {
     if (ty == NULL)
         return 4;
     if (ty->ty == CHAR)
         return 1;
     if (ty->ty == INT)
         return 4;
-    if (ty->ty == STRUCT) {
-        int size = 0;
-        for (Member* m = ty->members; m; m = m->next) {
-            size += type_size(m->type);
-        }
-        return size;
-    }
-    if (ty->array_size > 0)
-        return type_size(ty->ptr_to) * ty->array_size;
+    if (ty->ty == LONG)
+        return 8;
     if (ty->ty == PTR)
         return 8;
+    if (ty->ty == STRUCT) {
+        int max_align = 1;
+        for (Member* m = ty->members; m; m = m->next) {
+            int a = type_align(m->type);
+            if (a > max_align)
+                max_align = a;
+        }
+        return max_align;
+    }
+    if (ty->array_size > 0)
+        return type_align(ty->ptr_to);
+    return 4;
+}
+
+static int type_size(Type* ty) {
+    if (ty == NULL)
+        return 4;
+    if (ty->array_size > 0)
+        return type_size(ty->ptr_to) * ty->array_size;
+
+    if (ty->ty == CHAR)
+        return 1;
+    if (ty->ty == INT)
+        return 4;
+    if (ty->ty == LONG)
+        return 8;
+    if (ty->ty == PTR)
+        return 8;
+    if (ty->ty == STRUCT) {
+        int size = 0;
+        int max_align = 1;
+        for (Member* m = ty->members; m; m = m->next) {
+            int a = type_align(m->type);
+            if (a > max_align)
+                max_align = a;
+            // Align current size to member alignment
+            size = ((size + a - 1) / a) * a;
+            size += type_size(m->type);
+        }
+        // Final size is multiple of max_align
+        size = ((size + max_align - 1) / max_align) * max_align;
+        return size;
+    }
     return 4;
 }
 
@@ -825,8 +1078,7 @@ static Node* parse_postfix(Context* ctx) {
             }
             Member* m = find_member(node->type, tok);
             if (!m) {
-                fprintf(stderr, "Member '%.*s' not found\n", tok->len,
-                        tok->str);
+                fprintf(stderr, "Member not found\n");
                 exit(1);
             }
             Node* n = new_node(ND_MEMBER, node, NULL);
@@ -855,8 +1107,7 @@ static Node* parse_postfix(Context* ctx) {
 
             Member* m = find_member(deref->type, tok);
             if (!m) {
-                fprintf(stderr, "Member '%.*s' not found\n", tok->len,
-                        tok->str);
+                fprintf(stderr, "Member not found\n");
                 exit(1);
             }
             Node* n = new_node(ND_MEMBER, deref, NULL);
@@ -896,12 +1147,13 @@ static Node* convert_array_to_ptr(Node* node) {
 static bool is_type(Context* ctx) {
     Token* tok = ctx->current_token;
     if (tok->kind == TK_RESERVED) {
-        char* keywords[] = {"int",    "char",   "void",    "long",  "bool",
-                            "size_t", "enum",   "struct",  "const", "static",
-                            "extern", "signed", "unsigned"};
-        for (size_t i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++) {
-            if ((size_t)tok->len == strlen(keywords[i]) &&
-                strncmp(tok->str, keywords[i], tok->len) == 0)
+        char* type_keywords[13] = {
+            "int",    "char",  "void",   "long",   "bool",   "size_t",  "enum",
+            "struct", "const", "static", "extern", "signed", "unsigned"};
+        int num_type_kw = 13;
+        for (int i = 0; i < num_type_kw; i++) {
+            if ((size_t)tok->len == strlen(type_keywords[i]) &&
+                strncmp(tok->str, type_keywords[i], tok->len) == 0)
                 return true;
         }
     }
@@ -984,8 +1236,11 @@ Node* parse_unary(Context* ctx) {
     if (consume(ctx, "&")) {
         Node* operand = parse_unary_no_array_conv(ctx);
         Node* node = new_node(ND_ADDR, operand, NULL);
-        node->type =
-            new_type_ptr(operand->type ? operand->type : new_type_int());
+        Type* ptr_to = new_type_int();
+        if (operand->type) {
+            ptr_to = operand->type;
+        }
+        node->type = new_type_ptr(ptr_to);
         return node;
     }
     if (consume(ctx, "!")) {
@@ -1031,8 +1286,11 @@ static Node* parse_unary_no_array_conv(Context* ctx) {
     } else if (consume(ctx, "&")) {
         Node* operand = parse_unary_no_array_conv(ctx); // &array is allowed
         Node* node = new_node(ND_ADDR, operand, NULL);
-        node->type =
-            new_type_ptr(operand->type ? operand->type : new_type_int());
+        Type* ptr_to = new_type_int();
+        if (operand->type) {
+            ptr_to = operand->type;
+        }
+        node->type = new_type_ptr(ptr_to);
         return node;
     } else {
         return parse_postfix(ctx);
@@ -1073,6 +1331,8 @@ Node* parse_primary(Context* ctx) {
 
     // function call or ident
     Token* tok = consume_ident(ctx);
+    if (!tok && !at_eof(ctx)) {
+    }
 
     if (tok) {
         if (consume(ctx, "(")) {
@@ -1153,7 +1413,7 @@ Node* parse_primary(Context* ctx) {
     }
 
     // number (without subscript)
-    return new_node_num(expect_number(ctx));
+    return new_node_num(expect_const_int(ctx));
 }
 
 Node* parse_args(Context* ctx) {

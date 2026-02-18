@@ -7,7 +7,14 @@
 #include "lex.h"
 #include "parse.h"
 
+// Declare stdio initialization function
+extern void init_stdio(void);
+extern FILE* stderr;
+extern FILE* stdout;
+
 int main(int argc, const char** argv) {
+    // Initialize stdio before any I/O
+    init_stdio();
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <input_file> [-o <output_file>]\n", argv[0]);
         fprintf(stderr, "  Default output: tmp.ll\n");
@@ -36,11 +43,12 @@ int main(int argc, const char** argv) {
         return 1;
     }
 
-    printf("Compiling: %s\n", source);
+    // printf("Compiling: %s\n", source);
     printf("Output: %s\n\n", output_file);
 
     // Create context and tokenize
-    Context ctx = {0};
+    Context ctx;
+    memset(&ctx, 0, sizeof(ctx));
     ctx.current_token = tokenize(source);
 
     // Parse AST
@@ -59,13 +67,13 @@ int main(int argc, const char** argv) {
     printf("Generated: %s\n", output_file);
 
     // Clean up
-    free((void*)source);
-    for (int i = 0; i < ctx.node_count; i++) {
-        free_ast(ctx.code[i]);
-    }
-    if (ctx.current_token) {
-        free_tokens(ctx.current_token);
-    }
+    // free((void*)source);
+    // for (int i = 0; i < ctx.node_count; i++) {
+    //     free_ast(ctx.code[i]);
+    // }
+    // if (ctx.current_token) {
+    //     free_tokens(ctx.current_token);
+    // }
 
     return 0;
 }
