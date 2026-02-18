@@ -82,7 +82,7 @@ echo $?
 `clang -E` や `gcc -E` でソースを `.i` に展開した後、その `.i` を入力してください。たとえば：
 
 ```bash
-clang -E demo/example10.c -o demo/example10.i
+clang -Iselfhost/include -E demo/example10.c -o demo/example10.i
 ./build/llvm7 demo/example10.i -o demo/example10.ll
 llc demo/example10.ll -o demo/example10.s
 clang demo/example10.s -o demo/example10
@@ -107,7 +107,8 @@ int main() {
 これをコンパイルして実行するには：
 
 ```bash
-./build/llvm7 demo/stdio.c -o demo/stdio.ll
+clang -Iselfhost/include -E demo/stdio.c -o demo/stdio.i
+./build/llvm7 demo/stdio.i -o demo/stdio.ll
 llc demo/stdio.ll -o demo/stdio.s
 clang demo/stdio.s -o demo/stdio -lc
 ./demo/stdio
