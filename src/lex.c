@@ -53,9 +53,11 @@ int NUM_KEYWORDS = 28;
 char *three_char_ops[1] = {"..."};
 int NUM_THREE_CHAR_OPS = 1;
 
-char *two_char_ops[13] = {"==", "!=", "<=", ">=", "&&", "||", "->",
-                          "++", "--", "+=", "-=", "*=", "/="};
-int NUM_TWO_CHAR_OPS = 13;
+static char *two_char_ops[] = {"==", "!=", "<=", ">=", "&&", "||", "->",
+                               "++", "--", "+=", "-=", "*=", "/=", "<<"};
+
+static const int NUM_TWO_CHAR_OPS = sizeof(two_char_ops) /
+                                   sizeof(two_char_ops[0]);
 
 Token *new_token(TokenKind kind, Token *cur, const char *str, int len) {
     Token *tok = calloc(1, sizeof(Token));
@@ -152,7 +154,7 @@ Token *tokenize(const char *p) {
         }
 
         // Check for single-character operators and delimiters
-        char *single_char_ops = "+-*/()<>;={},&[].!:=?%.\0";
+        char *single_char_ops = "+-*/()<>;={},&|[].!:=?%.\0";
         if (strchr(single_char_ops, *p)) {
             cur = new_token(TK_RESERVED, cur, p++, 1);
             continue;

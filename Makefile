@@ -93,6 +93,8 @@ SELFHOST_BUILD = $(SELFHOST_DIR)/build
 SELFHOST_INC = $(SELFHOST_DIR)/include
 SELFHOST_TARGET = $(BUILD_DIR)/llvm7_selfhost
 SELFHOST_SRCS = stdio.c main.c lex.c parse.c codegen.c file.c variable.c
+SELFHOST_CPP_FLAGS = -nostdinc -I$(SELFHOST_INC) -Isrc -P `llvm-config --cflags`
+SELFHOST_CPP = clang -E $(SELFHOST_CPP_FLAGS)
 BOOTSTRAP_DIR = $(SELFHOST_DIR)/bootstrap
 BOOTSTRAP_INPUT_DIR = $(BOOTSTRAP_DIR)/input
 BOOTSTRAP_TC1_DIR = $(BOOTSTRAP_DIR)/tc1
@@ -105,7 +107,10 @@ selfhost: $(TARGET) $(SELFHOST_BUILD)
 	@echo "=== Self-hosting: compiling with own compiler ==="
 	@for src in $(SELFHOST_SRCS); do \
 		echo "  CPP+COMPILE: src/$$src"; \
-		clang -E -nostdinc -I$(SELFHOST_INC) -Isrc -P src/$$src `llvm-config --cflags` -o $(SELFHOST_BUILD)/$${src%.c}.i || exit 1; \
+		tmp=$(SELFHOST_BUILD)/$${src%.c}.i.tmp; \
+		$(SELFHOST_CPP) src/$$src -o $$tmp || exit 1; \
+		sed '/^#/d' $$tmp > $(SELFHOST_BUILD)/$${src%.c}.i || exit 1; \
+		rm -f $$tmp; \
 		LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(TARGET) $(SELFHOST_BUILD)/$${src%.c}.i -o $(SELFHOST_BUILD)/$${src%.c}.ll || exit 1; \
 	done
 	@echo "  LLVM-LINK..."
@@ -131,12 +136,18 @@ bootstrap_prepare:
 	@echo "=== bootstrap: preprocess inputs ==="
 	@for src in $(SELFHOST_SRCS); do \
 		echo "  preprocess src/$$src"; \
-		clang -E -nostdinc -I$(SELFHOST_INC) -Isrc -P src/$$src `llvm-config --cflags` -o $(BOOTSTRAP_INPUT_DIR)/$${src%.c}.i || exit 1; \
+		tmp=$(BOOTSTRAP_INPUT_DIR)/$${src%.c}.i.tmp; \
+		$(SELFHOST_CPP) src/$$src -o $$tmp || exit 1; \
+		sed '/^#/d' $$tmp > $(BOOTSTRAP_INPUT_DIR)/$${src%.c}.i || exit 1; \
+		rm -f $$tmp; \
 	done
 	@for src in $(wildcard demo/*.c); do \
 		base=$$(basename $$src .c); \
 		echo "  preprocess $$src"; \
-		clang -E -nostdinc -I$(SELFHOST_INC) -Isrc -P $$src `llvm-config --cflags` -o $(BOOTSTRAP_INPUT_DIR)/$$base.i || exit 1; \
+		tmp=$(BOOTSTRAP_INPUT_DIR)/$$base.i.tmp; \
+		$(SELFHOST_CPP) $$src -o $$tmp || exit 1; \
+		sed '/^#/d' $$tmp > $(BOOTSTRAP_INPUT_DIR)/$$base.i || exit 1; \
+		rm -f $$tmp; \
 	done
 
 .PHONY: bootstrap_tc1_outputs
@@ -182,7 +193,10 @@ selfhost_demo_check: selfhost
 	@for src in demo/*.c; do \
 		base=$$(basename $$src .c); \
 		echo "  preprocess $$src"; \
-		clang -E -nostdinc -I$(SELFHOST_INC) -Isrc -P $$src `llvm-config --cflags` -o $(SELFHOST_DEMO_DIR)/input/$$base.i || exit 1; \
+		tmp=$(SELFHOST_DEMO_DIR)/input/$$base.i.tmp; \
+		$(SELFHOST_CPP) $$src -o $$tmp || exit 1; \
+		sed '/^#/d' $$tmp > $(SELFHOST_DEMO_DIR)/input/$$base.i || exit 1; \
+		rm -f $$tmp; \
 		echo "  selfhost compile $$base.i"; \
 		LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(SELFHOST_TARGET) $(SELFHOST_DEMO_DIR)/input/$$base.i -o $(SELFHOST_DEMO_DIR)/ll/$$base.ll || exit 1; \
 		expected=""; \

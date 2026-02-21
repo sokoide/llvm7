@@ -177,6 +177,7 @@ Type *try_parse_type(Context *ctx) {
         base = calloc(1, sizeof(Type));
         base->ty = VOID;
     } else if (consume(ctx, "long")) {
+        consume(ctx, "long"); // Support 'long long'
         base = calloc(1, sizeof(Type));
         base->ty = LONG;
     } else if (consume(ctx, "bool") ||
@@ -605,8 +606,11 @@ void parse_program(Context *ctx) {
             // Since we've already consumed the ident, we need to check for "["
             // or ";"
             if (consume(ctx, "[")) {
-                int size = expect_const_int(ctx);
-                expect(ctx, "]");
+                int size = 0;
+                if (!consume(ctx, "]")) {
+                    size = expect_const_int(ctx);
+                    expect(ctx, "]");
+                }
                 ty = new_type_array(ty, size);
             }
 
@@ -626,6 +630,7 @@ void parse_program(Context *ctx) {
 
             // extern declarations cannot have initializers
             if (!is_extern && consume(ctx, "=")) {
+                int array_size_before = gvar_node->type->array_size;
                 // Check if next token is '{'
                 Token *t = ctx->current_token;
                 if (t->kind == TK_RESERVED && t->len == 1 && t->str[0] == '{') {
@@ -633,6 +638,16 @@ void parse_program(Context *ctx) {
                     gvar_node->init->type = ty; // Set type for codegen
                 } else {
                     gvar_node->init = parse_expr(ctx);
+                }
+
+                if (array_size_before == 0 && gvar_node->type->ty == PTR &&
+                    gvar_node->init && gvar_node->init->lhs) {
+                    int count = 0;
+                    for (Node *init_node = gvar_node->init->lhs; init_node;
+                         init_node = init_node->next) {
+                        count++;
+                    }
+                    gvar_node->type->array_size = count;
                 }
             }
             expect(ctx, ";");
