@@ -16,8 +16,8 @@
 // member       = type ident ("[" num? "]")? ";"
 // enum_decl    = "enum" ident? ("{" enum_entry ("," enum_entry)* ","? "}")?
 // enum_entry   = ident ("=" num)?
-// global_decl  = type ident ("[" num? "]")? ("=" (expr | "{" expr ("," expr)* ","? "}"))? ";"
-// stmt         = expr? ";"
+// global_decl  = type ident ("[" num? "]")? ("=" (expr | "{" expr ("," expr)*
+// ","? "}"))? ";" stmt         = expr? ";"
 //              | "{" stmt* "}"
 //              | "return" expr? ";"
 //              | "if" "(" expr ")" stmt ("else" stmt)?
@@ -29,14 +29,12 @@
 //              | "break" ";"
 //              | "continue" ";"
 //              | declaration
-// declaration  = type ident ("[" num? "]")? ("=" (expr | "{" expr ("," expr)* ","? "}"))? ";"
-// expr         = assign
-// assign       = conditional (("=" | "+=" | "-=" | "*=" | "/=") assign)?
-// conditional  = logor ("?" expr ":" conditional)?
-// logor        = logand ("||" logand)*
-// logand       = equality ("&&" equality)*
-// equality     = relational ("==" relational | "!=" relational)*
-// relational   = add ("<" add | "<=" add | ">" add | ">=" add)*
+// declaration  = type ident ("[" num? "]")? ("=" (expr | "{" expr ("," expr)*
+// ","? "}"))? ";" expr         = assign assign       = conditional (("=" | "+="
+// | "-=" | "*=" | "/=") assign)? conditional  = logor ("?" expr ":"
+// conditional)? logor        = logand ("||" logand)* logand       = equality
+// ("&&" equality)* equality     = relational ("==" relational | "!="
+// relational)* relational   = add ("<" add | "<=" add | ">" add | ">=" add)*
 // add          = mul ("+" mul | "-" mul)*
 // mul          = unary ("*" unary | "/" unary | "%" unary)*
 // unary        = "sizeof" (unary | "(" type ")")

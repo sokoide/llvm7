@@ -9,7 +9,7 @@
 
 // Declare stdio initialization function (Removed)
 
-int main(int argc, const char **argv) {
+int main(int argc, const char** argv) {
     // Initialize stdio before any I/O
     // init_stdio();
     if (argc < 2) {
@@ -18,8 +18,8 @@ int main(int argc, const char **argv) {
         return 1;
     }
 
-    const char *input_file = argv[1];
-    const char *output_file = "tmp.ll"; // default
+    const char* input_file = argv[1];
+    const char* output_file = "tmp.ll"; // default
 
     // Parse -o option
     for (int i = 2; i < argc; i++) {
@@ -34,7 +34,7 @@ int main(int argc, const char **argv) {
         }
     }
 
-    const char *source = read_file(input_file);
+    const char* source = read_file(input_file);
     if (source == NULL) {
         printf("Error: could not read file %s\n", input_file);
         return 1;
@@ -54,7 +54,7 @@ int main(int argc, const char **argv) {
     // Generate LLVM IR to file
     if (generate_code_to_file(&ctx, output_file) != 0) {
         fprintf(stderr, "Error: failed to generate LLVM IR\n");
-        free((void *)source);
+        free((void*)source);
         if (ctx.current_token) {
             free_tokens(ctx.current_token);
         }

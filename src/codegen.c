@@ -8,14 +8,14 @@
 
 #define MODULE_NAME "sokoide_module"
 
-static LLVMValueRef codegen(Context *ctx, Node *node, LLVMBuilderRef builder,
-                            LLVMValueRef *local_allocas, bool *has_return,
+static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
+                            LLVMValueRef* local_allocas, bool* has_return,
                             LLVMModuleRef module);
 
 /**
  * Converts Type to LLVMTypeRef
  */
-static LLVMTypeRef to_llvm_type(Type *ty) {
+static LLVMTypeRef to_llvm_type(Type* ty) {
     if (ty == NULL || ty->ty == INT) {
         return LLVMInt32Type();
     }
@@ -41,13 +41,13 @@ static LLVMTypeRef to_llvm_type(Type *ty) {
 
         // Count members
         int count = 0;
-        for (Member *m = ty->members; m; m = m->next)
+        for (Member* m = ty->members; m; m = m->next)
             count++;
 
         if (count > 0) {
-            LLVMTypeRef *types = malloc(sizeof(LLVMTypeRef) * count);
+            LLVMTypeRef* types = malloc(sizeof(LLVMTypeRef) * count);
             int i = 0;
-            for (Member *m = ty->members; m; m = m->next) {
+            for (Member* m = ty->members; m; m = m->next) {
                 types[i++] = to_llvm_type(m->type);
             }
             LLVMStructSetBody(named_struct, types, count, false);
@@ -68,8 +68,8 @@ static LLVMTypeRef to_llvm_type(Type *ty) {
 }
 
 // Helper to match types for binary operations
-static void match_types(LLVMBuilderRef builder, LLVMValueRef *lhs,
-                        LLVMValueRef *rhs) {
+static void match_types(LLVMBuilderRef builder, LLVMValueRef* lhs,
+                        LLVMValueRef* rhs) {
     LLVMTypeRef lty = LLVMTypeOf(*lhs);
     LLVMTypeRef rty = LLVMTypeOf(*rhs);
 
@@ -142,7 +142,7 @@ static LLVMValueRef convert_to_bool(LLVMBuilderRef builder, LLVMValueRef val) {
  * @param[in] ctx Context containing AST nodes
  * @return LLVMModuleRef Reference to generated LLVM module
  */
-static LLVMValueRef codegen_constant(Node *node, LLVMModuleRef module) {
+static LLVMValueRef codegen_constant(Node* node, LLVMModuleRef module) {
     if (node->kind == ND_NUM) {
         return LLVMConstInt(to_llvm_type(node->type), node->val, 1);
     }
@@ -158,16 +158,16 @@ static LLVMValueRef codegen_constant(Node *node, LLVMModuleRef module) {
                                      indices, 2);
     }
     if (node->kind == ND_INIT) {
-        Type *elem_type = node->type->ptr_to;
+        Type* elem_type = node->type->ptr_to;
         LLVMTypeRef llvm_elem_type = to_llvm_type(elem_type);
 
         int count = 0;
-        for (Node *n = node->lhs; n; n = n->next)
+        for (Node* n = node->lhs; n; n = n->next)
             count++;
 
-        LLVMValueRef *values = calloc(count, sizeof(LLVMValueRef));
+        LLVMValueRef* values = calloc(count, sizeof(LLVMValueRef));
         int i = 0;
-        for (Node *n = node->lhs; n; n = n->next) {
+        for (Node* n = node->lhs; n; n = n->next) {
             values[i++] = codegen_constant(n, module);
         }
 
@@ -191,7 +191,7 @@ static LLVMValueRef codegen_constant(Node *node, LLVMModuleRef module) {
     return LLVMConstNull(to_llvm_type(node->type));
 }
 
-LLVMModuleRef generate_module(Context *ctx) {
+LLVMModuleRef generate_module(Context* ctx) {
     // Create a new LLVM module with specified name
     LLVMModuleRef module = LLVMModuleCreateWithName(MODULE_NAME);
     // Create an LLVM builder for constructing instructions
@@ -281,7 +281,7 @@ LLVMModuleRef generate_module(Context *ctx) {
         snprintf(name, sizeof(name), ".str.%d", i);
         // Create null-terminated string constant
         int str_len = ctx->string_lens[i];
-        char *str_data = malloc(str_len + 1);
+        char* str_data = malloc(str_len + 1);
         memcpy(str_data, ctx->strings[i], str_len);
         str_data[str_len] = '\0';
         LLVMValueRef str_const = LLVMConstStringInContext(
@@ -296,7 +296,7 @@ LLVMModuleRef generate_module(Context *ctx) {
 
     // Second pass: generate global variables
     for (int i = 0; i < ctx->node_count; i++) {
-        Node *node = ctx->code[i];
+        Node* node = ctx->code[i];
         if (node->kind == ND_GVAR) {
             char var_name[64];
             int len = node->tok->len < 63 ? node->tok->len : 63;
@@ -320,7 +320,7 @@ LLVMModuleRef generate_module(Context *ctx) {
 
     // Generate code for each function
     for (int i = 0; i < ctx->node_count; i++) {
-        Node *func_node = ctx->code[i];
+        Node* func_node = ctx->code[i];
 
         if (func_node->kind != ND_FUNCTION) {
             continue;
@@ -342,7 +342,7 @@ LLVMModuleRef generate_module(Context *ctx) {
         // Count parameters (excluding ellipsis)
         int param_count = 0;
         bool is_variadic = func_node->is_vararg;
-        Node *param = func_node->rhs;
+        Node* param = func_node->rhs;
         while (param) {
             param_count++;
             param = param->next;
@@ -357,7 +357,7 @@ LLVMModuleRef generate_module(Context *ctx) {
             ret_type = to_llvm_type(func_node->type);
         }
 
-        LLVMTypeRef *param_types = NULL;
+        LLVMTypeRef* param_types = NULL;
         if (param_count > 0) {
             param_types = malloc(param_count * sizeof(LLVMTypeRef));
             param = func_node->rhs;
@@ -389,7 +389,7 @@ LLVMModuleRef generate_module(Context *ctx) {
         LLVMValueRef local_allocas[1024]; // Max 100 locals for now
         memset(local_allocas, 0, sizeof(local_allocas));
 
-        LVar *var = func_node->locals;
+        LVar* var = func_node->locals;
         while (var) {
             if (var->offset < 1024) {
                 char var_name[64];
@@ -420,7 +420,7 @@ LLVMModuleRef generate_module(Context *ctx) {
         // Generate function body statements
         LLVMValueRef res = LLVMConstInt(LLVMInt32Type(), 0, 0);
         bool has_return = false;
-        Node *stmt = func_node->lhs;
+        Node* stmt = func_node->lhs;
         while (stmt != NULL) {
             res =
                 codegen(ctx, stmt, builder, local_allocas, &has_return, module);
@@ -449,7 +449,7 @@ LLVMModuleRef generate_module(Context *ctx) {
     }
 
     // Removed mandatory main check to allow library compilation
-    char *error = NULL;
+    char* error = NULL;
     if (LLVMVerifyModule(module, LLVMReturnStatusAction, &error)) {
         fprintf(stderr, "LLVM IR verification failed: %s\n", error);
         LLVMDisposeMessage(error);
@@ -467,8 +467,8 @@ LLVMModuleRef generate_module(Context *ctx) {
  * @param[out] has_return Set to true if return statement was encountered
  * @return LLVMValueRef Generated value
  */
-static LLVMValueRef codegen(Context *ctx, Node *node, LLVMBuilderRef builder,
-                            LLVMValueRef *local_allocas, bool *has_return,
+static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
+                            LLVMValueRef* local_allocas, bool* has_return,
                             LLVMModuleRef module) {
     if (node == NULL) {
         return LLVMConstInt(LLVMInt32Type(), 0, 0);
@@ -534,7 +534,7 @@ static LLVMValueRef codegen(Context *ctx, Node *node, LLVMBuilderRef builder,
             LLVMBuildStore(builder, store_val, ptr);
         } else if (node->lhs->kind == ND_MEMBER) {
             // member access: s.a = value
-            Node *addr_node = new_node(ND_ADDR, node->lhs, NULL);
+            Node* addr_node = new_node(ND_ADDR, node->lhs, NULL);
             addr_node->type = new_type_ptr(node->lhs->type);
             LLVMValueRef ptr = codegen(ctx, addr_node, builder, local_allocas,
                                        has_return, module);
@@ -694,15 +694,15 @@ static LLVMValueRef codegen(Context *ctx, Node *node, LLVMBuilderRef builder,
 
         // Count arguments and generate code for each
         int arg_count = 0;
-        Node *arg = node->lhs;
+        Node* arg = node->lhs;
         while (arg != NULL) {
             arg_count++;
             arg = arg->next;
         }
 
         // Generate argument values
-        LLVMValueRef *args = NULL;
-        LLVMTypeRef *param_types = NULL;
+        LLVMValueRef* args = NULL;
+        LLVMTypeRef* param_types = NULL;
         if (arg_count > 0) {
             args = malloc(arg_count * sizeof(LLVMValueRef));
             param_types = malloc(arg_count * sizeof(LLVMTypeRef));
@@ -717,7 +717,7 @@ static LLVMValueRef codegen(Context *ctx, Node *node, LLVMBuilderRef builder,
 
         LLVMValueRef func = LLVMGetNamedFunction(module, func_name);
         LLVMTypeRef func_type;
-        LLVMTypeRef *dest_param_types = NULL;
+        LLVMTypeRef* dest_param_types = NULL;
         int dest_param_count = 0;
 
         if (!func) {
@@ -729,7 +729,7 @@ static LLVMValueRef codegen(Context *ctx, Node *node, LLVMBuilderRef builder,
             func = LLVMAddFunction(module, func_name, func_type);
 
             // Register function type for calls
-            FuncType *ft = calloc(1, sizeof(FuncType));
+            FuncType* ft = calloc(1, sizeof(FuncType));
             ft->name = strdup(func_name);
             ft->len = strlen(func_name);
             ft->llvm_type = func_type;
@@ -738,7 +738,7 @@ static LLVMValueRef codegen(Context *ctx, Node *node, LLVMBuilderRef builder,
         } else {
             // Lookup function type in our context
             func_type = NULL;
-            for (FuncType *ft = ctx->func_types; ft; ft = ft->next) {
+            for (FuncType* ft = ctx->func_types; ft; ft = ft->next) {
                 if (strlen(func_name) == (size_t)ft->len &&
                     strncmp(func_name, ft->name, ft->len) == 0) {
                     func_type = ft->llvm_type;
@@ -815,7 +815,7 @@ static LLVMValueRef codegen(Context *ctx, Node *node, LLVMBuilderRef builder,
     case ND_PRE_DEC:
     case ND_POST_DEC: {
         // Get address of operand
-        Node *addr_node = new_node(ND_ADDR, node->lhs, NULL);
+        Node* addr_node = new_node(ND_ADDR, node->lhs, NULL);
         addr_node->type = new_type_ptr(node->lhs->type);
         LLVMValueRef ptr =
             codegen(ctx, addr_node, builder, local_allocas, has_return, module);
@@ -930,8 +930,8 @@ static LLVMValueRef codegen(Context *ctx, Node *node, LLVMBuilderRef builder,
         LLVMBasicBlockRef merge_bb = LLVMAppendBasicBlock(
             LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder)), "while.end");
 
-        void *old_break = ctx->current_break_label;
-        void *old_continue = ctx->current_continue_label;
+        void* old_break = ctx->current_break_label;
+        void* old_continue = ctx->current_continue_label;
         ctx->current_break_label = merge_bb;
         ctx->current_continue_label = cond_bb;
 
@@ -978,8 +978,8 @@ static LLVMValueRef codegen(Context *ctx, Node *node, LLVMBuilderRef builder,
         LLVMBasicBlockRef merge_bb = LLVMAppendBasicBlock(
             LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder)), "for.end");
 
-        void *old_break = ctx->current_break_label;
-        void *old_continue = ctx->current_continue_label;
+        void* old_break = ctx->current_break_label;
+        void* old_continue = ctx->current_continue_label;
         ctx->current_break_label = merge_bb;
         ctx->current_continue_label = inc_bb;
         // Generate init if present
@@ -1040,15 +1040,15 @@ static LLVMValueRef codegen(Context *ctx, Node *node, LLVMBuilderRef builder,
 
         // Count cases
         int case_count = 0;
-        for (Node *c = node->cases; c; c = c->next_case)
+        for (Node* c = node->cases; c; c = c->next_case)
             case_count++;
 
         LLVMValueRef sw_inst =
             LLVMBuildSwitch(builder, cond, break_bb, case_count);
 
         LLVMValueRef old_sw_inst = (LLVMValueRef)ctx->current_switch_inst;
-        void *old_break = ctx->current_break_label;
-        void *old_continue =
+        void* old_break = ctx->current_break_label;
+        void* old_continue =
             ctx->current_continue_label; // Save continue label for nested loops
 
         ctx->current_switch_inst = sw_inst;
@@ -1056,7 +1056,7 @@ static LLVMValueRef codegen(Context *ctx, Node *node, LLVMBuilderRef builder,
         ctx->current_continue_label = NULL; // No continue in switch
 
         if (node->lhs && node->lhs->kind == ND_BLOCK) {
-            for (Node *stmt = node->lhs->lhs; stmt; stmt = stmt->next) {
+            for (Node* stmt = node->lhs->lhs; stmt; stmt = stmt->next) {
                 bool stmt_has_return = false;
                 codegen(ctx, stmt, builder, local_allocas, &stmt_has_return,
                         module);
@@ -1134,7 +1134,7 @@ static LLVMValueRef codegen(Context *ctx, Node *node, LLVMBuilderRef builder,
     case ND_BLOCK: {
         // Execute statements in sequence
         LLVMValueRef result = LLVMConstInt(LLVMInt32Type(), 0, 0);
-        Node *stmt = node->lhs;
+        Node* stmt = node->lhs;
         while (stmt != NULL) {
             result =
                 codegen(ctx, stmt, builder, local_allocas, has_return, module);
@@ -1161,7 +1161,7 @@ static LLVMValueRef codegen(Context *ctx, Node *node, LLVMBuilderRef builder,
     }
     case ND_MEMBER: {
         // member access: s.a
-        Node *addr_node = new_node(ND_ADDR, node, NULL);
+        Node* addr_node = new_node(ND_ADDR, node, NULL);
         addr_node->type = new_type_ptr(node->type);
         LLVMValueRef ptr =
             codegen(ctx, addr_node, builder, local_allocas, has_return, module);
@@ -1210,7 +1210,7 @@ static LLVMValueRef codegen(Context *ctx, Node *node, LLVMBuilderRef builder,
                 base_addr = LLVMGetNamedGlobal(module, var_name);
             } else if (node->lhs->lhs->kind == ND_MEMBER) {
                 // recursive nested struct: &s.a.b
-                Node *nested_addr = new_node(ND_ADDR, node->lhs->lhs, NULL);
+                Node* nested_addr = new_node(ND_ADDR, node->lhs->lhs, NULL);
                 nested_addr->type = new_type_ptr(node->lhs->lhs->type);
                 base_addr = codegen(ctx, nested_addr, builder, local_allocas,
                                     has_return, module);
@@ -1274,7 +1274,7 @@ static LLVMValueRef codegen(Context *ctx, Node *node, LLVMBuilderRef builder,
 
             if (node->init->kind == ND_INIT) {
                 // Handle array/struct initialization
-                Node *cur = node->init->lhs;
+                Node* cur = node->init->lhs;
                 int i = 0;
                 LLVMTypeRef var_type = to_llvm_type(node->type);
 
@@ -1288,7 +1288,7 @@ static LLVMValueRef codegen(Context *ctx, Node *node, LLVMBuilderRef builder,
                         element_ptr = LLVMBuildStructGEP2(
                             builder, var_type, alloca_ptr, i, "init_sgep");
                         // Find member type
-                        Member *m = node->type->members;
+                        Member* m = node->type->members;
                         for (int j = 0; j < i && m; j++)
                             m = m->next;
                         elem_ty = to_llvm_type(m ? m->type : NULL);
@@ -1483,7 +1483,7 @@ static LLVMValueRef codegen(Context *ctx, Node *node, LLVMBuilderRef builder,
  *
  * @param[in] ctx Context containing AST nodes
  */
-void generate_code(Context *ctx) {
+void generate_code(Context* ctx) {
     LLVMModuleRef module = generate_module(ctx);
 
     // Output IR
@@ -1500,11 +1500,11 @@ void generate_code(Context *ctx) {
  * @param[in] filename Output filename
  * @return 0 on success, non-zero on failure
  */
-int generate_code_to_file(Context *ctx, const char *filename) {
+int generate_code_to_file(Context* ctx, const char* filename) {
     LLVMModuleRef module = generate_module(ctx);
 
     // Write IR to file
-    char *error = NULL;
+    char* error = NULL;
     int result = LLVMPrintModuleToFile(module, filename, &error);
 
     if (error) {

@@ -10,9 +10,9 @@ struct ScopedLVar {
 
 static int current_scope_depth = 0;
 
-LVar *find_lvar(Context *ctx, Token *tok) {
-    for (LVar *var = ctx->locals; var != NULL; var = var->next) {
-        ScopedLVar *scoped = (ScopedLVar *)var;
+LVar* find_lvar(Context* ctx, Token* tok) {
+    for (LVar* var = ctx->locals; var != NULL; var = var->next) {
+        ScopedLVar* scoped = (ScopedLVar*)var;
         if (scoped->scope_depth <= current_scope_depth &&
             var->len == tok->len &&
             memcmp(var->name, tok->str, tok->len) == 0) {
@@ -22,8 +22,8 @@ LVar *find_lvar(Context *ctx, Token *tok) {
     return NULL;
 }
 
-LVar *find_gvar(Context *ctx, Token *tok) {
-    for (LVar *var = ctx->globals; var != NULL; var = var->next) {
+LVar* find_gvar(Context* ctx, Token* tok) {
+    for (LVar* var = ctx->globals; var != NULL; var = var->next) {
         if (var->len == tok->len &&
             memcmp(var->name, tok->str, tok->len) == 0) {
             return var;
@@ -32,9 +32,9 @@ LVar *find_gvar(Context *ctx, Token *tok) {
     return NULL;
 }
 
-LVar *add_lvar(Context *ctx, Token *tok, Type *type) {
-    ScopedLVar *scoped = calloc(1, sizeof(ScopedLVar));
-    LVar *new_var = &scoped->base;
+LVar* add_lvar(Context* ctx, Token* tok, Type* type) {
+    ScopedLVar* scoped = calloc(1, sizeof(ScopedLVar));
+    LVar* new_var = &scoped->base;
     new_var->name = tok->str;
     new_var->len = tok->len;
     new_var->type = type;
@@ -42,7 +42,7 @@ LVar *add_lvar(Context *ctx, Token *tok, Type *type) {
 
     // Assign unique slot id for codegen local_allocas[] indexing.
     int next_offset = 0;
-    for (LVar *var = ctx->locals; var != NULL; var = var->next) {
+    for (LVar* var = ctx->locals; var != NULL; var = var->next) {
         if (var->offset >= next_offset) {
             next_offset = var->offset + 1;
         }

@@ -11,8 +11,8 @@ static int is_alnum(char c) {
            ('0' <= c && c <= '9') || c == '_';
 }
 
-static char decode_escape_char(const char **pp) {
-    const char *p = *pp;
+static char decode_escape_char(const char** pp) {
+    const char* p = *pp;
     if (*p == 'n') {
         *pp = p + 1;
         return '\n';
@@ -41,7 +41,7 @@ static char decode_escape_char(const char **pp) {
 }
 
 // Keyword table (selfhost-compatible: no anonymous struct)
-char *kw_str[28] = {
+char* kw_str[28] = {
     "return", "if",     "else",    "while",   "for",      "int",      "char",
     "void",   "sizeof", "struct",  "typedef", "enum",     "static",   "extern",
     "const",  "long",   "bool",    "size_t",  "NULL",     "true",     "false",
@@ -50,17 +50,36 @@ int kw_len[28] = {6, 2, 4, 5, 3, 3, 4, 4, 6, 6, 7, 4, 6, 6,
                   5, 4, 4, 6, 4, 4, 5, 6, 4, 7, 5, 8, 8, 6};
 int NUM_KEYWORDS = 28;
 
-char *three_char_ops[1] = {"..."};
+char* three_char_ops[1] = {"..."};
 int NUM_THREE_CHAR_OPS = 1;
 
-static char *two_char_ops[] = {"==", "!=", "<=", ">=", "&&", "||", "->",
-                               "++", "--", "+=", "-=", "*=", "/=", "<<"};
+static bool lex_debug = false;
 
-static const int NUM_TWO_CHAR_OPS = sizeof(two_char_ops) /
-                                   sizeof(two_char_ops[0]);
+static void print_token(TokenKind kind, const char* str, int len, int val) {
+    const char* kind_name = "UNKNOWN";
+    switch (kind) {
+    case TK_RESERVED:
+        kind_name = "RESERVED";
+        break;
+    case TK_IDENT:
+        kind_name = "IDENT";
+        break;
+    case TK_NUM:
+        kind_name = "NUM";
+        break;
+    case TK_STR:
+        kind_name = "STR";
+        break;
+    case TK_EOF:
+        kind_name = "EOF";
+        break;
+    }
+    fprintf(stderr, "token: kind=%s len=%d str='%.20s' val=%d\n", kind_name,
+            len, str, val);
+}
 
-Token *new_token(TokenKind kind, Token *cur, const char *str, int len) {
-    Token *tok = calloc(1, sizeof(Token));
+Token* new_token(TokenKind kind, Token* cur, const char* str, int len) {
+    Token* tok = calloc(1, sizeof(Token));
     tok->kind = kind;
     tok->val = 0;
     if (kind == TK_NUM && len > 0) {
@@ -69,6 +88,9 @@ Token *new_token(TokenKind kind, Token *cur, const char *str, int len) {
     tok->str = str;
     tok->len = len;
     cur->next = tok;
+    if (lex_debug) {
+        print_token(kind, str, len, tok->val);
+    }
     return tok;
 }
 
@@ -78,11 +100,12 @@ Token *new_token(TokenKind kind, Token *cur, const char *str, int len) {
  * @param[in] p The input string to be tokenized
  * @return Pointer to the head of the token linked list
  */
-Token *tokenize(const char *p) {
+Token* tokenize(const char* p) {
     // Initialize head and tail pointers for the token linked list
     Token head;
     head.next = NULL;
-    Token *cur = &head;
+    Token* cur = &head;
+    lex_debug = getenv("DEBUG_TOKENS") != NULL;
 
     // Iterate through the input string until null terminator
     while (*p) {
@@ -101,7 +124,7 @@ Token *tokenize(const char *p) {
 
         // Skip block comments
         if (strncmp(p, "/*", 2) == 0) {
-            const char *q = strstr(p + 2, "*/");
+            const char* q = strstr(p + 2, "*/");
             if (!q) {
                 fprintf(stderr, "lex error: unterminated block comment\n");
                 return NULL;
@@ -139,22 +162,23 @@ Token *tokenize(const char *p) {
             continue;
         }
 
-        // Check for two-character operators
-        bool two_char_matched = false;
-        for (int i = 0; i < NUM_TWO_CHAR_OPS; i++) {
-            if (strncmp(p, two_char_ops[i], 2) == 0) {
-                cur = new_token(TK_RESERVED, cur, p, 2);
-                p += 2;
-                two_char_matched = true;
-                break;
-            }
-        }
-        if (two_char_matched) {
+        // Check for two-character operators.
+        // Keep this explicit to avoid fragile pointer-table initialization in
+        // selfhosted builds.
+        if (strncmp(p, "==", 2) == 0 || strncmp(p, "!=", 2) == 0 ||
+            strncmp(p, "<=", 2) == 0 || strncmp(p, ">=", 2) == 0 ||
+            strncmp(p, "&&", 2) == 0 || strncmp(p, "||", 2) == 0 ||
+            strncmp(p, "->", 2) == 0 || strncmp(p, "++", 2) == 0 ||
+            strncmp(p, "--", 2) == 0 || strncmp(p, "+=", 2) == 0 ||
+            strncmp(p, "-=", 2) == 0 || strncmp(p, "*=", 2) == 0 ||
+            strncmp(p, "/=", 2) == 0 || strncmp(p, "<<", 2) == 0) {
+            cur = new_token(TK_RESERVED, cur, p, 2);
+            p += 2;
             continue;
         }
 
         // Check for single-character operators and delimiters
-        char *single_char_ops = "+-*/()<>;={},&|[].!:=?%.\0";
+        char* single_char_ops = "+-*/()<>;={},&|[].!:=?%.\0";
         if (strchr(single_char_ops, *p)) {
             cur = new_token(TK_RESERVED, cur, p++, 1);
             continue;
@@ -164,7 +188,7 @@ Token *tokenize(const char *p) {
         if (*p == '"') {
             p++; // skip opening quote
             size_t cap = strlen(p) + 1;
-            char *decoded = calloc(cap, 1);
+            char* decoded = calloc(cap, 1);
             size_t len = 0;
             while (*p && *p != '"') {
                 if (*p == '\\') {
@@ -214,7 +238,7 @@ Token *tokenize(const char *p) {
 
         // Number
         if (isdigit(*p)) {
-            const char *start = p;
+            const char* start = p;
             while (isdigit(*p)) {
                 p++;
             }
@@ -224,7 +248,7 @@ Token *tokenize(const char *p) {
 
         // Identifier
         if (('a' <= *p && *p <= 'z') || ('A' <= *p && *p <= 'Z') || *p == '_') {
-            const char *start = p;
+            const char* start = p;
             while (('a' <= *p && *p <= 'z') || ('A' <= *p && *p <= 'Z') ||
                    ('0' <= *p && *p <= '9') || *p == '_') {
                 p++;
@@ -247,10 +271,10 @@ Token *tokenize(const char *p) {
  *
  * @param[in] head Pointer to the head of the token linked list to free
  */
-void free_tokens(Token *head) {
-    Token *curr = head;
+void free_tokens(Token* head) {
+    Token* curr = head;
     while (curr != NULL) {
-        Token *next = curr->next;
+        Token* next = curr->next;
         free(curr);
         curr = next;
     }
@@ -263,7 +287,7 @@ void free_tokens(Token *head) {
  * @param[in] op The character operator to be consumed
  * @return true if the token was consumed successfully, false otherwise
  */
-bool consume(Context *ctx, char *op) {
+bool consume(Context* ctx, char* op) {
     if (ctx->current_token->kind != TK_RESERVED ||
         (int)strlen(op) != ctx->current_token->len ||
         memcmp(ctx->current_token->str, op, ctx->current_token->len)) {
@@ -280,13 +304,13 @@ bool consume(Context *ctx, char *op) {
  * @return Pointer to the identifier token if the current token is an
  * identifier, NULL otherwise
  */
-Token *consume_ident(Context *ctx) {
+Token* consume_ident(Context* ctx) {
     // Check if the current token is an identifier
     if (ctx->current_token->kind != TK_IDENT) {
         return NULL;
     }
     // Store current token and advance to the next token
-    Token *t = ctx->current_token;
+    Token* t = ctx->current_token;
     ctx->current_token = ctx->current_token->next;
     return t;
 }
@@ -297,7 +321,7 @@ Token *consume_ident(Context *ctx) {
  * @param[in] ctx Context containing current token
  * @param[in] op The expected operator string
  */
-void expect(Context *ctx, char *op) {
+void expect(Context* ctx, char* op) {
     // Try to consume (match) the expected operator
     if (!consume(ctx, op)) {
         // If the operator doesn't match, print an error message to stderr
@@ -308,7 +332,7 @@ void expect(Context *ctx, char *op) {
     }
 }
 
-int expect_number(Context *ctx) {
+int expect_number(Context* ctx) {
     // Check if the current token is a number
     if (ctx->current_token->kind != TK_NUM) {
         // If it's not a number, print an error message to stderr
@@ -322,4 +346,4 @@ int expect_number(Context *ctx) {
     return val;
 }
 
-bool at_eof(Context *ctx) { return ctx->current_token->kind == TK_EOF; }
+bool at_eof(Context* ctx) { return ctx->current_token->kind == TK_EOF; }

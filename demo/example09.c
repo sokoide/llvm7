@@ -2,7 +2,7 @@ int main() {
     struct {
         int a;
         int b;
-        int *c;
+        int* c;
     } s;
 
     s.a = 1;

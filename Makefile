@@ -60,7 +60,7 @@ clean:
 
 .PHONY: format
 format:
-	clang-format -i $(SRC_DIR)/*.c $(SRC_DIR)/*.h demo/*.c demo/*.h
+	clang-format -i $(SRC_DIR)/*.c $(SRC_DIR)/*.h demo/*.c 
 	$(MAKE) -C test format
 
 # TARGET
