@@ -2,7 +2,7 @@
 int g;
 int main() {
     int x; // comment
-    int* y;
+    int *y;
     int ar[10];
 
     /*

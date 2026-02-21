@@ -7,6 +7,9 @@ CC = clang
 CFLAGS = -Wall -Wextra -O2 -g -std=c99 -Isrc -MMD -MP `llvm-config --cflags`
 LDFLAGS = `llvm-config --ldflags --libs --system-libs`
 
+# Get LLVM library directory for runtime linking
+LLVM_LIBDIR = $(shell llvm-config --libdir)
+
 # Directory structure
 BUILD_DIR = build
 TMP_DIR = tmp
@@ -103,7 +106,7 @@ selfhost: $(TARGET) $(SELFHOST_BUILD)
 	@for src in $(SELFHOST_SRCS); do \
 		echo "  CPP+COMPILE: src/$$src"; \
 		clang -E -nostdinc -I$(SELFHOST_INC) -Isrc -P src/$$src `llvm-config --cflags` -o $(SELFHOST_BUILD)/$${src%.c}.i || exit 1; \
-		$(TARGET) $(SELFHOST_BUILD)/$${src%.c}.i -o $(SELFHOST_BUILD)/$${src%.c}.ll || exit 1; \
+		LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(TARGET) $(SELFHOST_BUILD)/$${src%.c}.i -o $(SELFHOST_BUILD)/$${src%.c}.ll || exit 1; \
 	done
 	@echo "  LLVM-LINK..."
 	llvm-link $(patsubst %.c,$(SELFHOST_BUILD)/%.ll,$(SELFHOST_SRCS)) -o $(SELFHOST_BUILD)/combined.bc
@@ -115,8 +118,8 @@ selfhost: $(TARGET) $(SELFHOST_BUILD)
 .PHONY: selfhost_test
 selfhost_test: selfhost
 	@echo "=== Verifying selfhost binary ==="
-	$(SELFHOST_TARGET) $(DEMO) -o $(SELFHOST_BUILD)/verify.ll
-	$(TARGET) $(DEMO) -o $(SELFHOST_BUILD)/original.ll
+	@LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(SELFHOST_TARGET) $(DEMO) -o $(SELFHOST_BUILD)/verify.ll
+	@LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(TARGET) $(DEMO) -o $(SELFHOST_BUILD)/original.ll
 	@diff $(SELFHOST_BUILD)/original.ll $(SELFHOST_BUILD)/verify.ll && echo "PASS: Output matches" || echo "FAIL: Output differs"
 
 $(SELFHOST_BUILD):
@@ -142,7 +145,7 @@ bootstrap_tc1_outputs: $(TARGET) bootstrap_prepare
 	@for c in $(BOOTSTRAP_CASES); do \
 		base=$${c%.c}; \
 		echo "  tc1 compile $$base.i"; \
-		$(TARGET) $(BOOTSTRAP_INPUT_DIR)/$$base.i -o $(BOOTSTRAP_TC1_DIR)/$$base.ll || exit 1; \
+		LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(TARGET) $(BOOTSTRAP_INPUT_DIR)/$$base.i -o $(BOOTSTRAP_TC1_DIR)/$$base.ll || exit 1; \
 	done
 
 .PHONY: bootstrap_tc2
@@ -155,7 +158,7 @@ bootstrap_tc2_outputs: bootstrap_tc2 bootstrap_prepare
 	@for c in $(BOOTSTRAP_CASES); do \
 		base=$${c%.c}; \
 		echo "  tc2 compile $$base.i"; \
-		$(SELFHOST_TARGET) $(BOOTSTRAP_INPUT_DIR)/$$base.i -o $(BOOTSTRAP_TC2_DIR)/$$base.ll || exit 1; \
+		LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(SELFHOST_TARGET) $(BOOTSTRAP_INPUT_DIR)/$$base.i -o $(BOOTSTRAP_TC2_DIR)/$$base.ll || exit 1; \
 	done
 
 .PHONY: bootstrap_compare
@@ -181,7 +184,7 @@ selfhost_demo_check: selfhost
 		echo "  preprocess $$src"; \
 		clang -E -nostdinc -I$(SELFHOST_INC) -Isrc -P $$src `llvm-config --cflags` -o $(SELFHOST_DEMO_DIR)/input/$$base.i || exit 1; \
 		echo "  selfhost compile $$base.i"; \
-		$(SELFHOST_TARGET) $(SELFHOST_DEMO_DIR)/input/$$base.i -o $(SELFHOST_DEMO_DIR)/ll/$$base.ll || exit 1; \
+		LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(SELFHOST_TARGET) $(SELFHOST_DEMO_DIR)/input/$$base.i -o $(SELFHOST_DEMO_DIR)/ll/$$base.ll || exit 1; \
 		expected=""; \
 		case $$base in \
 			example01) expected=4 ;; \
@@ -196,7 +199,7 @@ selfhost_demo_check: selfhost
 		esac; \
 		if [ -n "$$expected" ]; then \
 			clang $(SELFHOST_DEMO_DIR)/ll/$$base.ll -o $(SELFHOST_DEMO_DIR)/bin/$$base `llvm-config --ldflags --libs --system-libs` -lc || exit 1; \
-			$(SELFHOST_DEMO_DIR)/bin/$$base >/dev/null 2>&1; \
+			LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(SELFHOST_DEMO_DIR)/bin/$$base >/dev/null 2>&1; \
 			actual=$$?; \
 			if [ "$$actual" -ne "$$expected" ]; then \
 				echo "FAIL: $$base expected $$expected got $$actual"; \

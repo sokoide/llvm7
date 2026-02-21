@@ -1,12 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-char* read_file(const char* filename);
+char *read_file(const char *filename);
 
-char* read_file(const char* filename) {
-    char* source;
+char *read_file(const char *filename) {
+    char *source;
 
-    FILE* file = fopen(filename, "r");
+    FILE *file = fopen(filename, "r");
     if (file == NULL) {
         return NULL;
     }

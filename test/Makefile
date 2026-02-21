@@ -4,6 +4,9 @@ CC = clang
 CFLAGS = -Wall -Wextra -O2 -std=c99 -I../src -MMD -MP `llvm-config --cflags`
 LDFLAGS = `llvm-config --ldflags --libs --system-libs`
 
+# Get LLVM library directory for runtime linking
+LLVM_LIBDIR = $(shell llvm-config --libdir)
+
 # Source files
 TEST_SRCS = $(wildcard *.c)
 PRODUCT_SRCS = $(filter-out ../src/main.c, $(wildcard ../src/*.c))
@@ -29,7 +32,7 @@ all: $(TEST_TARGET)
 BUILD_DIR = ../build
 
 test run: $(TEST_TARGET)
-	@$(TEST_TARGET)
+	@LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(TEST_TARGET)
 
 # Build test executable
 $(TEST_TARGET): $(BUILD_DIR) $(ALL_OBJS)

@@ -12,9 +12,9 @@
 // base_type    = "int" | "char" | "void" | "long" | "bool" | "size_t"
 //              | struct_decl | enum_decl | typedef_name
 // struct_decl  = "struct" ident? ("{" (type ident ("[" num? "]")? ";")* "}")?
-// enum_decl    = "enum" ident? ("{" ident ("=" num)? ("," ident ("=" num)?)* ","? "}")?
-// global_decl  = type ident ("[" num? "]")? ("=" (expr | "{" expr ("," expr)* ","? "}"))? ";"
-// stmt         = expr? ";"
+// enum_decl    = "enum" ident? ("{" ident ("=" num)? ("," ident ("=" num)?)*
+// ","? "}")? global_decl  = type ident ("[" num? "]")? ("=" (expr | "{" expr
+// ("," expr)* ","? "}"))? ";" stmt         = expr? ";"
 //              | "{" stmt* "}"
 //              | "return" expr? ";"
 //              | "if" "(" expr ")" stmt ("else" stmt)?
@@ -26,14 +26,12 @@
 //              | "break" ";"
 //              | "continue" ";"
 //              | declaration
-// declaration  = type ident ("[" num? "]")? ("=" (expr | "{" expr ("," expr)* ","? "}"))? ";"
-// expr         = assign
-// assign       = conditional (("=" | "+=" | "-=" | "*=" | "/=") assign)?
-// conditional  = logor ("?" expr ":" conditional)?
-// logor        = logand ("||" logand)*
-// logand       = equality ("&&" equality)*
-// equality     = relational ("==" relational | "!=" relational)*
-// relational   = add ("<" add | "<=" add | ">" add | ">=" add)*
+// declaration  = type ident ("[" num? "]")? ("=" (expr | "{" expr ("," expr)*
+// ","? "}"))? ";" expr         = assign assign       = conditional (("=" | "+="
+// | "-=" | "*=" | "/=") assign)? conditional  = logor ("?" expr ":"
+// conditional)? logor        = logand ("||" logand)* logand       = equality
+// ("&&" equality)* equality     = relational ("==" relational | "!="
+// relational)* relational   = add ("<" add | "<=" add | ">" add | ">=" add)*
 // add          = mul ("+" mul | "-" mul)*
 // mul          = unary ("*" unary | "/" unary | "%" unary)*
 // unary        = "sizeof" (unary | "(" type ")")
@@ -41,8 +39,8 @@
 //              | "(" type ")" unary
 //              | postfix
 // postfix      = primary ("[" expr "]" | "." ident | "->" ident | "++" | "--")*
-// primary      = num | "NULL" | "true" | "false" | ident ("(" args? ")")? | string | "(" expr ")"
-// args         = expr ("," expr)*
+// primary      = num | "NULL" | "true" | "false" | ident ("(" args? ")")? |
+// string | "(" expr ")" args         = expr ("," expr)*
 
 extern Node* new_node(NodeKind kind, Node* lhs, Node* rhs);
 extern Node* new_node_num(int val);

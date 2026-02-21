@@ -45,6 +45,12 @@ static int init_llvm_context(LLVMTestContext* ctx, LLVMModuleRef module) {
         return -1;
     }
 
+    // Map the alloc4 function from test_common.c
+    LLVMValueRef alloc4_func = LLVMGetNamedFunction(module, "alloc4");
+    if (alloc4_func) {
+        LLVMAddGlobalMapping(ctx->engine, alloc4_func, (void*)&alloc4);
+    }
+
     ctx->module = module;
     return 0;
 }
