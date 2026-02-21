@@ -3,7 +3,7 @@
 
 #include "common.h"
 
-// program      = (typedef | function | global_decl)*
+// program      = (extern? (typedef | function | global_decl))*
 // typedef      = "typedef" type ident ";"
 // function     = type ident "(" params? ")" ( "{" stmt* "}" | ";" )
 // params       = param ("," param)* ("," "...")?
@@ -15,26 +15,29 @@
 // struct_decl  = "struct" ident? ("{" member* "}")?
 // member       = type ident ("[" num? "]")? ";"
 // enum_decl    = "enum" ident? ("{" enum_entry ("," enum_entry)* ","? "}")?
-// enum_entry   = ident ("=" num)?
-// global_decl  = type ident ("[" num? "]")? ("=" (expr | "{" expr ("," expr)*
-// ","? "}"))? ";" stmt         = expr? ";"
+// enum_entry   = ident ("=" expr)?
+// global_decl  = type ident ("[" expr? "]")? ("=" (expr | initializer))? ";"
+// initializer  = "{" expr ("," expr)* ","? "}"
+// stmt         = declaration
+//              | expr? ";"
 //              | "{" stmt* "}"
 //              | "return" expr? ";"
 //              | "if" "(" expr ")" stmt ("else" stmt)?
 //              | "while" "(" expr ")" stmt
 //              | "for" "(" (declaration | expr?) ";" expr? ";" expr? ")" stmt
 //              | "switch" "(" expr ")" stmt
-//              | "case" num ":"
+//              | "case" expr ":"
 //              | "default" ":"
 //              | "break" ";"
 //              | "continue" ";"
-//              | declaration
-// declaration  = type ident ("[" num? "]")? ("=" (expr | "{" expr ("," expr)*
-// ","? "}"))? ";" expr         = assign assign       = conditional (("=" | "+="
-// | "-=" | "*=" | "/=") assign)? conditional  = logor ("?" expr ":"
-// conditional)? logor        = logand ("||" logand)* logand       = equality
-// ("&&" equality)* equality     = relational ("==" relational | "!="
-// relational)* relational   = add ("<" add | "<=" add | ">" add | ">=" add)*
+// declaration  = type ident ("[" expr? "]")? ("=" (expr | initializer))? ";"
+// expr         = assign
+// assign       = conditional (("=" | "+=" | "-=" | "*=" | "/=") assign)?
+// conditional  = logor ("?" expr ":" conditional)?
+// logor        = logand ("||" logand)*
+// logand       = equality ("&&" equality)*
+// equality     = relational ("==" relational | "!=" relational)*
+// relational   = add ("<" add | "<=" add | ">" add | ">=" add)*
 // add          = mul ("+" mul | "-" mul)*
 // mul          = unary ("*" unary | "/" unary | "%" unary)*
 // unary        = "sizeof" (unary | "(" type ")")

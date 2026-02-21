@@ -53,6 +53,11 @@ int NUM_KEYWORDS = 28;
 char* three_char_ops[1] = {"..."};
 int NUM_THREE_CHAR_OPS = 1;
 
+static char* two_char_ops[] = {"==", "!=", "<=", ">=", "&&", "||", "->",
+                               "++", "--", "+=", "-=", "*=", "/=", "<<"};
+
+static int NUM_TWO_CHAR_OPS = sizeof(two_char_ops) / sizeof(two_char_ops[0]);
+
 static bool lex_debug = false;
 
 static void print_token(TokenKind kind, const char* str, int len, int val) {
@@ -162,18 +167,17 @@ Token* tokenize(const char* p) {
             continue;
         }
 
-        // Check for two-character operators.
-        // Keep this explicit to avoid fragile pointer-table initialization in
-        // selfhosted builds.
-        if (strncmp(p, "==", 2) == 0 || strncmp(p, "!=", 2) == 0 ||
-            strncmp(p, "<=", 2) == 0 || strncmp(p, ">=", 2) == 0 ||
-            strncmp(p, "&&", 2) == 0 || strncmp(p, "||", 2) == 0 ||
-            strncmp(p, "->", 2) == 0 || strncmp(p, "++", 2) == 0 ||
-            strncmp(p, "--", 2) == 0 || strncmp(p, "+=", 2) == 0 ||
-            strncmp(p, "-=", 2) == 0 || strncmp(p, "*=", 2) == 0 ||
-            strncmp(p, "/=", 2) == 0 || strncmp(p, "<<", 2) == 0) {
-            cur = new_token(TK_RESERVED, cur, p, 2);
-            p += 2;
+        // Check for two-character operators
+        bool two_char_matched = false;
+        for (int i = 0; i < NUM_TWO_CHAR_OPS; i++) {
+            if (strncmp(p, two_char_ops[i], 2) == 0) {
+                cur = new_token(TK_RESERVED, cur, p, 2);
+                p += 2;
+                two_char_matched = true;
+                break;
+            }
+        }
+        if (two_char_matched) {
             continue;
         }
 

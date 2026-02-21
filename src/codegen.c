@@ -136,6 +136,140 @@ static LLVMValueRef convert_to_bool(LLVMBuilderRef builder, LLVMValueRef val) {
     return val;
 }
 
+static bool eval_const_int(Node* node, long long* out) {
+    if (!node) {
+        return false;
+    }
+
+    long long lhs = 0;
+    long long rhs = 0;
+    switch (node->kind) {
+    case ND_NUM:
+        *out = node->val;
+        return true;
+    case ND_CAST:
+        return eval_const_int(node->lhs, out);
+    case ND_NOT:
+        if (!eval_const_int(node->lhs, &lhs))
+            return false;
+        *out = !lhs;
+        return true;
+    case ND_ADD:
+        if (!eval_const_int(node->lhs, &lhs) ||
+            !eval_const_int(node->rhs, &rhs))
+            return false;
+        *out = lhs + rhs;
+        return true;
+    case ND_SUB:
+        if (!eval_const_int(node->lhs, &lhs) ||
+            !eval_const_int(node->rhs, &rhs))
+            return false;
+        *out = lhs - rhs;
+        return true;
+    case ND_MUL:
+        if (!eval_const_int(node->lhs, &lhs) ||
+            !eval_const_int(node->rhs, &rhs))
+            return false;
+        *out = lhs * rhs;
+        return true;
+    case ND_DIV:
+        if (!eval_const_int(node->lhs, &lhs) ||
+            !eval_const_int(node->rhs, &rhs) || rhs == 0)
+            return false;
+        *out = lhs / rhs;
+        return true;
+    case ND_MOD:
+        if (!eval_const_int(node->lhs, &lhs) ||
+            !eval_const_int(node->rhs, &rhs) || rhs == 0)
+            return false;
+        *out = lhs % rhs;
+        return true;
+    case ND_EQ:
+        if (!eval_const_int(node->lhs, &lhs) ||
+            !eval_const_int(node->rhs, &rhs))
+            return false;
+        *out = (lhs == rhs);
+        return true;
+    case ND_NE:
+        if (!eval_const_int(node->lhs, &lhs) ||
+            !eval_const_int(node->rhs, &rhs))
+            return false;
+        *out = (lhs != rhs);
+        return true;
+    case ND_LT:
+        if (!eval_const_int(node->lhs, &lhs) ||
+            !eval_const_int(node->rhs, &rhs))
+            return false;
+        *out = (lhs < rhs);
+        return true;
+    case ND_LE:
+        if (!eval_const_int(node->lhs, &lhs) ||
+            !eval_const_int(node->rhs, &rhs))
+            return false;
+        *out = (lhs <= rhs);
+        return true;
+    case ND_GT:
+        if (!eval_const_int(node->lhs, &lhs) ||
+            !eval_const_int(node->rhs, &rhs))
+            return false;
+        *out = (lhs > rhs);
+        return true;
+    case ND_GE:
+        if (!eval_const_int(node->lhs, &lhs) ||
+            !eval_const_int(node->rhs, &rhs))
+            return false;
+        *out = (lhs >= rhs);
+        return true;
+    case ND_LOGAND:
+        if (!eval_const_int(node->lhs, &lhs) ||
+            !eval_const_int(node->rhs, &rhs))
+            return false;
+        *out = (lhs && rhs);
+        return true;
+    case ND_LOGOR:
+        if (!eval_const_int(node->lhs, &lhs) ||
+            !eval_const_int(node->rhs, &rhs))
+            return false;
+        *out = (lhs || rhs);
+        return true;
+    case ND_COND:
+        if (!eval_const_int(node->cond, &lhs))
+            return false;
+        if (lhs) {
+            return eval_const_int(node->lhs, out);
+        }
+        return eval_const_int(node->rhs, out);
+    default:
+        return false;
+    }
+}
+
+static LLVMValueRef cast_constant_value(LLVMValueRef val, LLVMTypeRef dest_ty) {
+    LLVMTypeRef src_ty = LLVMTypeOf(val);
+    if (src_ty == dest_ty) {
+        return val;
+    }
+
+    LLVMTypeKind src_kind = LLVMGetTypeKind(src_ty);
+    LLVMTypeKind dest_kind = LLVMGetTypeKind(dest_ty);
+
+    if (dest_kind == LLVMPointerTypeKind && src_kind == LLVMIntegerTypeKind) {
+        return LLVMConstIntToPtr(val, dest_ty);
+    }
+    if (dest_kind == LLVMIntegerTypeKind && src_kind == LLVMPointerTypeKind) {
+        return LLVMConstPtrToInt(val, dest_ty);
+    }
+    if (dest_kind == LLVMIntegerTypeKind && src_kind == LLVMIntegerTypeKind) {
+        long long iv = LLVMConstIntGetSExtValue(val);
+        return LLVMConstInt(dest_ty, (unsigned long long)iv, true);
+    }
+    if (dest_kind == LLVMPointerTypeKind && src_kind == LLVMPointerTypeKind) {
+        return LLVMConstBitCast(val, dest_ty);
+    }
+
+    return val;
+}
+
 /**
  * Internal function: Generates LLVM IR module from a Node AST
  *
@@ -143,6 +277,12 @@ static LLVMValueRef convert_to_bool(LLVMBuilderRef builder, LLVMValueRef val) {
  * @return LLVMModuleRef Reference to generated LLVM module
  */
 static LLVMValueRef codegen_constant(Node* node, LLVMModuleRef module) {
+    long long const_val = 0;
+    if (eval_const_int(node, &const_val)) {
+        return LLVMConstInt(to_llvm_type(node->type),
+                            (unsigned long long)const_val, true);
+    }
+
     if (node->kind == ND_NUM) {
         return LLVMConstInt(to_llvm_type(node->type), node->val, 1);
     }
@@ -306,7 +446,9 @@ LLVMModuleRef generate_module(Context* ctx) {
             LLVMTypeRef var_type = to_llvm_type(node->type);
             LLVMValueRef gvar = LLVMAddGlobal(module, var_type, var_name);
             if (node->init) {
-                LLVMSetInitializer(gvar, codegen_constant(node->init, module));
+                LLVMValueRef init_val = codegen_constant(node->init, module);
+                init_val = cast_constant_value(init_val, var_type);
+                LLVMSetInitializer(gvar, init_val);
             } else if (!node->is_extern) {
                 // Non-extern globals without initializer get null init
                 LLVMSetInitializer(gvar, LLVMConstNull(var_type));
