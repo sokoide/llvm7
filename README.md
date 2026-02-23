@@ -56,6 +56,7 @@ make selfhost
 llc test.ll -o test.s
 clang test.s -o test
 ./test
+```
 
 ### デモコードをIR→バイナリ化して試す
 
@@ -115,8 +116,6 @@ clang demo/stdio.s -o demo/stdio -lc
 ```
 
 `printf` の宣言が足りない場合は `selfhost/include/stdio.h` を必要な関数で拡張してください。
-
-```
 
 ## サポートされている C の機能
 
