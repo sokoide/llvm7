@@ -1,4 +1,5 @@
 #include "codegen_test.h"
+#include "file_test.h"
 #include "lex_test.h"
 #include "parse_test.h"
 #include "test_common.h"
@@ -60,12 +61,16 @@ static char* run_all_tests() {
                 "codegen: switch case after return case");
     mu_run_test(test_generate_inc_dec, "codegen: inc dec");
     mu_run_test(test_generate_proto_and_init, "codegen: proto and init");
+    mu_run_test(test_read_file_success, "file: read_file success");
+    mu_run_test(test_read_file_not_found, "file: read_file not found");
     mu_run_test(test_lex_tokenize, "lex: tokenize");
 
     mu_run_test(test_consume_operator, "lex: consume operator");
     mu_run_test(test_expect_operator, "lex: expect operator");
     mu_run_test(test_expect_number, "lex: expect number");
     mu_run_test(test_lex_comments, "lex: comments");
+    mu_run_test(test_lex_get_line_col, "lex: get line col");
+    mu_run_test(test_lex_token_positions, "lex: token positions");
     mu_run_test(test_new_node_num, "parse: new_node_num");
     mu_run_test(test_new_node, "parse: new_node");
     mu_run_test(test_unary_num, "parse: unary num");
@@ -129,6 +134,12 @@ static char* run_all_tests() {
     mu_run_test(test_unary_addr, "parse: unary addr");
     mu_run_test(test_unary_deref_complex, "parse: unary deref complex");
     mu_run_test(test_expr_with_deref, "parse: expr with deref");
+    mu_run_test(test_parse_add_assign_does_not_share_lhs_node,
+                "parse: compound assign no shared lhs");
+    mu_run_test(test_global_ptr_init_not_treated_as_array,
+                "parse: global ptr init not array");
+    mu_run_test(test_scope_depth_is_context_local,
+                "parse: scope depth is context local");
     return NULL;
 }
 

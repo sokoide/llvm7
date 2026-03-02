@@ -114,3 +114,36 @@ char* test_lex_comments() {
     free_tokens(head);
     return NULL;
 }
+
+char* test_lex_get_line_col() {
+    const char* src = "aa\nbbb\ncccc";
+    int line = 0;
+    int col = 0;
+
+    lex_get_line_col(src, src, &line, &col);
+    mu_assert("start position should be line 1 col 1", line == 1 && col == 1);
+
+    lex_get_line_col(src, src + 3, &line, &col); // 'b'
+    mu_assert("line 2 should start at col 1", line == 2 && col == 1);
+
+    lex_get_line_col(src, src + 8, &line, &col); // second 'c'
+    mu_assert("line 3 second char should be col 2", line == 3 && col == 2);
+
+    return NULL;
+}
+
+char* test_lex_token_positions() {
+    Token* head = tokenize("a\n  + 12");
+    Token* t = head;
+
+    mu_assert("first token line/col should be 1:1",
+              t->line == 1 && t->col == 1);
+    t = t->next;
+    mu_assert("plus token line/col should be 2:3", t->line == 2 && t->col == 3);
+    t = t->next;
+    mu_assert("number token line/col should be 2:5",
+              t->line == 2 && t->col == 5);
+
+    free_tokens(head);
+    return NULL;
+}

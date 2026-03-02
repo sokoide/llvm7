@@ -8,13 +8,10 @@ struct ScopedLVar {
     int scope_depth;
 };
 
-static int current_scope_depth = 0;
-
 LVar* find_lvar(Context* ctx, Token* tok) {
     for (LVar* var = ctx->locals; var != NULL; var = var->next) {
         ScopedLVar* scoped = (ScopedLVar*)var;
-        if (scoped->scope_depth <= current_scope_depth &&
-            var->len == tok->len &&
+        if (scoped->scope_depth <= ctx->scope_depth && var->len == tok->len &&
             memcmp(var->name, tok->str, tok->len) == 0) {
             return var;
         }
@@ -38,7 +35,7 @@ LVar* add_lvar(Context* ctx, Token* tok, Type* type) {
     new_var->name = tok->str;
     new_var->len = tok->len;
     new_var->type = type;
-    scoped->scope_depth = current_scope_depth;
+    scoped->scope_depth = ctx->scope_depth;
 
     // Assign unique slot id for codegen local_allocas[] indexing.
     int next_offset = 0;
@@ -56,12 +53,12 @@ LVar* add_lvar(Context* ctx, Token* tok, Type* type) {
     return new_var;
 }
 
-void reset_scope(void) { current_scope_depth = 0; }
+void reset_scope(Context* ctx) { ctx->scope_depth = 0; }
 
-void enter_scope(void) { current_scope_depth++; }
+void enter_scope(Context* ctx) { ctx->scope_depth++; }
 
-void leave_scope(void) {
-    if (current_scope_depth > 0) {
-        current_scope_depth--;
+void leave_scope(Context* ctx) {
+    if (ctx->scope_depth > 0) {
+        ctx->scope_depth--;
     }
 }

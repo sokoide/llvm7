@@ -5,6 +5,8 @@
 
 extern Token* new_token(TokenKind kind, Token* cur, const char* str, int len);
 extern Token* tokenize(const char* p);
+extern void lex_get_line_col(const char* source, const char* pos, int* line,
+                             int* col);
 extern void free_tokens(Token* head);
 extern bool consume(Context* ctx, char* op);
 extern Token* consume_ident(Context* ctx);

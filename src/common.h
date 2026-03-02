@@ -31,6 +31,8 @@ struct Token {
     int val;
     const char* str;
     int len;
+    int line;
+    int col;
 };
 
 struct Type {
@@ -174,6 +176,7 @@ struct Context {
     int string_count;               // number of string literals
     Type* current_func_type; // Return type of current function being generated
     FuncType* func_types;    // Function types for opaque pointers support
+    int scope_depth; // lexical scope depth for local variable visibility
 };
 
 #endif

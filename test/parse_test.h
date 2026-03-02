@@ -64,5 +64,8 @@ char* test_unary_deref();
 char* test_unary_addr();
 char* test_unary_deref_complex();
 char* test_expr_with_deref();
+char* test_parse_add_assign_does_not_share_lhs_node();
+char* test_global_ptr_init_not_treated_as_array();
+char* test_scope_depth_is_context_local();
 
 #endif

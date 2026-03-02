@@ -100,20 +100,32 @@ typedef enum {
 } LLVMCallConv;
 
 LLVMModuleRef LLVMModuleCreateWithName(const char *ModuleID);
+LLVMModuleRef LLVMModuleCreateWithNameInContext(const char *ModuleID,
+                                                LLVMContextRef C);
 void LLVMDisposeModule(LLVMModuleRef M);
 void LLVMDumpModule(LLVMModuleRef M);
 
 LLVMBuilderRef LLVMCreateBuilder(void);
+LLVMBuilderRef LLVMCreateBuilderInContext(LLVMContextRef C);
 void LLVMDisposeBuilder(LLVMBuilderRef B);
 
 LLVMBasicBlockRef LLVMAppendBasicBlock(LLVMValueRef Fn, const char *Name);
+LLVMBasicBlockRef LLVMAppendBasicBlockInContext(LLVMContextRef C,
+                                                LLVMValueRef Fn,
+                                                const char *Name);
 void LLVMPositionBuilderAtEnd(LLVMBuilderRef B, LLVMBasicBlockRef BB);
 
+LLVMContextRef LLVMContextCreate(void);
 LLVMTypeRef LLVMInt1Type(void);
 LLVMTypeRef LLVMInt8Type(void);
 LLVMTypeRef LLVMInt32Type(void);
 LLVMTypeRef LLVMInt64Type(void);
 LLVMTypeRef LLVMVoidType(void);
+LLVMTypeRef LLVMInt1TypeInContext(LLVMContextRef C);
+LLVMTypeRef LLVMInt8TypeInContext(LLVMContextRef C);
+LLVMTypeRef LLVMInt32TypeInContext(LLVMContextRef C);
+LLVMTypeRef LLVMInt64TypeInContext(LLVMContextRef C);
+LLVMTypeRef LLVMVoidTypeInContext(LLVMContextRef C);
 LLVMTypeRef LLVMPointerType(LLVMTypeRef ElementType, unsigned AddrSpace);
 LLVMTypeRef LLVMArrayType(LLVMTypeRef ElementType, unsigned ElementCount);
 LLVMTypeRef LLVMFunctionType(LLVMTypeRef ReturnType, LLVMTypeRef *ParamTypes,

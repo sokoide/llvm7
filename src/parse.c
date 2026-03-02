@@ -11,6 +11,7 @@ static Node* convert_array_to_ptr(Node* node);
 static Node* parse_unary_no_array_conv(Context* ctx);
 static EnumConst* find_enum_const(Context* ctx, Token* tok);
 static Typedef* find_typedef(Context* ctx, Token* tok);
+static Node* clone_ast(Node* node);
 
 Node* new_node(NodeKind kind, Node* lhs, Node* rhs) {
     Node* node = calloc(1, sizeof(Node));
@@ -66,15 +67,27 @@ Node* new_node_ident(Context* ctx, Token* tok) {
 void free_ast(Node* ast) {
     if (ast == NULL)
         return;
-    // Don't free ast->lhs for ND_CALL (it's a Token*, not a Node*)
-    // if (ast->kind != ND_CALL) {
-    //     free_ast(ast->lhs);
-    // }
+    free_ast(ast->lhs);
     free_ast(ast->rhs);
     free_ast(ast->next);
     free_ast(ast->cond);
     free_ast(ast->init);
     free(ast);
+}
+
+static Node* clone_ast(Node* node) {
+    if (node == NULL) {
+        return NULL;
+    }
+
+    Node* cloned = calloc(1, sizeof(Node));
+    *cloned = *node;
+    cloned->lhs = clone_ast(node->lhs);
+    cloned->rhs = clone_ast(node->rhs);
+    cloned->next = clone_ast(node->next);
+    cloned->cond = clone_ast(node->cond);
+    cloned->init = clone_ast(node->init);
+    return cloned;
 }
 
 // parse_type = "int" | "void" | type "*"
@@ -392,7 +405,7 @@ Node* parse_function(Context* ctx) {
 
     // Reset locals for each function
     ctx->locals = NULL;
-    reset_scope();
+    reset_scope(ctx);
 
     expect(ctx, "(");
 
@@ -487,7 +500,7 @@ static Node* parse_initializer(Context* ctx) {
 }
 
 static Node* parse_block_stmt(Context* ctx) {
-    enter_scope();
+    enter_scope(ctx);
     Node* head = calloc(1, sizeof(Node));
     Node* cur = head;
     while (!consume(ctx, "}")) {
@@ -498,7 +511,7 @@ static Node* parse_block_stmt(Context* ctx) {
         cur->next = parse_stmt(ctx);
         cur = cur->next;
     }
-    leave_scope();
+    leave_scope(ctx);
     return new_node(ND_BLOCK, head->next, NULL);
 }
 
@@ -547,7 +560,7 @@ void parse_program(Context* ctx) {
         if (consume(ctx, "(")) {
             // Reconstruct the parse state for parse_function
             ctx->locals = NULL;
-            reset_scope();
+            reset_scope(ctx);
 
             // Parse parameters
             Node* func_params = NULL;
@@ -641,7 +654,8 @@ void parse_program(Context* ctx) {
                 }
 
                 if (array_size_before == 0 && gvar_node->type->ty == PTR &&
-                    gvar_node->init && gvar_node->init->lhs) {
+                    gvar_node->init && gvar_node->init->kind == ND_INIT &&
+                    gvar_node->init->lhs) {
                     int count = 0;
                     for (Node* init_node = gvar_node->init->lhs; init_node;
                          init_node = init_node->next) {
@@ -749,7 +763,7 @@ Node* parse_stmt(Context* ctx) {
     } else if (consume(ctx, "for")) {
         expect(ctx, "(");
         Node* for_node = new_node(ND_FOR, NULL, NULL);
-        enter_scope();
+        enter_scope(ctx);
 
         Type* ty = try_parse_type(ctx);
         if (ty) {
@@ -770,7 +784,7 @@ Node* parse_stmt(Context* ctx) {
             expect(ctx, ")");
         }
         for_node->lhs = parse_stmt(ctx);
-        leave_scope();
+        leave_scope(ctx);
         return for_node;
     } else if (consume(ctx, "switch")) {
         expect(ctx, "(");
@@ -883,21 +897,29 @@ Node* parse_assign(Context* ctx) {
         node =
             new_node(ND_ASSIGN, node, convert_array_to_ptr(parse_assign(ctx)));
     } else if (consume(ctx, "+=")) {
-        node = new_node(
-            ND_ASSIGN, node,
-            new_node(ND_ADD, node, convert_array_to_ptr(parse_assign(ctx))));
+        Node* lhs = node;
+        Node* lhs_copy = clone_ast(lhs);
+        node = new_node(ND_ASSIGN, lhs,
+                        new_node(ND_ADD, lhs_copy,
+                                 convert_array_to_ptr(parse_assign(ctx))));
     } else if (consume(ctx, "-=")) {
-        node = new_node(
-            ND_ASSIGN, node,
-            new_node(ND_SUB, node, convert_array_to_ptr(parse_assign(ctx))));
+        Node* lhs = node;
+        Node* lhs_copy = clone_ast(lhs);
+        node = new_node(ND_ASSIGN, lhs,
+                        new_node(ND_SUB, lhs_copy,
+                                 convert_array_to_ptr(parse_assign(ctx))));
     } else if (consume(ctx, "*=")) {
-        node = new_node(
-            ND_ASSIGN, node,
-            new_node(ND_MUL, node, convert_array_to_ptr(parse_assign(ctx))));
+        Node* lhs = node;
+        Node* lhs_copy = clone_ast(lhs);
+        node = new_node(ND_ASSIGN, lhs,
+                        new_node(ND_MUL, lhs_copy,
+                                 convert_array_to_ptr(parse_assign(ctx))));
     } else if (consume(ctx, "/=")) {
-        node = new_node(
-            ND_ASSIGN, node,
-            new_node(ND_DIV, node, convert_array_to_ptr(parse_assign(ctx))));
+        Node* lhs = node;
+        Node* lhs_copy = clone_ast(lhs);
+        node = new_node(ND_ASSIGN, lhs,
+                        new_node(ND_DIV, lhs_copy,
+                                 convert_array_to_ptr(parse_assign(ctx))));
     }
 
     if (node && node->kind == ND_ASSIGN) {

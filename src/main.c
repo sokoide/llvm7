@@ -64,13 +64,13 @@ int main(int argc, const char** argv) {
     printf("Generated: %s\n", output_file);
 
     // Clean up
-    // free((void*)source);
-    // for (int i = 0; i < ctx.node_count; i++) {
-    //     free_ast(ctx.code[i]);
-    // }
-    // if (ctx.current_token) {
-    //     free_tokens(ctx.current_token);
-    // }
+    free((void*)source);
+    for (int i = 0; i < ctx.node_count; i++) {
+        free_ast(ctx.code[i]);
+    }
+    if (ctx.current_token) {
+        free_tokens(ctx.current_token);
+    }
 
     return 0;
 }

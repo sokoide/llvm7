@@ -9,5 +9,7 @@ char* test_consume_operator();
 char* test_expect_operator();
 char* test_expect_number();
 char* test_lex_comments();
+char* test_lex_get_line_col();
+char* test_lex_token_positions();
 
 #endif

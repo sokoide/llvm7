@@ -60,6 +60,22 @@ static int NUM_TWO_CHAR_OPS = sizeof(two_char_ops) / sizeof(two_char_ops[0]);
 
 static bool lex_debug = false;
 
+void lex_get_line_col(const char* source, const char* pos, int* line,
+                      int* col) {
+    int ln = 1;
+    int cl = 1;
+    for (const char* p = source; p < pos && *p; p++) {
+        if (*p == '\n') {
+            ln++;
+            cl = 1;
+        } else {
+            cl++;
+        }
+    }
+    *line = ln;
+    *col = cl;
+}
+
 static void print_token(TokenKind kind, const char* str, int len, int val) {
     const char* kind_name = "UNKNOWN";
     switch (kind) {
@@ -92,10 +108,19 @@ Token* new_token(TokenKind kind, Token* cur, const char* str, int len) {
     }
     tok->str = str;
     tok->len = len;
+    tok->line = 0;
+    tok->col = 0;
     cur->next = tok;
     if (lex_debug) {
         print_token(kind, str, len, tok->val);
     }
+    return tok;
+}
+
+static Token* new_token_at(TokenKind kind, Token* cur, const char* str, int len,
+                           const char* source, const char* pos) {
+    Token* tok = new_token(kind, cur, str, len);
+    lex_get_line_col(source, pos, &tok->line, &tok->col);
     return tok;
 }
 
@@ -106,6 +131,7 @@ Token* new_token(TokenKind kind, Token* cur, const char* str, int len) {
  * @return Pointer to the head of the token linked list
  */
 Token* tokenize(const char* p) {
+    const char* source = p;
     // Initialize head and tail pointers for the token linked list
     Token head;
     head.next = NULL;
@@ -131,7 +157,11 @@ Token* tokenize(const char* p) {
         if (strncmp(p, "/*", 2) == 0) {
             const char* q = strstr(p + 2, "*/");
             if (!q) {
-                fprintf(stderr, "lex error: unterminated block comment\n");
+                int line = 0;
+                int col = 0;
+                lex_get_line_col(source, p, &line, &col);
+                fprintf(stderr, "lex error:%d:%d: unterminated block comment\n",
+                        line, col);
                 return NULL;
             }
             p = q + 2;
@@ -143,7 +173,7 @@ Token* tokenize(const char* p) {
         for (int i = 0; i < NUM_KEYWORDS; i++) {
             if (strncmp(p, kw_str[i], kw_len[i]) == 0 &&
                 !is_alnum(p[kw_len[i]])) {
-                cur = new_token(TK_RESERVED, cur, p, kw_len[i]);
+                cur = new_token_at(TK_RESERVED, cur, p, kw_len[i], source, p);
                 p += kw_len[i];
                 keyword_matched = true;
                 break;
@@ -157,7 +187,7 @@ Token* tokenize(const char* p) {
         bool three_char_matched = false;
         for (int i = 0; i < NUM_THREE_CHAR_OPS; i++) {
             if (strncmp(p, three_char_ops[i], 3) == 0) {
-                cur = new_token(TK_RESERVED, cur, p, 3);
+                cur = new_token_at(TK_RESERVED, cur, p, 3, source, p);
                 p += 3;
                 three_char_matched = true;
                 break;
@@ -171,7 +201,7 @@ Token* tokenize(const char* p) {
         bool two_char_matched = false;
         for (int i = 0; i < NUM_TWO_CHAR_OPS; i++) {
             if (strncmp(p, two_char_ops[i], 2) == 0) {
-                cur = new_token(TK_RESERVED, cur, p, 2);
+                cur = new_token_at(TK_RESERVED, cur, p, 2, source, p);
                 p += 2;
                 two_char_matched = true;
                 break;
@@ -184,7 +214,8 @@ Token* tokenize(const char* p) {
         // Check for single-character operators and delimiters
         char* single_char_ops = "+-*/()<>;={},&|[].!:=?%.\0";
         if (strchr(single_char_ops, *p)) {
-            cur = new_token(TK_RESERVED, cur, p++, 1);
+            cur = new_token_at(TK_RESERVED, cur, p, 1, source, p);
+            p++;
             continue;
         }
 
@@ -204,10 +235,15 @@ Token* tokenize(const char* p) {
                 p++;
             }
             if (*p != '"') {
-                fprintf(stderr, "lex error: unterminated string literal\n");
+                int line = 0;
+                int col = 0;
+                lex_get_line_col(source, p, &line, &col);
+                fprintf(stderr,
+                        "lex error:%d:%d: unterminated string literal\n", line,
+                        col);
                 return NULL;
             }
-            cur = new_token(TK_STR, cur, decoded, (int)len);
+            cur = new_token_at(TK_STR, cur, decoded, (int)len, source, p);
             p++; // skip closing quote
             continue;
         }
@@ -224,11 +260,16 @@ Token* tokenize(const char* p) {
             }
 
             if (*p != '\'') {
-                fprintf(stderr, "lex error: unterminated character literal\n");
+                int line = 0;
+                int col = 0;
+                lex_get_line_col(source, p, &line, &col);
+                fprintf(stderr,
+                        "lex error:%d:%d: unterminated character literal\n",
+                        line, col);
                 return NULL;
             }
             p++; // skip closing '
-            cur = new_token(TK_NUM, cur, p - 2, 1);
+            cur = new_token_at(TK_NUM, cur, p - 2, 1, source, p - 2);
             cur->val = val;
             cur->len =
                 0; // Still use 0 to avoid consume() matching, but wait...
@@ -246,7 +287,7 @@ Token* tokenize(const char* p) {
             while (isdigit(*p)) {
                 p++;
             }
-            cur = new_token(TK_NUM, cur, start, p - start);
+            cur = new_token_at(TK_NUM, cur, start, p - start, source, start);
             continue;
         }
 
@@ -257,16 +298,20 @@ Token* tokenize(const char* p) {
                    ('0' <= *p && *p <= '9') || *p == '_') {
                 p++;
             }
-            cur = new_token(TK_IDENT, cur, start, p - start);
+            cur = new_token_at(TK_IDENT, cur, start, p - start, source, start);
             continue;
         }
 
         // Error
-        fprintf(stderr, "lex error: Invalid character '%c'\n", *p);
+        int line = 0;
+        int col = 0;
+        lex_get_line_col(source, p, &line, &col);
+        fprintf(stderr, "lex error:%d:%d: invalid character '%c'\n", line, col,
+                *p);
         return NULL;
     }
 
-    new_token(TK_EOF, cur, p, 0);
+    new_token_at(TK_EOF, cur, p, 0, source, p);
     return head.next;
 }
 
@@ -328,8 +373,8 @@ Token* consume_ident(Context* ctx) {
 void expect(Context* ctx, char* op) {
     // Try to consume (match) the expected operator
     if (!consume(ctx, op)) {
-        // If the operator doesn't match, print an error message to stderr
-        fprintf(stderr, "lex error: Expected '%s'\n", op);
+        fprintf(stderr, "lex error:%d:%d: expected '%s'\n",
+                ctx->current_token->line, ctx->current_token->col, op);
         // Context: fprintf(stderr, "Context: '%.20s'\n",
         // ctx->current_token->str); Exit the program with an error status
         exit(1);
@@ -339,8 +384,8 @@ void expect(Context* ctx, char* op) {
 int expect_number(Context* ctx) {
     // Check if the current token is a number
     if (ctx->current_token->kind != TK_NUM) {
-        // If it's not a number, print an error message to stderr
-        fprintf(stderr, "lex error: Expected a number\n");
+        fprintf(stderr, "lex error:%d:%d: expected a number\n",
+                ctx->current_token->line, ctx->current_token->col);
         // Exit the program with an error status
         exit(1);
     }

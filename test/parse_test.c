@@ -1065,3 +1065,64 @@ char* test_expr_with_deref() {
     free_tokens(ctx.current_token);
     return NULL;
 }
+
+char* test_parse_add_assign_does_not_share_lhs_node() {
+    Context ctx = {0};
+    Token* tok = tokenize("a += 1");
+    Token* tok_a = tok;
+    add_lvar(&ctx, tok_a, new_type_int());
+    ctx.current_token = tok;
+
+    Node* node = parse_expr(&ctx);
+
+    mu_assert("node should be assignment", node->kind == ND_ASSIGN);
+    mu_assert("assignment rhs should be add", node->rhs->kind == ND_ADD);
+    mu_assert("compound assign should not share lhs node pointer",
+              node->lhs != node->rhs->lhs);
+    free_ast(node);
+    free_tokens(tok);
+    return NULL;
+}
+
+char* test_global_ptr_init_not_treated_as_array() {
+    Context ctx = {0};
+    Token* tok = tokenize("int gx = 10; int* gpx = &gx;");
+    ctx.current_token = tok;
+
+    parse_program(&ctx);
+
+    mu_assert("first global should exist", ctx.code[0] != NULL);
+    mu_assert("second global should exist", ctx.code[1] != NULL);
+    mu_assert("second global should be ND_GVAR", ctx.code[1]->kind == ND_GVAR);
+    mu_assert("gpx type should be PTR", ctx.code[1]->type->ty == PTR);
+    mu_assert("gpx should not be treated as array",
+              ctx.code[1]->type->array_size == 0);
+    mu_assert("gpx initializer should be address-of",
+              ctx.code[1]->init && ctx.code[1]->init->kind == ND_ADDR);
+
+    free_ast(ctx.code[0]);
+    free_ast(ctx.code[1]);
+    free_tokens(tok);
+    return NULL;
+}
+
+char* test_scope_depth_is_context_local() {
+    Context ctx1 = {0};
+    Context ctx2 = {0};
+    Token* tok = tokenize("x");
+
+    reset_scope(&ctx1);
+    enter_scope(&ctx1);
+    add_lvar(&ctx1, tok, new_type_int());
+
+    // Another context resets its own scope; this must not affect ctx1.
+    reset_scope(&ctx2);
+    add_lvar(&ctx2, tok, new_type_int());
+
+    mu_assert("ctx1 local should still be visible in ctx1",
+              find_lvar(&ctx1, tok) != NULL);
+
+    leave_scope(&ctx1);
+    free_tokens(tok);
+    return NULL;
+}
