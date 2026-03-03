@@ -61,6 +61,13 @@ static char* run_all_tests() {
                 "codegen: switch case after return case");
     mu_run_test(test_generate_inc_dec, "codegen: inc dec");
     mu_run_test(test_generate_proto_and_init, "codegen: proto and init");
+    mu_run_test(test_generate_double_add, "codegen: double add");
+    mu_run_test(test_generate_double_sub, "codegen: double sub");
+    mu_run_test(test_generate_double_mul, "codegen: double mul");
+    mu_run_test(test_generate_double_div, "codegen: double div");
+    mu_run_test(test_generate_double_compare, "codegen: double compare");
+    mu_run_test(test_generate_double_from_int, "codegen: double from int");
+    mu_run_test(test_generate_int_from_double, "codegen: int from double");
     mu_run_test(test_read_file_success, "file: read_file success");
     mu_run_test(test_read_file_not_found, "file: read_file not found");
     mu_run_test(test_lex_tokenize, "lex: tokenize");
@@ -71,6 +78,7 @@ static char* run_all_tests() {
     mu_run_test(test_lex_comments, "lex: comments");
     mu_run_test(test_lex_get_line_col, "lex: get line col");
     mu_run_test(test_lex_token_positions, "lex: token positions");
+    mu_run_test(test_lex_double, "lex: double and floats");
     mu_run_test(test_new_node_num, "parse: new_node_num");
     mu_run_test(test_new_node, "parse: new_node");
     mu_run_test(test_unary_num, "parse: unary num");
@@ -140,6 +148,7 @@ static char* run_all_tests() {
                 "parse: global ptr init not array");
     mu_run_test(test_scope_depth_is_context_local,
                 "parse: scope depth is context local");
+    mu_run_test(test_parse_double, "parse: double declarations");
     return NULL;
 }
 

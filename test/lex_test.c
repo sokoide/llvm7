@@ -147,3 +147,32 @@ char* test_lex_token_positions() {
     free_tokens(head);
     return NULL;
 }
+
+char* test_lex_double() {
+    Token* head = tokenize("double x = 1.23;");
+    Token* curr = head;
+
+    mu_assert("First token should be double",
+              curr->kind == TK_RESERVED &&
+                  strncmp(curr->str, "double", curr->len) == 0);
+
+    curr = curr->next;
+    mu_assert("Second token should be x",
+              curr->kind == TK_IDENT &&
+                  strncmp(curr->str, "x", curr->len) == 0);
+
+    curr = curr->next;
+    mu_assert("Third token should be =",
+              curr->kind == TK_RESERVED && curr->str[0] == '=');
+
+    curr = curr->next;
+    mu_assert("Fourth token should be TK_NUM", curr->kind == TK_NUM);
+    mu_assert("Fourth token fval should be 1.23", curr->fval == 1.23);
+
+    curr = curr->next;
+    mu_assert("Fifth token should be ;",
+              curr->kind == TK_RESERVED && curr->str[0] == ';');
+
+    free_tokens(head);
+    return NULL;
+}

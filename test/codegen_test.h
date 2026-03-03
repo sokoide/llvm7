@@ -50,5 +50,12 @@ char* test_generate_switch_distinct_case_values();
 char* test_generate_switch_case_after_return_case();
 char* test_generate_inc_dec();
 char* test_generate_proto_and_init();
+char* test_generate_double_add();
+char* test_generate_double_sub();
+char* test_generate_double_mul();
+char* test_generate_double_div();
+char* test_generate_double_compare();
+char* test_generate_double_from_int();
+char* test_generate_int_from_double();
 
 #endif

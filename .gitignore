@@ -8,6 +8,7 @@ build/
 # LLM
 .claude/
 .serena/
+conductor/
 
 # Executables
 playground_exe

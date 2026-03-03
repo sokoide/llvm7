@@ -37,6 +37,10 @@ static LLVMTypeRef ty_i64(void) {
     return LLVMInt64TypeInContext(get_llvm_context());
 }
 
+static LLVMTypeRef ty_double(void) {
+    return LLVMDoubleTypeInContext(get_llvm_context());
+}
+
 static LLVMTypeRef ty_void(void) {
     return LLVMVoidTypeInContext(get_llvm_context());
 }
@@ -47,6 +51,9 @@ static LLVMTypeRef ty_void(void) {
 static LLVMTypeRef to_llvm_type(Type* ty) {
     if (ty == NULL || ty->ty == INT) {
         return ty_i32();
+    }
+    if (ty->ty == DOUBLE) {
+        return ty_double();
     }
     if (ty->ty == VOID) {
         return ty_void();
@@ -108,6 +115,15 @@ static void match_types(LLVMBuilderRef builder, LLVMValueRef* lhs,
     LLVMTypeKind lk = LLVMGetTypeKind(lty);
     LLVMTypeKind rk = LLVMGetTypeKind(rty);
 
+    if (lk == LLVMDoubleTypeKind && rk == LLVMIntegerTypeKind) {
+        *rhs = LLVMBuildSIToFP(builder, *rhs, lty, "sitofp");
+        return;
+    }
+    if (lk == LLVMIntegerTypeKind && rk == LLVMDoubleTypeKind) {
+        *lhs = LLVMBuildSIToFP(builder, *lhs, rty, "sitofp");
+        return;
+    }
+
     if (lk == LLVMIntegerTypeKind && rk == LLVMPointerTypeKind) {
         *lhs = LLVMBuildIntToPtr(builder, *lhs, rty, "inttoptr");
     } else if (lk == LLVMPointerTypeKind && rk == LLVMIntegerTypeKind) {
@@ -131,6 +147,13 @@ static LLVMValueRef cast_value(LLVMBuilderRef builder, LLVMValueRef val,
 
     LLVMTypeKind src_kind = LLVMGetTypeKind(src_ty);
     LLVMTypeKind dest_kind = LLVMGetTypeKind(dest_ty);
+
+    if (dest_kind == LLVMDoubleTypeKind && src_kind == LLVMIntegerTypeKind) {
+        return LLVMBuildSIToFP(builder, val, dest_ty, "cast_sitofp");
+    }
+    if (dest_kind == LLVMIntegerTypeKind && src_kind == LLVMDoubleTypeKind) {
+        return LLVMBuildFPToSI(builder, val, dest_ty, "cast_fptosi");
+    }
 
     if (dest_kind == LLVMPointerTypeKind && src_kind == LLVMIntegerTypeKind) {
         return LLVMBuildIntToPtr(builder, val, dest_ty, "cast_itop");
@@ -647,7 +670,10 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
 
     switch (node->kind) {
     case ND_NUM: {
-        return LLVMConstInt(ty_i32(), node->val, 0);
+        return LLVMConstInt(to_llvm_type(node->type), node->val, 0);
+    }
+    case ND_FNUM: {
+        return LLVMConstReal(ty_double(), node->fval);
     }
     case ND_LVAR: {
         if (node->val < 1024 && local_allocas[node->val]) {
@@ -749,6 +775,9 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
                                          "ptradd");
         }
         match_types(builder, &lhs, &rhs);
+        if (LLVMGetTypeKind(LLVMTypeOf(lhs)) == LLVMDoubleTypeKind) {
+            return LLVMBuildFAdd(builder, lhs, rhs, "faddtmp");
+        }
         return LLVMBuildAdd(builder, lhs, rhs, "addtmp");
     }
     case ND_SUB: {
@@ -771,6 +800,9 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
                                          "ptrsub");
         }
         match_types(builder, &lhs, &rhs);
+        if (LLVMGetTypeKind(LLVMTypeOf(lhs)) == LLVMDoubleTypeKind) {
+            return LLVMBuildFSub(builder, lhs, rhs, "fsubtmp");
+        }
         return LLVMBuildSub(builder, lhs, rhs, "subtmp");
     }
     case ND_MUL: {
@@ -779,6 +811,9 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
         match_types(builder, &lhs, &rhs);
+        if (LLVMGetTypeKind(LLVMTypeOf(lhs)) == LLVMDoubleTypeKind) {
+            return LLVMBuildFMul(builder, lhs, rhs, "fmultmp");
+        }
         return LLVMBuildMul(builder, lhs, rhs, "multmp");
     }
     case ND_DIV: {
@@ -787,6 +822,9 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
         match_types(builder, &lhs, &rhs);
+        if (LLVMGetTypeKind(LLVMTypeOf(lhs)) == LLVMDoubleTypeKind) {
+            return LLVMBuildFDiv(builder, lhs, rhs, "fdivtmp");
+        }
         return LLVMBuildSDiv(builder, lhs, rhs, "divtmp");
     }
     case ND_MOD: {
@@ -803,6 +841,11 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
         match_types(builder, &lhs, &rhs);
+        if (LLVMGetTypeKind(LLVMTypeOf(lhs)) == LLVMDoubleTypeKind) {
+            LLVMValueRef res =
+                LLVMBuildFCmp(builder, LLVMRealOLT, lhs, rhs, "fcmptmp");
+            return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
+        }
         LLVMValueRef res =
             LLVMBuildICmp(builder, LLVMIntSLT, lhs, rhs, "lttmp");
         return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
@@ -813,6 +856,11 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
         match_types(builder, &lhs, &rhs);
+        if (LLVMGetTypeKind(LLVMTypeOf(lhs)) == LLVMDoubleTypeKind) {
+            LLVMValueRef res =
+                LLVMBuildFCmp(builder, LLVMRealOLE, lhs, rhs, "fcmptmp");
+            return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
+        }
         LLVMValueRef res =
             LLVMBuildICmp(builder, LLVMIntSLE, lhs, rhs, "letmp");
         return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
@@ -823,6 +871,11 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
         match_types(builder, &lhs, &rhs);
+        if (LLVMGetTypeKind(LLVMTypeOf(lhs)) == LLVMDoubleTypeKind) {
+            LLVMValueRef res =
+                LLVMBuildFCmp(builder, LLVMRealOEQ, lhs, rhs, "fcmptmp");
+            return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
+        }
         LLVMValueRef res = LLVMBuildICmp(builder, LLVMIntEQ, lhs, rhs, "eqtmp");
         return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
     }
@@ -832,6 +885,11 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
         match_types(builder, &lhs, &rhs);
+        if (LLVMGetTypeKind(LLVMTypeOf(lhs)) == LLVMDoubleTypeKind) {
+            LLVMValueRef res =
+                LLVMBuildFCmp(builder, LLVMRealONE, lhs, rhs, "fcmptmp");
+            return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
+        }
         LLVMValueRef res = LLVMBuildICmp(builder, LLVMIntNE, lhs, rhs, "netmp");
         return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
     }
@@ -841,6 +899,11 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
         match_types(builder, &lhs, &rhs);
+        if (LLVMGetTypeKind(LLVMTypeOf(lhs)) == LLVMDoubleTypeKind) {
+            LLVMValueRef res =
+                LLVMBuildFCmp(builder, LLVMRealOGE, lhs, rhs, "fcmptmp");
+            return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
+        }
         LLVMValueRef res =
             LLVMBuildICmp(builder, LLVMIntSGE, lhs, rhs, "getmp");
         return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
@@ -851,6 +914,11 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
         match_types(builder, &lhs, &rhs);
+        if (LLVMGetTypeKind(LLVMTypeOf(lhs)) == LLVMDoubleTypeKind) {
+            LLVMValueRef res =
+                LLVMBuildFCmp(builder, LLVMRealOGT, lhs, rhs, "fcmptmp");
+            return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
+        }
         LLVMValueRef res =
             LLVMBuildICmp(builder, LLVMIntSGT, lhs, rhs, "gttmp");
         return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");

@@ -40,6 +40,25 @@ typedef enum {
 } LLVMTypeKind;
 
 typedef enum {
+  LLVMRealPredicateFalse,
+  LLVMRealOEQ,
+  LLVMRealOGT,
+  LLVMRealOGE,
+  LLVMRealOLT,
+  LLVMRealOLE,
+  LLVMRealONE,
+  LLVMRealORD,
+  LLVMRealUNO,
+  LLVMRealUEQ,
+  LLVMRealUGT,
+  LLVMRealUGE,
+  LLVMRealULT,
+  LLVMRealULE,
+  LLVMRealUNE,
+  LLVMRealPredicateTrue
+} LLVMRealPredicate;
+
+typedef enum {
   LLVMIntEQ = 32,
   LLVMIntNE,
   LLVMIntUGT,
@@ -125,6 +144,7 @@ LLVMTypeRef LLVMInt1TypeInContext(LLVMContextRef C);
 LLVMTypeRef LLVMInt8TypeInContext(LLVMContextRef C);
 LLVMTypeRef LLVMInt32TypeInContext(LLVMContextRef C);
 LLVMTypeRef LLVMInt64TypeInContext(LLVMContextRef C);
+LLVMTypeRef LLVMDoubleTypeInContext(LLVMContextRef C);
 LLVMTypeRef LLVMVoidTypeInContext(LLVMContextRef C);
 LLVMTypeRef LLVMPointerType(LLVMTypeRef ElementType, unsigned AddrSpace);
 LLVMTypeRef LLVMArrayType(LLVMTypeRef ElementType, unsigned ElementCount);
@@ -138,6 +158,7 @@ LLVMContextRef LLVMGetGlobalContext(void);
 
 LLVMValueRef LLVMConstInt(LLVMTypeRef IntTy, unsigned long long N,
                           LLVMBool Signed);
+LLVMValueRef LLVMConstReal(LLVMTypeRef RealTy, double N);
 LLVMValueRef LLVMConstNull(LLVMTypeRef Ty);
 LLVMValueRef LLVMConstPointerNull(LLVMTypeRef Ty);
 LLVMValueRef LLVMConstArray(LLVMTypeRef Ty, LLVMValueRef *Vals,
@@ -184,6 +205,21 @@ LLVMValueRef LLVMBuildCall2(LLVMBuilderRef B, LLVMTypeRef Ty, LLVMValueRef Fn,
                             const char *Name);
 LLVMValueRef LLVMBuildCondBr(LLVMBuilderRef B, LLVMValueRef If,
                              LLVMBasicBlockRef Then, LLVMBasicBlockRef Else);
+LLVMValueRef LLVMBuildFCmp(LLVMBuilderRef B, LLVMRealPredicate Predicate,
+                           LLVMValueRef LHS, LLVMValueRef RHS,
+                           const char *Name);
+LLVMValueRef LLVMBuildFAdd(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS,
+                           const char *Name);
+LLVMValueRef LLVMBuildFSub(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS,
+                           const char *Name);
+LLVMValueRef LLVMBuildFMul(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS,
+                           const char *Name);
+LLVMValueRef LLVMBuildFDiv(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS,
+                           const char *Name);
+LLVMValueRef LLVMBuildFPToSI(LLVMBuilderRef B, LLVMValueRef Val,
+                             LLVMTypeRef DestTy, const char *Name);
+LLVMValueRef LLVMBuildSIToFP(LLVMBuilderRef B, LLVMValueRef Val,
+                             LLVMTypeRef DestTy, const char *Name);
 LLVMValueRef LLVMBuildICmp(LLVMBuilderRef B, LLVMIntPredicate Predicate,
                            LLVMValueRef LHS, LLVMValueRef RHS,
                            const char *Name);

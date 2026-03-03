@@ -41,14 +41,15 @@ static char decode_escape_char(const char** pp) {
 }
 
 // Keyword table (selfhost-compatible: no anonymous struct)
-char* kw_str[28] = {
-    "return", "if",     "else",    "while",   "for",      "int",      "char",
-    "void",   "sizeof", "struct",  "typedef", "enum",     "static",   "extern",
-    "const",  "long",   "bool",    "size_t",  "NULL",     "true",     "false",
-    "switch", "case",   "default", "break",   "continue", "unsigned", "signed"};
-int kw_len[28] = {6, 2, 4, 5, 3, 3, 4, 4, 6, 6, 7, 4, 6, 6,
-                  5, 4, 4, 6, 4, 4, 5, 6, 4, 7, 5, 8, 8, 6};
-int NUM_KEYWORDS = 28;
+char* kw_str[29] = {"return",   "if",       "else",   "while",   "for",
+                    "int",      "char",     "void",   "sizeof",  "struct",
+                    "typedef",  "enum",     "static", "extern",  "const",
+                    "long",     "bool",     "size_t", "NULL",    "true",
+                    "false",    "switch",   "case",   "default", "break",
+                    "continue", "unsigned", "signed", "double"};
+int kw_len[29] = {6, 2, 4, 5, 3, 3, 4, 4, 6, 6, 7, 4, 6, 6, 5,
+                  4, 4, 6, 4, 4, 5, 6, 4, 7, 5, 8, 8, 6, 6};
+int NUM_KEYWORDS = 29;
 
 char* three_char_ops[1] = {"..."};
 int NUM_THREE_CHAR_OPS = 1;
@@ -103,6 +104,7 @@ Token* new_token(TokenKind kind, Token* cur, const char* str, int len) {
     Token* tok = calloc(1, sizeof(Token));
     tok->kind = kind;
     tok->val = 0;
+    tok->fval = 0;
     if (kind == TK_NUM && len > 0) {
         tok->val = strtol(str, NULL, 10);
     }
@@ -282,12 +284,44 @@ Token* tokenize(const char* p) {
         }
 
         // Number
-        if (isdigit(*p)) {
+        if (isdigit(*p) || (*p == '.' && isdigit(p[1]))) {
             const char* start = p;
-            while (isdigit(*p)) {
+            bool is_float = false;
+            if (*p == '.') {
+                is_float = true;
                 p++;
+                while (isdigit(*p)) {
+                    p++;
+                }
+            } else {
+                while (isdigit(*p)) {
+                    p++;
+                }
+                if (*p == '.') {
+                    is_float = true;
+                    p++;
+                    while (isdigit(*p)) {
+                        p++;
+                    }
+                }
+            }
+            if (*p == 'e' || *p == 'E') {
+                is_float = true;
+                p++;
+                if (*p == '+' || *p == '-') {
+                    p++;
+                }
+                while (isdigit(*p)) {
+                    p++;
+                }
             }
             cur = new_token_at(TK_NUM, cur, start, p - start, source, start);
+            cur->is_float = is_float;
+            if (is_float) {
+                cur->fval = strtod(start, NULL);
+            } else {
+                cur->fval = (double)cur->val;
+            }
             continue;
         }
 

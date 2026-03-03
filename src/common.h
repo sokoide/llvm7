@@ -29,6 +29,8 @@ struct Token {
     TokenKind kind;
     Token* next;
     int val;
+    double fval;
+    bool is_float;
     const char* str;
     int len;
     int line;
@@ -36,7 +38,7 @@ struct Token {
 };
 
 struct Type {
-    enum { INT, CHAR, VOID, PTR, STRUCT, LONG } ty;
+    enum { INT, CHAR, VOID, PTR, STRUCT, LONG, DOUBLE } ty;
     struct Type* ptr_to;
     size_t array_size;
     struct Member* members; // For STRUCT
@@ -59,6 +61,7 @@ typedef enum {
     ND_LVAR,         // local var
     ND_GVAR,         // global var
     ND_NUM,          // Integer
+    ND_FNUM,         // Floating point
     ND_RETURN,       // return
     ND_IF,           // if
     ND_WHILE,        // while
@@ -128,6 +131,7 @@ struct Node {
     Node* init; // Initialization for for loop
     Token* tok; // Function name or token for the node
     int val;
+    double fval;
     Type* type;       // Type of the node (for ND_DECL, ND_LVAR, etc.)
     LVar* locals;     // Local variables (for ND_FUNCTION)
     Member* member;   // for ND_MEMBER

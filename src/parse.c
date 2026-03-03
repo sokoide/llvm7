@@ -126,6 +126,22 @@ Type* new_type_array(Type* base, size_t size) {
     return t;
 }
 
+// Helper to create a new double type
+Type* new_type_double(void) {
+    Type* t = calloc(1, sizeof(Type));
+    t->ty = DOUBLE;
+    t->ptr_to = NULL;
+    return t;
+}
+
+Node* new_node_fnum(double fval) {
+    Node* node = calloc(1, sizeof(Node));
+    node->kind = ND_FNUM;
+    node->fval = fval;
+    node->type = new_type_double();
+    return node;
+}
+
 static EnumConst* find_enum_const(Context* ctx, Token* tok) {
     for (EnumConst* ec = ctx->enum_consts; ec; ec = ec->next) {
         if (ec->len == tok->len && strncmp(ec->name, tok->str, ec->len) == 0)
@@ -186,6 +202,8 @@ Type* try_parse_type(Context* ctx) {
         base = new_type_int();
     } else if (consume(ctx, "char")) {
         base = new_type_char();
+    } else if (consume(ctx, "double")) {
+        base = new_type_double();
     } else if (consume(ctx, "void")) {
         base = calloc(1, sizeof(Type));
         base->ty = VOID;
@@ -983,6 +1001,10 @@ Node* parse_add(Context* ctx) {
                 newNode->type = node->type;
             } else if (rhs->type && rhs->type->ty == PTR) {
                 newNode->type = rhs->type;
+            } else if (node->type && node->type->ty == DOUBLE) {
+                newNode->type = node->type;
+            } else if (rhs->type && rhs->type->ty == DOUBLE) {
+                newNode->type = rhs->type;
             } else {
                 newNode->type = new_type_int();
             }
@@ -993,6 +1015,10 @@ Node* parse_add(Context* ctx) {
             Node* newNode = new_node(ND_SUB, node, rhs);
             if (node->type && node->type->ty == PTR) {
                 newNode->type = node->type;
+            } else if (node->type && node->type->ty == DOUBLE) {
+                newNode->type = node->type;
+            } else if (rhs->type && rhs->type->ty == DOUBLE) {
+                newNode->type = rhs->type;
             } else {
                 newNode->type = new_type_int();
             }
@@ -1007,13 +1033,27 @@ Node* parse_mul(Context* ctx) {
     Node* node = parse_unary(ctx);
     while (1) {
         if (consume(ctx, "*")) {
-            node = new_node(ND_MUL, convert_array_to_ptr(node),
-                            convert_array_to_ptr(parse_unary(ctx)));
-            node->type = new_type_int();
+            Node* lhs = convert_array_to_ptr(node);
+            Node* rhs = convert_array_to_ptr(parse_unary(ctx));
+            node = new_node(ND_MUL, lhs, rhs);
+            if (lhs->type && lhs->type->ty == DOUBLE) {
+                node->type = lhs->type;
+            } else if (rhs->type && rhs->type->ty == DOUBLE) {
+                node->type = rhs->type;
+            } else {
+                node->type = new_type_int();
+            }
         } else if (consume(ctx, "/")) {
-            node = new_node(ND_DIV, convert_array_to_ptr(node),
-                            convert_array_to_ptr(parse_unary(ctx)));
-            node->type = new_type_int();
+            Node* lhs = convert_array_to_ptr(node);
+            Node* rhs = convert_array_to_ptr(parse_unary(ctx));
+            node = new_node(ND_DIV, lhs, rhs);
+            if (lhs->type && lhs->type->ty == DOUBLE) {
+                node->type = lhs->type;
+            } else if (rhs->type && rhs->type->ty == DOUBLE) {
+                node->type = rhs->type;
+            } else {
+                node->type = new_type_int();
+            }
         } else if (consume(ctx, "%")) {
             node = new_node(ND_MOD, convert_array_to_ptr(node),
                             convert_array_to_ptr(parse_unary(ctx)));
@@ -1031,6 +1071,8 @@ static int type_align(Type* ty) {
         return 1;
     if (ty->ty == INT)
         return 4;
+    if (ty->ty == DOUBLE)
+        return 8;
     if (ty->ty == LONG)
         return 8;
     if (ty->ty == PTR)
@@ -1059,6 +1101,8 @@ static int type_size(Type* ty) {
         return 1;
     if (ty->ty == INT)
         return 4;
+    if (ty->ty == DOUBLE)
+        return 8;
     if (ty->ty == LONG)
         return 8;
     if (ty->ty == PTR)
@@ -1194,14 +1238,14 @@ static Node* convert_array_to_ptr(Node* node) {
     return node;
 }
 
-static char* type_keywords[13] = {
-    "int",    "char",  "void",   "long",   "bool",   "size_t",  "enum",
-    "struct", "const", "static", "extern", "signed", "unsigned"};
+static char* type_keywords[14] = {
+    "int",    "char",  "void",   "long",   "bool",   "size_t",   "enum",
+    "struct", "const", "static", "extern", "signed", "unsigned", "double"};
 
 static bool is_type(Context* ctx) {
     Token* tok = ctx->current_token;
     if (tok->kind == TK_RESERVED) {
-        int num_type_kw = 13;
+        int num_type_kw = 14;
         for (int i = 0; i < num_type_kw; i++) {
             if ((size_t)tok->len == strlen(type_keywords[i]) &&
                 strncmp(tok->str, type_keywords[i], tok->len) == 0)
@@ -1437,7 +1481,15 @@ Node* parse_primary(Context* ctx) {
 
     // Check for number followed by subscript (e.g., 0[a])
     if (ctx->current_token->kind == TK_NUM) {
-        Node* num_node = new_node_num(expect_number(ctx));
+        Token* num_tok = ctx->current_token;
+        Node* num_node;
+        if (num_tok->is_float) {
+            num_node = new_node_fnum(num_tok->fval);
+            ctx->current_token = ctx->current_token->next;
+        } else {
+            num_node = new_node_num(expect_number(ctx));
+        }
+
         // Check for [ after number
         if (consume(ctx, "[")) {
             // 0[y] -> *(0+y)

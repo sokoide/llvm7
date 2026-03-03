@@ -1126,3 +1126,22 @@ char* test_scope_depth_is_context_local() {
     free_tokens(tok);
     return NULL;
 }
+
+char* test_parse_double() {
+    Context ctx = {0};
+    Token* tok = tokenize("double x = 1.23;");
+    ctx.current_token = tok;
+
+    Node* node = parse_stmt(&ctx);
+
+    mu_assert("Node kind should be ND_DECL", node->kind == ND_DECL);
+    mu_assert("Node type should be DOUBLE", node->type->ty == DOUBLE);
+    mu_assert("Node initializer should exist", node->init != NULL);
+    mu_assert("Node initializer kind should be ND_FNUM",
+              node->init->kind == ND_FNUM);
+    mu_assert("Node initializer fval should be 1.23", node->init->fval == 1.23);
+
+    free_ast(node);
+    free_tokens(tok);
+    return NULL;
+}
