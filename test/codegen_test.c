@@ -179,6 +179,143 @@ static char* run_generate_double_test(Node* ast, double expected) {
     return NULL;
 }
 
+// Helper to run generate test returning float
+static char* run_generate_float_test(Node* ast, float expected) {
+    Node* ret = new_node(ND_RETURN, ast, NULL);
+    ret->type = new_type_float();
+
+    // Create function node wrapping the statement
+    Token main_tok = {0};
+    main_tok.kind = TK_IDENT;
+    main_tok.str = "main";
+    main_tok.len = 4;
+
+    Node* func = new_node(ND_FUNCTION, ret, NULL);
+    func->tok = &main_tok;
+    func->type = new_type_float();
+
+    // Setup Context with single function
+    Context parse_ctx = {0};
+    parse_ctx.code[0] = func;
+    parse_ctx.code[1] = NULL;
+    parse_ctx.node_count = 1;
+
+    LLVMModuleRef module = generate_module(&parse_ctx);
+    if (!module) {
+        return "Failed to generate module";
+    }
+
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    LLVMExecutionEngineRef engine;
+    char* error = NULL;
+    if (LLVMCreateExecutionEngineForModule(&engine, module, &error)) {
+        fprintf(stderr, "Failed to create execution engine: %s\n", error);
+        LLVMDisposeMessage(error);
+        return "Failed to create execution engine";
+    }
+
+    float (*main_func)() =
+        (float (*)(void))LLVMGetFunctionAddress(engine, "main");
+    if (!main_func) {
+        LLVMDisposeExecutionEngine(engine);
+        return "Failed to get function address";
+    }
+
+    float result = main_func();
+
+    LLVMDisposeExecutionEngine(engine);
+
+    char msg[128];
+    // Use a small epsilon for float comparison
+    float diff = result - expected;
+    if (diff < 0)
+        diff = -diff;
+    if (diff > 0.00001f) {
+        sprintf(msg, "Expected %f, got %f", (double)expected, (double)result);
+        char* fail_msg = strdup(msg);
+        return fail_msg;
+    }
+
+    return NULL;
+}
+
+char* test_generate_float_add() {
+    Node* lhs = new_node_fnum(1.5, new_type_float());
+    Node* rhs = new_node_fnum(2.5, new_type_float());
+    Node* add = new_node(ND_ADD, lhs, rhs);
+    add->type = new_type_float();
+
+    return run_generate_float_test(add, 4.0f);
+}
+
+char* test_generate_float_sub() {
+    Node* lhs = new_node_fnum(5.5, new_type_float());
+    Node* rhs = new_node_fnum(1.2, new_type_float());
+    Node* sub = new_node(ND_SUB, lhs, rhs);
+    sub->type = new_type_float();
+
+    return run_generate_float_test(sub, 4.3f);
+}
+
+char* test_generate_float_to_double() {
+    Context ctx = {0};
+    Token* head = tokenize("double main() { float x = 1.5f; return x; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    LLVMExecutionEngineRef engine;
+    char* error = NULL;
+    LLVMCreateExecutionEngineForModule(&engine, module, &error);
+    double (*main_func)() =
+        (double (*)(void))LLVMGetFunctionAddress(engine, "main");
+    double result = main_func();
+    LLVMDisposeExecutionEngine(engine);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+
+    if (result != 1.5)
+        return "Expected 1.5";
+    return NULL;
+}
+
+char* test_generate_double_to_float() {
+    Context ctx = {0};
+    Token* head = tokenize("float main() { double x = 1.5; return x; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    LLVMExecutionEngineRef engine;
+    char* error = NULL;
+    LLVMCreateExecutionEngineForModule(&engine, module, &error);
+    float (*main_func)() =
+        (float (*)(void))LLVMGetFunctionAddress(engine, "main");
+    float result = main_func();
+    LLVMDisposeExecutionEngine(engine);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+
+    if (result != 1.5f)
+        return "Expected 1.5f";
+    return NULL;
+}
+
 // return 42
 char* test_generate_return_42() {
     Node* ast = new_node_num(42);
@@ -1054,8 +1191,8 @@ char* test_generate_proto_and_init() {
 }
 
 char* test_generate_double_add() {
-    Node* lhs = new_node_fnum(1.5);
-    Node* rhs = new_node_fnum(2.5);
+    Node* lhs = new_node_fnum(1.5, new_type_double());
+    Node* rhs = new_node_fnum(2.5, new_type_double());
     Node* add = new_node(ND_ADD, lhs, rhs);
     add->type = new_type_double();
 
@@ -1063,8 +1200,8 @@ char* test_generate_double_add() {
 }
 
 char* test_generate_double_sub() {
-    Node* lhs = new_node_fnum(5.5);
-    Node* rhs = new_node_fnum(1.2);
+    Node* lhs = new_node_fnum(5.5, new_type_double());
+    Node* rhs = new_node_fnum(1.2, new_type_double());
     Node* sub = new_node(ND_SUB, lhs, rhs);
     sub->type = new_type_double();
 
@@ -1072,8 +1209,8 @@ char* test_generate_double_sub() {
 }
 
 char* test_generate_double_mul() {
-    Node* lhs = new_node_fnum(2.0);
-    Node* rhs = new_node_fnum(3.5);
+    Node* lhs = new_node_fnum(2.0, new_type_double());
+    Node* rhs = new_node_fnum(3.5, new_type_double());
     Node* mul = new_node(ND_MUL, lhs, rhs);
     mul->type = new_type_double();
 
@@ -1081,8 +1218,8 @@ char* test_generate_double_mul() {
 }
 
 char* test_generate_double_div() {
-    Node* lhs = new_node_fnum(10.0);
-    Node* rhs = new_node_fnum(4.0);
+    Node* lhs = new_node_fnum(10.0, new_type_double());
+    Node* rhs = new_node_fnum(4.0, new_type_double());
     Node* div = new_node(ND_DIV, lhs, rhs);
     div->type = new_type_double();
 
@@ -1090,8 +1227,8 @@ char* test_generate_double_div() {
 }
 
 char* test_generate_double_compare() {
-    Node* lhs = new_node_fnum(1.2);
-    Node* rhs = new_node_fnum(3.4);
+    Node* lhs = new_node_fnum(1.2, new_type_double());
+    Node* rhs = new_node_fnum(3.4, new_type_double());
     Node* lt = new_node(ND_LT, lhs, rhs);
     lt->type = new_type_int();
 
@@ -1150,5 +1287,124 @@ char* test_generate_int_from_double() {
 
     if (result != 42)
         return "Expected 42";
+    return NULL;
+}
+
+char* test_generate_do_while() {
+    // Standard case
+    {
+        Context ctx = {0};
+        Token* head = tokenize("int main() { int i = 0; do { i = i + 1; } "
+                               "while (i < 10); return i; }");
+        ctx.current_token = head;
+        parse_program(&ctx);
+
+        LLVMModuleRef module = generate_module(&ctx);
+        LLVMLinkInMCJIT();
+        LLVMInitializeNativeTarget();
+        LLVMInitializeNativeAsmPrinter();
+
+        LLVMExecutionEngineRef engine;
+        char* error = NULL;
+        LLVMCreateExecutionEngineForModule(&engine, module, &error);
+        int (*main_func)() =
+            (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+        int result = main_func();
+        LLVMDisposeExecutionEngine(engine);
+
+        for (int i = 0; i < ctx.node_count; i++)
+            free_ast(ctx.code[i]);
+        free_tokens(head);
+
+        if (result != 10)
+            return "Expected 10";
+    }
+
+    // Condition false initially - should execute once
+    {
+        Context ctx = {0};
+        Token* head = tokenize(
+            "int main() { int i = 0; do { i = i + 1; } while (0); return i; }");
+        ctx.current_token = head;
+        parse_program(&ctx);
+
+        LLVMModuleRef module = generate_module(&ctx);
+        LLVMLinkInMCJIT();
+        LLVMInitializeNativeTarget();
+        LLVMInitializeNativeAsmPrinter();
+
+        LLVMExecutionEngineRef engine;
+        char* error = NULL;
+        LLVMCreateExecutionEngineForModule(&engine, module, &error);
+        int (*main_func)() =
+            (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+        int result = main_func();
+        LLVMDisposeExecutionEngine(engine);
+
+        for (int i = 0; i < ctx.node_count; i++)
+            free_ast(ctx.code[i]);
+        free_tokens(head);
+
+        if (result != 1)
+            return "Expected 1 (should execute once)";
+    }
+
+    return NULL;
+}
+
+char* test_generate_ternary_float() {
+    Context ctx = {0};
+    Token* head =
+        tokenize("float main() { float x = 1.5f; return 1 ? x : 2.5f; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    LLVMExecutionEngineRef engine;
+    char* error = NULL;
+    LLVMCreateExecutionEngineForModule(&engine, module, &error);
+    float (*main_func)() =
+        (float (*)(void))LLVMGetFunctionAddress(engine, "main");
+    float result = main_func();
+    LLVMDisposeExecutionEngine(engine);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+
+    if (result != 1.5f)
+        return "Expected 1.5f";
+    return NULL;
+}
+
+char* test_generate_ternary_mixed() {
+    Context ctx = {0};
+    Token* head = tokenize("double main() { return 0 ? 1.5f : 2.5; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    LLVMExecutionEngineRef engine;
+    char* error = NULL;
+    LLVMCreateExecutionEngineForModule(&engine, module, &error);
+    double (*main_func)() =
+        (double (*)(void))LLVMGetFunctionAddress(engine, "main");
+    double result = main_func();
+    LLVMDisposeExecutionEngine(engine);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+
+    if (result != 2.5)
+        return "Expected 2.5";
     return NULL;
 }

@@ -41,15 +41,15 @@ static char decode_escape_char(const char** pp) {
 }
 
 // Keyword table (selfhost-compatible: no anonymous struct)
-char* kw_str[29] = {"return",   "if",       "else",   "while",   "for",
-                    "int",      "char",     "void",   "sizeof",  "struct",
-                    "typedef",  "enum",     "static", "extern",  "const",
-                    "long",     "bool",     "size_t", "NULL",    "true",
-                    "false",    "switch",   "case",   "default", "break",
-                    "continue", "unsigned", "signed", "double"};
-int kw_len[29] = {6, 2, 4, 5, 3, 3, 4, 4, 6, 6, 7, 4, 6, 6, 5,
-                  4, 4, 6, 4, 4, 5, 6, 4, 7, 5, 8, 8, 6, 6};
-int NUM_KEYWORDS = 29;
+char* kw_str[31] = {
+    "return", "if",     "else",    "while",   "for",      "int",      "char",
+    "void",   "sizeof", "struct",  "typedef", "enum",     "static",   "extern",
+    "const",  "long",   "bool",    "size_t",  "NULL",     "true",     "false",
+    "switch", "case",   "default", "break",   "continue", "unsigned", "signed",
+    "double", "float",  "do"};
+int kw_len[31] = {6, 2, 4, 5, 3, 3, 4, 4, 6, 6, 7, 4, 6, 6, 5, 4,
+                  4, 6, 4, 4, 5, 6, 4, 7, 5, 8, 8, 6, 6, 5, 2};
+int NUM_KEYWORDS = 31;
 
 char* three_char_ops[1] = {"..."};
 int NUM_THREE_CHAR_OPS = 1;
@@ -314,6 +314,10 @@ Token* tokenize(const char* p) {
                 while (isdigit(*p)) {
                     p++;
                 }
+            }
+            if (*p == 'f' || *p == 'F') {
+                is_float = true;
+                p++;
             }
             cur = new_token_at(TK_NUM, cur, start, p - start, source, start);
             cur->is_float = is_float;

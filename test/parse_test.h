@@ -68,5 +68,7 @@ char* test_parse_add_assign_does_not_share_lhs_node();
 char* test_global_ptr_init_not_treated_as_array();
 char* test_scope_depth_is_context_local();
 char* test_parse_double();
+char* test_parse_float();
+char* test_parse_do_while();
 
 #endif

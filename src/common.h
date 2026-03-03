@@ -38,7 +38,7 @@ struct Token {
 };
 
 struct Type {
-    enum { INT, CHAR, VOID, PTR, STRUCT, LONG, DOUBLE } ty;
+    enum { INT, CHAR, VOID, PTR, STRUCT, LONG, DOUBLE, FLOAT } ty;
     struct Type* ptr_to;
     size_t array_size;
     struct Member* members; // For STRUCT
@@ -139,6 +139,7 @@ struct Node {
     Node* next_case;  // for case/default list in ND_SWITCH
     int case_val;     // for ND_CASE
     bool is_default;  // for ND_DEFAULT
+    bool is_do_while; // for ND_WHILE: distinguish do-while from while
     bool is_extern;   // for extern global var
     bool is_variadic; // for ND_FUNCTION: variadic function
     bool is_vararg;   // Variadic function default: false

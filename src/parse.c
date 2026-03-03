@@ -134,11 +134,19 @@ Type* new_type_double(void) {
     return t;
 }
 
-Node* new_node_fnum(double fval) {
+// Helper to create a new float type
+Type* new_type_float(void) {
+    Type* t = calloc(1, sizeof(Type));
+    t->ty = FLOAT;
+    t->ptr_to = NULL;
+    return t;
+}
+
+Node* new_node_fnum(double fval, Type* ty) {
     Node* node = calloc(1, sizeof(Node));
     node->kind = ND_FNUM;
     node->fval = fval;
-    node->type = new_type_double();
+    node->type = ty;
     return node;
 }
 
@@ -202,6 +210,8 @@ Type* try_parse_type(Context* ctx) {
         base = new_type_int();
     } else if (consume(ctx, "char")) {
         base = new_type_char();
+    } else if (consume(ctx, "float")) {
+        base = new_type_float();
     } else if (consume(ctx, "double")) {
         base = new_type_double();
     } else if (consume(ctx, "void")) {
@@ -778,6 +788,17 @@ Node* parse_stmt(Context* ctx) {
         Node* while_node = new_node(ND_WHILE, body, NULL);
         while_node->cond = cond;
         return while_node;
+    } else if (consume(ctx, "do")) {
+        Node* body = parse_stmt(ctx);
+        expect(ctx, "while");
+        expect(ctx, "(");
+        Node* cond = convert_array_to_ptr(parse_expr(ctx));
+        expect(ctx, ")");
+        expect(ctx, ";");
+        Node* do_while_node = new_node(ND_WHILE, body, NULL);
+        do_while_node->cond = cond;
+        do_while_node->is_do_while = true;
+        return do_while_node;
     } else if (consume(ctx, "for")) {
         expect(ctx, "(");
         Node* for_node = new_node(ND_FOR, NULL, NULL);
@@ -1071,6 +1092,8 @@ static int type_align(Type* ty) {
         return 1;
     if (ty->ty == INT)
         return 4;
+    if (ty->ty == FLOAT)
+        return 4;
     if (ty->ty == DOUBLE)
         return 8;
     if (ty->ty == LONG)
@@ -1100,6 +1123,8 @@ static int type_size(Type* ty) {
     if (ty->ty == CHAR)
         return 1;
     if (ty->ty == INT)
+        return 4;
+    if (ty->ty == FLOAT)
         return 4;
     if (ty->ty == DOUBLE)
         return 8;
@@ -1238,14 +1263,15 @@ static Node* convert_array_to_ptr(Node* node) {
     return node;
 }
 
-static char* type_keywords[14] = {
-    "int",    "char",  "void",   "long",   "bool",   "size_t",   "enum",
-    "struct", "const", "static", "extern", "signed", "unsigned", "double"};
+static char* type_keywords[15] = {"int",      "char",   "void",   "long",
+                                  "bool",     "size_t", "enum",   "struct",
+                                  "const",    "static", "extern", "signed",
+                                  "unsigned", "double", "float"};
 
 static bool is_type(Context* ctx) {
     Token* tok = ctx->current_token;
     if (tok->kind == TK_RESERVED) {
-        int num_type_kw = 14;
+        int num_type_kw = 15;
         for (int i = 0; i < num_type_kw; i++) {
             if ((size_t)tok->len == strlen(type_keywords[i]) &&
                 strncmp(tok->str, type_keywords[i], tok->len) == 0)
@@ -1484,7 +1510,14 @@ Node* parse_primary(Context* ctx) {
         Token* num_tok = ctx->current_token;
         Node* num_node;
         if (num_tok->is_float) {
-            num_node = new_node_fnum(num_tok->fval);
+            bool is_single = false;
+            if (num_tok->len > 0 && (num_tok->str[num_tok->len - 1] == 'f' ||
+                                     num_tok->str[num_tok->len - 1] == 'F')) {
+                is_single = true;
+            }
+            num_node =
+                new_node_fnum(num_tok->fval,
+                              is_single ? new_type_float() : new_type_double());
             ctx->current_token = ctx->current_token->next;
         } else {
             num_node = new_node_num(expect_number(ctx));

@@ -176,3 +176,33 @@ char* test_lex_double() {
     free_tokens(head);
     return NULL;
 }
+
+char* test_lex_float() {
+    Token* head = tokenize("float y = 1.23f;");
+    Token* curr = head;
+
+    mu_assert("First token should be float",
+              curr->kind == TK_RESERVED &&
+                  strncmp(curr->str, "float", curr->len) == 0);
+
+    curr = curr->next;
+    mu_assert("Second token should be y",
+              curr->kind == TK_IDENT &&
+                  strncmp(curr->str, "y", curr->len) == 0);
+
+    curr = curr->next;
+    mu_assert("Third token should be =",
+              curr->kind == TK_RESERVED && curr->str[0] == '=');
+
+    curr = curr->next;
+    mu_assert("Fourth token should be TK_NUM", curr->kind == TK_NUM);
+    mu_assert("Fourth token should be float", curr->is_float);
+    mu_assert("Fourth token fval should be 1.23", curr->fval == 1.23);
+
+    curr = curr->next;
+    mu_assert("Fifth token should be ;",
+              curr->kind == TK_RESERVED && curr->str[0] == ';');
+
+    free_tokens(head);
+    return NULL;
+}

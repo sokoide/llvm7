@@ -1145,3 +1145,44 @@ char* test_parse_double() {
     free_tokens(tok);
     return NULL;
 }
+
+char* test_parse_float() {
+    Context ctx = {0};
+    Token* tok = tokenize("float y = 1.23f;");
+    ctx.current_token = tok;
+
+    Node* node = parse_stmt(&ctx);
+
+    mu_assert("Node kind should be ND_DECL", node->kind == ND_DECL);
+    mu_assert("Node type should be FLOAT", node->type->ty == FLOAT);
+    mu_assert("Node initializer should exist", node->init != NULL);
+    mu_assert("Node initializer kind should be ND_FNUM",
+              node->init->kind == ND_FNUM);
+    mu_assert("Node initializer fval should be 1.23", node->init->fval == 1.23);
+
+    free_ast(node);
+    free_tokens(tok);
+    return NULL;
+}
+
+char* test_parse_do_while() {
+    Context ctx = {0};
+    Token* tok = tokenize("do { a = a + 1; } while (a < 10);");
+    // Declare 'a'
+    add_lvar(&ctx, tok->next->next, new_type_int());
+    ctx.current_token = tok;
+
+    Node* node = parse_stmt(&ctx);
+
+    mu_assert("Node kind should be ND_WHILE", node->kind == ND_WHILE);
+    mu_assert("Node should be do-while", node->is_do_while);
+    mu_assert("Condition kind should be ND_LT", node->cond->kind == ND_LT);
+    mu_assert("Body kind should be ND_BLOCK", node->lhs->kind == ND_BLOCK);
+    // Note: I might need a new NodeKind or a flag for do-while to distinguish
+    // it from while in codegen. In C, do-while always executes at least once.
+    // I'll add a flag to Node.
+
+    free_ast(node);
+    free_tokens(tok);
+    return NULL;
+}
