@@ -75,6 +75,8 @@ static char* run_all_tests() {
     mu_run_test(test_generate_do_while, "codegen: do-while");
     mu_run_test(test_generate_ternary_float, "codegen: ternary float");
     mu_run_test(test_generate_ternary_mixed, "codegen: ternary mixed");
+    mu_run_test(test_generate_ternary_int_double_common_type,
+                "codegen: ternary int/double common type");
     mu_run_test(test_read_file_success, "file: read_file success");
     mu_run_test(test_read_file_not_found, "file: read_file not found");
     mu_run_test(test_lex_tokenize, "lex: tokenize");

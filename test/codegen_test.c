@@ -1408,3 +1408,31 @@ char* test_generate_ternary_mixed() {
         return "Expected 2.5";
     return NULL;
 }
+
+char* test_generate_ternary_int_double_common_type() {
+    Context ctx = {0};
+    Token* head = tokenize("double main() { return 0 ? 1 : 2.5; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    LLVMExecutionEngineRef engine;
+    char* error = NULL;
+    LLVMCreateExecutionEngineForModule(&engine, module, &error);
+    double (*main_func)() =
+        (double (*)(void))LLVMGetFunctionAddress(engine, "main");
+    double result = main_func();
+    LLVMDisposeExecutionEngine(engine);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+
+    if (result != 2.5)
+        return "Expected 2.5 (common type should be double)";
+    return NULL;
+}

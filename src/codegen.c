@@ -1745,12 +1745,9 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         // End block (PHI node)
         LLVMPositionBuilderAtEnd(builder, end_bb);
 
-        // Match types for PHI
+        // Match types for PHI using the same promotion rules as binary ops.
+        match_types(builder, &then_val, &else_val);
         LLVMTypeRef then_ty = LLVMTypeOf(then_val);
-        LLVMTypeRef else_ty = LLVMTypeOf(else_val);
-        if (then_ty != else_ty) {
-            else_val = cast_value(builder, else_val, then_ty);
-        }
 
         LLVMValueRef phi = LLVMBuildPhi(builder, then_ty, "ternary_res");
         LLVMValueRef incoming_values[2] = {then_val, else_val};
