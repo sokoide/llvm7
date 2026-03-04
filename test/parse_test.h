@@ -81,5 +81,6 @@ char* test_parse_designated_initializer_array();
 char* test_parse_designated_initializer_struct();
 char* test_parse_long_double_decl();
 char* test_parse_scalar_compound_literal();
+char* test_parse_complex_decl();
 
 #endif

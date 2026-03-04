@@ -1448,3 +1448,20 @@ char* test_parse_scalar_compound_literal() {
     free_tokens(tok);
     return NULL;
 }
+
+char* test_parse_complex_decl() {
+    Context ctx = {0};
+    Token* tok = tokenize("double _Complex x = 1.25;");
+    ctx.current_token = tok;
+    Node* node = parse_stmt(&ctx);
+
+    mu_assert("node should be ND_DECL", node->kind == ND_DECL);
+    mu_assert("type should map to DOUBLE",
+              node->type && node->type->ty == DOUBLE);
+    mu_assert("initializer should be float literal",
+              node->init && node->init->kind == ND_FNUM);
+
+    free_ast(node);
+    free_tokens(tok);
+    return NULL;
+}

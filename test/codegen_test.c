@@ -1844,3 +1844,31 @@ char* test_generate_scalar_compound_literal() {
         return "Expected 7 for scalar compound literal";
     return NULL;
 }
+
+char* test_generate_complex_basic() {
+    Context ctx = {0};
+    Token* head =
+        tokenize("int main() { double _Complex x = 3.5; return (int)x; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    LLVMExecutionEngineRef engine;
+    char* error = NULL;
+    LLVMCreateExecutionEngineForModule(&engine, module, &error);
+    int (*main_func)() = (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+    int result = main_func();
+    LLVMDisposeExecutionEngine(engine);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+
+    if (result != 3)
+        return "Expected 3 for basic _Complex handling";
+    return NULL;
+}

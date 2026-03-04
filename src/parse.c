@@ -268,20 +268,31 @@ Type* try_parse_type(Context* ctx) {
     } else if (consume(ctx, "char")) {
         base = new_type_char();
     } else if (consume(ctx, "float")) {
+        consume(ctx, "_Complex");
         base = new_type_float();
     } else if (consume(ctx, "double")) {
+        consume(ctx, "_Complex");
         base = new_type_double();
     } else if (consume(ctx, "void")) {
         base = calloc(1, sizeof(Type));
         base->ty = VOID;
     } else if (consume(ctx, "long")) {
         if (consume(ctx, "double")) {
+            consume(ctx, "_Complex");
             // Treat long double as double in current backend.
             base = new_type_double();
         } else {
             consume(ctx, "long"); // Support 'long long'
             base = calloc(1, sizeof(Type));
             base->ty = LONG;
+        }
+    } else if (consume(ctx, "_Complex")) {
+        if (consume(ctx, "float")) {
+            base = new_type_float();
+        } else {
+            consume(ctx, "long");
+            consume(ctx, "double");
+            base = new_type_double();
         }
     } else if (consume(ctx, "_Bool") || consume(ctx, "bool") ||
                (ctx->current_token->kind == TK_IDENT &&
@@ -1573,16 +1584,16 @@ static Node* convert_array_to_ptr(Node* node) {
     return node;
 }
 
-static char* type_keywords[21] = {
-    "int",      "char",     "void",     "long",   "bool",  "_Bool",
-    "size_t",   "enum",     "struct",   "union",  "const", "static",
-    "extern",   "signed",   "unsigned", "double", "float", "inline",
-    "restrict", "volatile", "register"};
+static char* type_keywords[22] = {
+    "int",      "char",     "void",     "long",    "bool",  "_Bool",
+    "size_t",   "enum",     "struct",   "union",   "const", "static",
+    "extern",   "signed",   "unsigned", "double",  "float", "inline",
+    "restrict", "volatile", "register", "_Complex"};
 
 static bool is_type(Context* ctx) {
     Token* tok = ctx->current_token;
     if (tok->kind == TK_RESERVED) {
-        int num_type_kw = 21;
+        int num_type_kw = 22;
         for (int i = 0; i < num_type_kw; i++) {
             if ((size_t)tok->len == strlen(type_keywords[i]) &&
                 strncmp(tok->str, type_keywords[i], tok->len) == 0)

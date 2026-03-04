@@ -43,17 +43,17 @@ static char decode_escape_char(const char** pp) {
 }
 
 // Keyword table (selfhost-compatible: no anonymous struct)
-char* kw_str[38] = {"return",   "if",       "else",   "while",   "for",
+char* kw_str[39] = {"return",   "if",       "else",   "while",   "for",
                     "int",      "char",     "void",   "sizeof",  "struct",
                     "typedef",  "enum",     "static", "extern",  "const",
                     "long",     "bool",     "size_t", "NULL",    "true",
                     "false",    "switch",   "case",   "default", "break",
                     "continue", "unsigned", "signed", "double",  "float",
                     "do",       "goto",     "union",  "inline",  "restrict",
-                    "volatile", "register", "_Bool"};
-int kw_len[38] = {6, 2, 4, 5, 3, 3, 4, 4, 6, 6, 7, 4, 6, 6, 5, 4, 4, 6, 4,
-                  4, 5, 6, 4, 7, 5, 8, 8, 6, 6, 5, 2, 4, 5, 6, 8, 8, 8, 5};
-int NUM_KEYWORDS = 38;
+                    "volatile", "register", "_Bool",  "_Complex"};
+int kw_len[39] = {6, 2, 4, 5, 3, 3, 4, 4, 6, 6, 7, 4, 6, 6, 5, 4, 4, 6, 4, 4,
+                  5, 6, 4, 7, 5, 8, 8, 6, 6, 5, 2, 4, 5, 6, 8, 8, 8, 5, 8};
+int NUM_KEYWORDS = 39;
 
 char* three_char_ops[3] = {"...", "<<=", ">>="};
 int NUM_THREE_CHAR_OPS = 3;
