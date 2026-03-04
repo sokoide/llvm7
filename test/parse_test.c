@@ -1430,3 +1430,21 @@ char* test_parse_long_double_decl() {
     free_tokens(tok);
     return NULL;
 }
+
+char* test_parse_scalar_compound_literal() {
+    Context ctx = {0};
+    Token* tok = tokenize("int x = (int){3};");
+    ctx.current_token = tok;
+    Node* node = parse_stmt(&ctx);
+
+    mu_assert("node should be ND_DECL", node->kind == ND_DECL);
+    mu_assert("initializer should exist", node->init != NULL);
+    mu_assert("initializer should be cast node", node->init->kind == ND_CAST);
+    mu_assert("cast operand should be number",
+              node->init->lhs && node->init->lhs->kind == ND_NUM &&
+                  node->init->lhs->val == 3);
+
+    free_ast(node);
+    free_tokens(tok);
+    return NULL;
+}

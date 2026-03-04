@@ -1608,6 +1608,24 @@ Node* parse_unary(Context* ctx) {
             consume(ctx, "(");
             Type* ty = parse_type(ctx);
             expect(ctx, ")");
+            if (ctx->current_token->kind == TK_RESERVED &&
+                ctx->current_token->len == 1 &&
+                ctx->current_token->str[0] == '{') {
+                Node* init = parse_initializer(ctx, ty);
+                if ((ty->ty == STRUCT || ty->ty == UNION) ||
+                    (ty->ty == PTR && ty->array_size > 0)) {
+                    fprintf(stderr, "compound literal for aggregate type is "
+                                    "not supported yet\n");
+                    exit(1);
+                }
+                Node* elem = init->lhs;
+                if (!elem) {
+                    elem = new_node_num(0);
+                }
+                Node* cast = new_node(ND_CAST, elem, NULL);
+                cast->type = ty;
+                return cast;
+            }
             Node* node = new_node(ND_CAST, parse_unary(ctx), NULL);
             node->type = ty;
             return node;

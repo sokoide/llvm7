@@ -90,6 +90,8 @@ static char* run_all_tests() {
     mu_run_test(test_generate_designated_initializer_struct,
                 "codegen: designated initializer struct");
     mu_run_test(test_generate_long_double, "codegen: long double");
+    mu_run_test(test_generate_scalar_compound_literal,
+                "codegen: scalar compound literal");
     mu_run_test(test_read_file_success, "file: read_file success");
     mu_run_test(test_read_file_not_found, "file: read_file not found");
     mu_run_test(test_lex_tokenize, "lex: tokenize");
@@ -191,6 +193,8 @@ static char* run_all_tests() {
     mu_run_test(test_parse_designated_initializer_struct,
                 "parse: designated initializer struct");
     mu_run_test(test_parse_long_double_decl, "parse: long double decl");
+    mu_run_test(test_parse_scalar_compound_literal,
+                "parse: scalar compound literal");
     mu_run_test(test_preprocess_noop, "preprocess: no-op");
     mu_run_test(test_preprocess_include, "preprocess: include");
     mu_run_test(test_preprocess_define, "preprocess: define");
