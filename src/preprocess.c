@@ -230,6 +230,9 @@ static int find_param_index(Macro* m, const char* name, size_t len) {
     return -1;
 }
 
+static char* expand_macros_in_text(PreprocessContext* ctx, const char* text,
+                                   int depth);
+
 static void sb_append_escaped_quoted(StrBuf* out, const char* s) {
     sb_append_c(out, '"');
     for (const char* p = s; *p; p++) {
@@ -296,6 +299,56 @@ static char* expand_function_macro(Macro* m, char** args, int argc) {
             }
             continue;
         }
+        sb_append_c(&out, *p++);
+    }
+    return out.data;
+}
+
+static char* expand_macros_in_text(PreprocessContext* ctx, const char* text,
+                                   int depth) {
+    if (depth > 16) {
+        return strdup(text);
+    }
+
+    StrBuf out;
+    sb_init(&out);
+    const char* p = text;
+    while (*p) {
+        if (*p == '"' || *p == '\'') {
+            char q = *p;
+            sb_append_c(&out, *p++);
+            bool escaped = false;
+            while (*p) {
+                sb_append_c(&out, *p);
+                if (escaped) {
+                    escaped = false;
+                } else if (*p == '\\') {
+                    escaped = true;
+                } else if (*p == q) {
+                    p++;
+                    break;
+                }
+                p++;
+            }
+            continue;
+        }
+
+        if (is_ident_start(*p)) {
+            const char* id_start = p;
+            while (is_ident_char(*p))
+                p++;
+            size_t id_len = (size_t)(p - id_start);
+            Macro* m = find_macro(ctx, id_start, id_len);
+            if (m && !m->is_function) {
+                char* ex = expand_macros_in_text(ctx, m->value, depth + 1);
+                sb_append_n(&out, ex, strlen(ex));
+                free(ex);
+            } else {
+                sb_append_n(&out, id_start, id_len);
+            }
+            continue;
+        }
+
         sb_append_c(&out, *p++);
     }
     return out.data;
@@ -713,7 +766,10 @@ static char* preprocess_internal(const char* input, const char* filename,
                                 if (argc == m->param_count) {
                                     char* ex =
                                         expand_function_macro(m, args, argc);
-                                    sb_append_n(&out, ex, strlen(ex));
+                                    char* re =
+                                        expand_macros_in_text(ctx, ex, 0);
+                                    sb_append_n(&out, re, strlen(re));
+                                    free(re);
                                     free(ex);
                                     s = call;
                                 } else {
@@ -726,7 +782,9 @@ static char* preprocess_internal(const char* input, const char* filename,
                                 sb_append_n(&out, id_start, id_len);
                             }
                         } else {
-                            sb_append_n(&out, m->value, strlen(m->value));
+                            char* ex = expand_macros_in_text(ctx, m->value, 0);
+                            sb_append_n(&out, ex, strlen(ex));
+                            free(ex);
                         }
                     } else {
                         sb_append_n(&out, id_start, id_len);

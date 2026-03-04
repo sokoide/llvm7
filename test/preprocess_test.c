@@ -176,3 +176,14 @@ char* test_preprocess_token_pasting() {
     free(output);
     return NULL;
 }
+
+char* test_preprocess_recursive_macro_expansion() {
+    const char* input = "#define A B\n"
+                        "#define B 1\n"
+                        "int x = A;\n";
+    char* output = preprocess(input, "recur.c");
+    mu_assert("recursive macro expansion should reach final token",
+              strstr(output, "int x = 1;") != NULL);
+    free(output);
+    return NULL;
+}

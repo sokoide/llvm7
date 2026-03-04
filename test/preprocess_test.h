@@ -14,5 +14,6 @@ char* test_preprocess_function_macro_and_undef();
 char* test_preprocess_pragma_ignored();
 char* test_preprocess_stringification();
 char* test_preprocess_token_pasting();
+char* test_preprocess_recursive_macro_expansion();
 
 #endif

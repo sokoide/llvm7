@@ -239,6 +239,8 @@ static char* run_all_tests() {
     mu_run_test(test_preprocess_pragma_ignored, "preprocess: pragma ignored");
     mu_run_test(test_preprocess_stringification, "preprocess: stringification");
     mu_run_test(test_preprocess_token_pasting, "preprocess: token pasting");
+    mu_run_test(test_preprocess_recursive_macro_expansion,
+                "preprocess: recursive macro expansion");
     return NULL;
 }
 
