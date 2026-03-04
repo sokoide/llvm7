@@ -77,20 +77,17 @@ echo $?
 
 `example01`〜`example09` には期待される終了コードがあるため、`make selfhost_demo_check` を使えばセルフホストバイナリで IR 生成から実行→コード一致まで自動的に確認できます。
 
-### 注意：`#include` があるソースは事前にプリプロセスする
+### 注意：外部プリプロセッサは不要
 
-`llvm7` 本体にはプリプロセッサがないため、`#include` や `#define` を含むファイル（例：`demo/example10.c`）をそのまま実行すると `lex error: Invalid character '#'` で止まり、最悪セグフォルトに至ります。
-`clang -E` や `gcc -E` でソースを `.i` に展開した後、その `.i` を入力してください。たとえば：
+`llvm7` 本体に簡易プリプロセッサを実装しているため、`#include` や `#define` を含む `.c` をそのまま入力できます。
+たとえば：
 
 ```bash
-clang -Iselfhost/include -E -P demo/example10.c -o demo/example10.i
-./build/llvm7 demo/example10.i -o demo/example10.ll
+./build/llvm7 demo/example10.c -o demo/example10.ll
 llc demo/example10.ll -o demo/example10.s
 clang demo/example10.s -o demo/example10
 ./demo/example10
 ```
-
-展開後の `.i` では `stdio.h` などの宣言も文字列として含まれるので、`selfhost/include` にある最小限のヘッダで処理できます。
 
 ### stdio の例
 
@@ -108,8 +105,7 @@ int main() {
 これをコンパイルして実行するには：
 
 ```bash
-clang -Iselfhost/include -E -P demo/stdio.c -o demo/stdio.i
-./build/llvm7 demo/stdio.i -o demo/stdio.ll
+./build/llvm7 demo/stdio.c -o demo/stdio.ll
 llc demo/stdio.ll -o demo/stdio.s
 clang demo/stdio.s -o demo/stdio -lc
 ./demo/stdio
@@ -126,11 +122,11 @@ clang demo/stdio.s -o demo/stdio -lc
 - ポインタ演算 (`+`/`-`) や `*`/`&` 演算子、配列のインデックス、構造体のメンバ (`.`/`->`)。
 - `typedef` による型エイリアス、`struct`/`enum` タグ、列挙子の解決。
 - 文字列リテラル・文字リテラルのエスケープ処理、行コメント `//` とブロックコメント `/* ... */`。
-- 単純なプリプロセッサなし。ただし `clang -E` で preprocessing した `.i` ファイルをそのまま入力できます。
+- 簡易プリプロセッサ（`#include`、`#define`、`#ifdef`/`#ifndef`/`#else`/`#endif`）。
 
 ## サポートされていない C の機能
 
-- `union`、ビットフィールド、複雑なプリプロセッサディレクティブ（`#ifdef`/`#elif` を含むマクロ展開）は未実装。またプリプロセッサ本体を持たないため、`#include`/`#define` を含むソースは事前に `clang -E` で展開してください。
-- `long double` や浮動小数点 (`float`/`double`) 型はサポートしていません。
+- `union`、ビットフィールド、関数形式マクロ、`#if`/`#elif` など複雑なプリプロセッサ機能は未実装です。
+- `long double` は未サポートです。
 - `goto`、構造体の未名前付きメンバ、関数ポインタの複雑なキャストや呼び出しなど高度な制御構造は不完全です。
 - 標準ライブラリのヘッダ全体は含まれず、必要なら `selfhost/include` 以下のミニマルな宣言を使って手動で補ってください。

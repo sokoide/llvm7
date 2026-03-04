@@ -22,6 +22,9 @@ struct Member {
     const char* name;
     int len;
     int index; // Member index for GEP
+    bool is_bitfield;
+    int bit_width;
+    int bit_offset;
 };
 
 typedef struct Token Token;
@@ -29,6 +32,7 @@ struct Token {
     TokenKind kind;
     Token* next;
     int val;
+    unsigned long long uval;
     double fval;
     bool is_float;
     bool is_unsigned;
@@ -39,7 +43,7 @@ struct Token {
 };
 
 struct Type {
-    enum { INT, CHAR, VOID, PTR, STRUCT, LONG, DOUBLE, FLOAT } ty;
+    enum { INT, CHAR, VOID, PTR, STRUCT, UNION, LONG, DOUBLE, FLOAT } ty;
     bool is_unsigned;
     struct Type* ptr_to;
     size_t array_size;
@@ -139,6 +143,7 @@ struct Node {
     Node* init; // Initialization for for loop
     Token* tok; // Function name or token for the node
     int val;
+    unsigned long long uval;
     double fval;
     Type* type;       // Type of the node (for ND_DECL, ND_LVAR, etc.)
     LVar* locals;     // Local variables (for ND_FUNCTION)

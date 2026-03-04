@@ -14,5 +14,7 @@ char* test_lex_token_positions();
 char* test_lex_double();
 char* test_lex_float();
 char* test_lex_bitwise();
+char* test_lex_no_unsigned_suffix_on_float();
+char* test_lex_large_unsigned_literal();
 
 #endif

@@ -95,6 +95,10 @@ static char* run_all_tests() {
     mu_run_test(test_lex_double, "lex: double and floats");
     mu_run_test(test_lex_float, "lex: float with suffix");
     mu_run_test(test_lex_bitwise, "lex: bitwise operators");
+    mu_run_test(test_lex_no_unsigned_suffix_on_float,
+                "lex: reject float unsigned suffix");
+    mu_run_test(test_lex_large_unsigned_literal,
+                "lex: keep large unsigned literal");
     mu_run_test(test_new_node_num, "parse: new_node_num");
     mu_run_test(test_new_node, "parse: new_node");
     mu_run_test(test_unary_num, "parse: unary num");
@@ -175,6 +179,12 @@ static char* run_all_tests() {
     mu_run_test(test_preprocess_include, "preprocess: include");
     mu_run_test(test_preprocess_define, "preprocess: define");
     mu_run_test(test_preprocess_ifdef, "preprocess: ifdef");
+    mu_run_test(test_preprocess_no_expand_in_literals_or_comments,
+                "preprocess: no expand in literals/comments");
+    mu_run_test(test_preprocess_macro_scope_is_per_call,
+                "preprocess: macro scope per call");
+    mu_run_test(test_preprocess_long_define_value,
+                "preprocess: long define value");
     return NULL;
 }
 

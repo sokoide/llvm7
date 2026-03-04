@@ -6,5 +6,8 @@ char* test_preprocess_noop();
 char* test_preprocess_include();
 char* test_preprocess_define();
 char* test_preprocess_ifdef();
+char* test_preprocess_no_expand_in_literals_or_comments();
+char* test_preprocess_macro_scope_is_per_call();
+char* test_preprocess_long_define_value();
 
 #endif

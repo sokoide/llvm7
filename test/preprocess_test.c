@@ -2,6 +2,7 @@
 #include "../src/preprocess.h"
 #include "test_common.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 char* test_preprocess_noop() {
@@ -57,5 +58,55 @@ char* test_preprocess_ifdef() {
     mu_assert("Output should contain y = 2",
               strstr(output, "int y = 2;") != NULL);
 
+    return NULL;
+}
+
+char* test_preprocess_no_expand_in_literals_or_comments() {
+    const char* input = "#define FOO 42\n"
+                        "int x = FOO;\n"
+                        "char* s = \"FOO\";\n"
+                        "char c = 'F';\n"
+                        "// FOO should stay in comment\n"
+                        "/* FOO should stay in block comment */\n";
+    char* output = preprocess(input, "test.c");
+
+    mu_assert("FOO in code should be expanded",
+              strstr(output, "int x = 42;") != NULL);
+    mu_assert("FOO in string should NOT be expanded",
+              strstr(output, "char* s = \"FOO\";") != NULL);
+    mu_assert("FOO in line comment should NOT be expanded",
+              strstr(output, "// FOO should stay in comment") != NULL);
+    mu_assert("FOO in block comment should NOT be expanded",
+              strstr(output, "/* FOO should stay in block comment */") != NULL);
+
+    free(output);
+    return NULL;
+}
+
+char* test_preprocess_macro_scope_is_per_call() {
+    char* out1 = preprocess("#define A 1\nint x = A;\n", "a.c");
+    mu_assert("first call should expand A", strstr(out1, "int x = 1;") != NULL);
+    free(out1);
+
+    char* out2 = preprocess("int y = A;\n", "b.c");
+    mu_assert("macro A should not leak to second call",
+              strstr(out2, "int y = A;") != NULL);
+    free(out2);
+    return NULL;
+}
+
+char* test_preprocess_long_define_value() {
+    char value[1501];
+    for (int i = 0; i < 1500; i++)
+        value[i] = 'x';
+    value[1500] = '\0';
+
+    char input[1700];
+    snprintf(input, sizeof(input), "#define BIG %s\nchar* s = BIG;\n", value);
+    char* output = preprocess(input, "long.c");
+
+    mu_assert("long macro value should be expanded",
+              strstr(output, value) != NULL);
+    free(output);
     return NULL;
 }

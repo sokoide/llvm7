@@ -388,6 +388,9 @@ static LLVMValueRef codegen_constant(Node* node, LLVMModuleRef module) {
     }
 
     if (node->kind == ND_NUM) {
+        if (node->type && node->type->is_unsigned) {
+            return LLVMConstInt(to_llvm_type(node->type), node->uval, 0);
+        }
         return LLVMConstInt(to_llvm_type(node->type), node->val, 1);
     }
     if (node->kind == ND_STR) {
@@ -722,6 +725,9 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
 
     switch (node->kind) {
     case ND_NUM: {
+        if (node->type && node->type->is_unsigned) {
+            return LLVMConstInt(to_llvm_type(node->type), node->uval, 0);
+        }
         return LLVMConstInt(to_llvm_type(node->type), node->val, 0);
     }
     case ND_FNUM: {

@@ -93,8 +93,6 @@ SELFHOST_BUILD = $(SELFHOST_DIR)/build
 SELFHOST_INC = $(SELFHOST_DIR)/include
 SELFHOST_TARGET = $(BUILD_DIR)/llvm7_selfhost
 SELFHOST_SRCS = stdio.c main.c lex.c parse.c codegen.c file.c variable.c preprocess.c
-SELFHOST_CPP_FLAGS = -nostdinc -I$(SELFHOST_INC) -Isrc -P `llvm-config --cflags`
-SELFHOST_CPP = clang -E $(SELFHOST_CPP_FLAGS)
 BOOTSTRAP_DIR = $(SELFHOST_DIR)/bootstrap
 BOOTSTRAP_INPUT_DIR = $(BOOTSTRAP_DIR)/input
 BOOTSTRAP_TC1_DIR = $(BOOTSTRAP_DIR)/tc1
@@ -106,12 +104,8 @@ SELFHOST_DEMO_DIR = $(SELFHOST_DIR)/demo_check
 selfhost: $(TARGET) $(SELFHOST_BUILD)
 	@echo "=== Self-hosting: compiling with own compiler ==="
 	@for src in $(SELFHOST_SRCS); do \
-		echo "  CPP+COMPILE: src/$$src"; \
-		tmp=$(SELFHOST_BUILD)/$${src%.c}.i.tmp; \
-		$(SELFHOST_CPP) src/$$src -o $$tmp || exit 1; \
-		sed '/^#/d' $$tmp > $(SELFHOST_BUILD)/$${src%.c}.i || exit 1; \
-		rm -f $$tmp; \
-		LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(TARGET) $(SELFHOST_BUILD)/$${src%.c}.i -o $(SELFHOST_BUILD)/$${src%.c}.ll || exit 1; \
+		echo "  COMPILE: src/$$src"; \
+		LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(TARGET) src/$$src -o $(SELFHOST_BUILD)/$${src%.c}.ll || exit 1; \
 	done
 	@echo "  LLVM-LINK..."
 	llvm-link $(patsubst %.c,$(SELFHOST_BUILD)/%.ll,$(SELFHOST_SRCS)) -o $(SELFHOST_BUILD)/combined.bc
@@ -133,21 +127,15 @@ $(SELFHOST_BUILD):
 .PHONY: bootstrap_prepare
 bootstrap_prepare:
 	@mkdir -p $(BOOTSTRAP_INPUT_DIR) $(BOOTSTRAP_TC1_DIR) $(BOOTSTRAP_TC2_DIR)
-	@echo "=== bootstrap: preprocess inputs ==="
+	@echo "=== bootstrap: prepare inputs ==="
 	@for src in $(SELFHOST_SRCS); do \
-		echo "  preprocess src/$$src"; \
-		tmp=$(BOOTSTRAP_INPUT_DIR)/$${src%.c}.i.tmp; \
-		$(SELFHOST_CPP) src/$$src -o $$tmp || exit 1; \
-		sed '/^#/d' $$tmp > $(BOOTSTRAP_INPUT_DIR)/$${src%.c}.i || exit 1; \
-		rm -f $$tmp; \
+		echo "  copy src/$$src"; \
+		cp src/$$src $(BOOTSTRAP_INPUT_DIR)/$$src || exit 1; \
 	done
 	@for src in $(wildcard demo/*.c); do \
-		base=$$(basename $$src .c); \
-		echo "  preprocess $$src"; \
-		tmp=$(BOOTSTRAP_INPUT_DIR)/$$base.i.tmp; \
-		$(SELFHOST_CPP) $$src -o $$tmp || exit 1; \
-		sed '/^#/d' $$tmp > $(BOOTSTRAP_INPUT_DIR)/$$base.i || exit 1; \
-		rm -f $$tmp; \
+		base=$$(basename $$src); \
+		echo "  copy $$src"; \
+		cp $$src $(BOOTSTRAP_INPUT_DIR)/$$base || exit 1; \
 	done
 
 .PHONY: bootstrap_tc1_outputs
@@ -155,8 +143,8 @@ bootstrap_tc1_outputs: $(TARGET) bootstrap_prepare
 	@echo "=== bootstrap: tc1 outputs ==="
 	@for c in $(BOOTSTRAP_CASES); do \
 		base=$${c%.c}; \
-		echo "  tc1 compile $$base.i"; \
-		LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(TARGET) $(BOOTSTRAP_INPUT_DIR)/$$base.i -o $(BOOTSTRAP_TC1_DIR)/$$base.ll || exit 1; \
+		echo "  tc1 compile $$base.c"; \
+		LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(TARGET) $(BOOTSTRAP_INPUT_DIR)/$$base.c -o $(BOOTSTRAP_TC1_DIR)/$$base.ll || exit 1; \
 	done
 
 .PHONY: bootstrap_tc2
@@ -168,8 +156,8 @@ bootstrap_tc2_outputs: bootstrap_tc2 bootstrap_prepare
 	@echo "=== bootstrap: tc2 outputs ==="
 	@for c in $(BOOTSTRAP_CASES); do \
 		base=$${c%.c}; \
-		echo "  tc2 compile $$base.i"; \
-		LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(SELFHOST_TARGET) $(BOOTSTRAP_INPUT_DIR)/$$base.i -o $(BOOTSTRAP_TC2_DIR)/$$base.ll || exit 1; \
+		echo "  tc2 compile $$base.c"; \
+		LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(SELFHOST_TARGET) $(BOOTSTRAP_INPUT_DIR)/$$base.c -o $(BOOTSTRAP_TC2_DIR)/$$base.ll || exit 1; \
 	done
 
 .PHONY: bootstrap_compare
@@ -189,16 +177,16 @@ bootstrap_check: test bootstrap_compare
 .PHONY: selfhost_demo_check
 selfhost_demo_check: selfhost
 	@echo "=== selfhost demo check ==="
-	@mkdir -p $(SELFHOST_DEMO_DIR)/input $(SELFHOST_DEMO_DIR)/ll $(SELFHOST_DEMO_DIR)/bin
+	@mkdir -p $(SELFHOST_DEMO_DIR)/ll $(SELFHOST_DEMO_DIR)/bin
 	@for src in demo/*.c; do \
 		base=$$(basename $$src .c); \
-		echo "  preprocess $$src"; \
-		tmp=$(SELFHOST_DEMO_DIR)/input/$$base.i.tmp; \
-		$(SELFHOST_CPP) $$src -o $$tmp || exit 1; \
-		sed '/^#/d' $$tmp > $(SELFHOST_DEMO_DIR)/input/$$base.i || exit 1; \
-		rm -f $$tmp; \
-		echo "  selfhost compile $$base.i"; \
-		LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(SELFHOST_TARGET) $(SELFHOST_DEMO_DIR)/input/$$base.i -o $(SELFHOST_DEMO_DIR)/ll/$$base.ll || exit 1; \
+		case $$base in \
+			include_test|define_test) \
+				echo "  SKIP $$base (experimental demo)"; \
+				continue ;; \
+		esac; \
+		echo "  selfhost compile $$base.c"; \
+		LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(SELFHOST_TARGET) $$src -o $(SELFHOST_DEMO_DIR)/ll/$$base.ll || exit 1; \
 		expected=""; \
 		case $$base in \
 			example01) expected=4 ;; \

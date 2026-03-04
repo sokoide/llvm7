@@ -248,3 +248,31 @@ char* test_lex_bitwise() {
     free_tokens(head);
     return NULL;
 }
+
+char* test_lex_no_unsigned_suffix_on_float() {
+    Token* head = tokenize("1.0u");
+    Token* curr = head;
+
+    mu_assert("first token should be float TK_NUM", curr->kind == TK_NUM);
+    mu_assert("first token should be float", curr->is_float);
+    mu_assert("float token should not be marked unsigned", !curr->is_unsigned);
+    curr = curr->next;
+    mu_assert("second token should be identifier 'u'",
+              curr->kind == TK_IDENT && curr->len == 1 && curr->str[0] == 'u');
+
+    free_tokens(head);
+    return NULL;
+}
+
+char* test_lex_large_unsigned_literal() {
+    Token* head = tokenize("4294967295u;");
+    Token* curr = head;
+
+    mu_assert("first token should be TK_NUM", curr->kind == TK_NUM);
+    mu_assert("first token should be unsigned", curr->is_unsigned);
+    mu_assert("uval should keep full unsigned literal",
+              curr->uval == 4294967295ULL);
+
+    free_tokens(head);
+    return NULL;
+}

@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define LLVM7_INT_MAX 2147483647
+
 static int is_alnum(char c) {
     return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') ||
            ('0' <= c && c <= '9') || c == '_';
@@ -41,15 +43,17 @@ static char decode_escape_char(const char** pp) {
 }
 
 // Keyword table (selfhost-compatible: no anonymous struct)
-char* kw_str[31] = {
-    "return", "if",     "else",    "while",   "for",      "int",      "char",
-    "void",   "sizeof", "struct",  "typedef", "enum",     "static",   "extern",
-    "const",  "long",   "bool",    "size_t",  "NULL",     "true",     "false",
-    "switch", "case",   "default", "break",   "continue", "unsigned", "signed",
-    "double", "float",  "do"};
-int kw_len[31] = {6, 2, 4, 5, 3, 3, 4, 4, 6, 6, 7, 4, 6, 6, 5, 4,
-                  4, 6, 4, 4, 5, 6, 4, 7, 5, 8, 8, 6, 6, 5, 2};
-int NUM_KEYWORDS = 31;
+char* kw_str[37] = {"return",   "if",       "else",   "while",    "for",
+                    "int",      "char",     "void",   "sizeof",   "struct",
+                    "typedef",  "enum",     "static", "extern",   "const",
+                    "long",     "bool",     "size_t", "NULL",     "true",
+                    "false",    "switch",   "case",   "default",  "break",
+                    "continue", "unsigned", "signed", "double",   "float",
+                    "do",       "union",    "inline", "restrict", "volatile",
+                    "register", "_Bool"};
+int kw_len[37] = {6, 2, 4, 5, 3, 3, 4, 4, 6, 6, 7, 4, 6, 6, 5, 4, 4, 6, 4,
+                  4, 5, 6, 4, 7, 5, 8, 8, 6, 6, 5, 2, 5, 6, 8, 8, 8, 5};
+int NUM_KEYWORDS = 37;
 
 char* three_char_ops[3] = {"...", "<<=", ">>="};
 int NUM_THREE_CHAR_OPS = 3;
@@ -105,10 +109,8 @@ Token* new_token(TokenKind kind, Token* cur, const char* str, int len) {
     Token* tok = calloc(1, sizeof(Token));
     tok->kind = kind;
     tok->val = 0;
+    tok->uval = 0;
     tok->fval = 0;
-    if (kind == TK_NUM && len > 0) {
-        tok->val = strtol(str, NULL, 10);
-    }
     tok->str = str;
     tok->len = len;
     tok->line = 0;
@@ -274,6 +276,7 @@ Token* tokenize(const char* p) {
             p++; // skip closing '
             cur = new_token_at(TK_NUM, cur, p - 2, 1, source, p - 2);
             cur->val = val;
+            cur->uval = (unsigned long long)(unsigned int)val;
             cur->len =
                 0; // Still use 0 to avoid consume() matching, but wait...
             // Let's use actual length 1 and pointed at the char but it's
@@ -325,9 +328,15 @@ Token* tokenize(const char* p) {
             if (is_float) {
                 cur->fval = strtod(start, NULL);
             } else {
-                cur->fval = (double)cur->val;
+                cur->uval = strtoull(start, NULL, 10);
+                cur->fval = (double)cur->uval;
+                if (cur->uval <= (unsigned long long)LLVM7_INT_MAX) {
+                    cur->val = (int)cur->uval;
+                } else {
+                    cur->val = LLVM7_INT_MAX;
+                }
             }
-            if (*p == 'u' || *p == 'U') {
+            if (!is_float && (*p == 'u' || *p == 'U')) {
                 cur->is_unsigned = true;
                 p++;
             }
@@ -430,6 +439,12 @@ int expect_number(Context* ctx) {
         fprintf(stderr, "lex error:%d:%d: expected a number\n",
                 ctx->current_token->line, ctx->current_token->col);
         // Exit the program with an error status
+        exit(1);
+    }
+    if (ctx->current_token->uval > (unsigned long long)LLVM7_INT_MAX) {
+        fprintf(stderr,
+                "lex error:%d:%d: integer literal out of range for int\n",
+                ctx->current_token->line, ctx->current_token->col);
         exit(1);
     }
     // Return the value of the number token

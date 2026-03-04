@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define LLVM7_INT_MAX 2147483647
+
 static Node* parse_logor(Context* ctx);
 static Node* parse_conditional(Context* ctx);
 static Node* parse_logand(Context* ctx);
@@ -34,6 +36,7 @@ Node* new_node_num(int val) {
     Node* node = calloc(1, sizeof(Node));
     node->kind = ND_NUM;
     node->val = val;
+    node->uval = (unsigned long long)(unsigned int)val;
     node->type = new_type_int();
     return node;
 }
@@ -244,7 +247,9 @@ Type* try_parse_type(Context* ctx) {
     bool has_qualifier = false;
     while (1) {
         if (consume(ctx, "const") || consume(ctx, "static") ||
-            consume(ctx, "extern") || consume(ctx, "signed")) {
+            consume(ctx, "extern") || consume(ctx, "signed") ||
+            consume(ctx, "inline") || consume(ctx, "restrict") ||
+            consume(ctx, "volatile") || consume(ctx, "register")) {
             has_qualifier = true;
             continue;
         }
@@ -273,7 +278,7 @@ Type* try_parse_type(Context* ctx) {
         consume(ctx, "long"); // Support 'long long'
         base = calloc(1, sizeof(Type));
         base->ty = LONG;
-    } else if (consume(ctx, "bool") ||
+    } else if (consume(ctx, "_Bool") || consume(ctx, "bool") ||
                (ctx->current_token->kind == TK_IDENT &&
                 ctx->current_token->len == 4 &&
                 strncmp(ctx->current_token->str, "bool", 4) == 0)) {
@@ -306,7 +311,7 @@ Type* try_parse_type(Context* ctx) {
         }
         base = new_type_int();
     } else if (consume(ctx, "struct")) {
-        // ... (keep rest of struct logic)
+        bool is_union = false;
         Token* tag = consume_ident(ctx);
         Type* str_type = NULL;
 
@@ -316,7 +321,7 @@ Type* try_parse_type(Context* ctx) {
                 str_type = st->type;
             } else {
                 str_type = calloc(1, sizeof(Type));
-                str_type->ty = STRUCT;
+                str_type->ty = is_union ? UNION : STRUCT;
                 StructTag* nst = calloc(1, sizeof(StructTag));
                 nst->name = tag->str;
                 nst->len = tag->len;
@@ -327,7 +332,7 @@ Type* try_parse_type(Context* ctx) {
         } else {
             // Anonymous struct
             str_type = calloc(1, sizeof(Type));
-            str_type->ty = STRUCT;
+            str_type->ty = is_union ? UNION : STRUCT;
         }
 
         if (consume(ctx, "{")) {
@@ -335,6 +340,7 @@ Type* try_parse_type(Context* ctx) {
             memset(&head, 0, sizeof(Member));
             Member* cur = &head;
             int index = 0;
+            int bit_used = 0;
             while (!consume(ctx, "}")) {
                 Type* mty = parse_type(ctx);
                 Token* mtok = consume_ident(ctx);
@@ -352,13 +358,41 @@ Type* try_parse_type(Context* ctx) {
                     }
                     mty = new_type_array(mty, (size_t)size);
                 }
-                expect(ctx, ";");
-
                 Member* m = calloc(1, sizeof(Member));
                 m->type = mty;
                 m->name = mtok->str;
                 m->len = mtok->len;
                 m->index = index++;
+                if (consume(ctx, ":")) {
+                    int bw = expect_const_int(ctx);
+                    if (bw <= 0 || bw > 32) {
+                        fprintf(stderr, "bitfield width must be 1..32\n");
+                        exit(1);
+                    }
+                    m->is_bitfield = true;
+                    m->bit_width = bw;
+                    if (!is_union) {
+                        if (bit_used + bw > 32) {
+                            index++;
+                            bit_used = 0;
+                        }
+                        m->index = index;
+                        m->bit_offset = bit_used;
+                        bit_used += bw;
+                        if (bit_used == 32) {
+                            index++;
+                            bit_used = 0;
+                        }
+                    } else {
+                        m->index = 0;
+                        m->bit_offset = 0;
+                    }
+                } else if (!is_union) {
+                    bit_used = 0;
+                } else {
+                    m->index = 0;
+                }
+                expect(ctx, ";");
                 cur->next = m;
                 cur = m;
             }
@@ -1642,11 +1676,15 @@ Node* parse_primary(Context* ctx) {
                               is_single ? new_type_float() : new_type_double());
             ctx->current_token = ctx->current_token->next;
         } else {
-            Token* num_tok = ctx->current_token;
-            num_node = new_node_num(expect_number(ctx));
+            int ival = (num_tok->uval <= (unsigned long long)LLVM7_INT_MAX)
+                           ? (int)num_tok->uval
+                           : LLVM7_INT_MAX;
+            num_node = new_node_num(ival);
+            num_node->uval = num_tok->uval;
             if (num_tok->is_unsigned) {
                 num_node->type->is_unsigned = true;
             }
+            ctx->current_token = ctx->current_token->next;
         }
 
         // Check for [ after number
