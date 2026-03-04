@@ -1726,6 +1726,15 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         }
         return loaded;
     }
+    case ND_COMPOUND: {
+        Node* addr_node = new_node(ND_ADDR, node, NULL);
+        addr_node->type = new_type_ptr(node->type);
+        LLVMValueRef ptr =
+            codegen(ctx, addr_node, builder, local_allocas, has_return, module);
+        free(addr_node);
+        LLVMTypeRef lit_type = to_llvm_type(node->type);
+        return LLVMBuildLoad2(builder, lit_type, ptr, "compound_load");
+    }
     case ND_ARRAY_TO_PTR:
     case ND_ADDR: {
         // &expr - get address of variable
@@ -1742,6 +1751,68 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
                 }
                 return ptr;
             }
+        } else if (node->lhs->kind == ND_COMPOUND) {
+            static int compound_id = 0;
+            char tmp_name[32];
+            snprintf(tmp_name, sizeof(tmp_name), "compound.%d", compound_id++);
+
+            LLVMTypeRef lit_ty = to_llvm_type(node->lhs->type);
+            LLVMValueRef tmp_ptr = LLVMBuildAlloca(builder, lit_ty, tmp_name);
+
+            if (node->lhs->init && node->lhs->init->kind == ND_INIT) {
+                Node* cur = node->lhs->init->lhs;
+                int i = 0;
+                if (node->lhs->type->ty == STRUCT) {
+                    while (cur) {
+                        LLVMValueRef val =
+                            codegen(ctx, cur, builder, local_allocas,
+                                    has_return, module);
+                        LLVMValueRef mptr = LLVMBuildStructGEP2(
+                            builder, lit_ty, tmp_ptr, i, "compound_sgep");
+                        Member* m = node->lhs->type->members;
+                        for (int j = 0; j < i && m; j++)
+                            m = m->next;
+                        LLVMTypeRef mty = to_llvm_type(m ? m->type : NULL);
+                        LLVMValueRef cast_val =
+                            cast_value(builder, val, cur->type, mty);
+                        LLVMBuildStore(builder, cast_val, mptr);
+                        cur = cur->next;
+                        i++;
+                    }
+                } else if (node->lhs->type->ty == UNION) {
+                    if (cur) {
+                        LLVMTypeRef elem_ptr_ty =
+                            LLVMPointerType(to_llvm_type(cur->type), 0);
+                        LLVMValueRef mptr =
+                            LLVMBuildBitCast(builder, tmp_ptr, elem_ptr_ty,
+                                             "compound_union_ptr");
+                        LLVMValueRef val =
+                            codegen(ctx, cur, builder, local_allocas,
+                                    has_return, module);
+                        LLVMBuildStore(builder, val, mptr);
+                    }
+                } else if (node->lhs->type->ty == PTR &&
+                           node->lhs->type->array_size > 0) {
+                    while (cur) {
+                        LLVMValueRef val =
+                            codegen(ctx, cur, builder, local_allocas,
+                                    has_return, module);
+                        LLVMValueRef indices[] = {LLVMConstInt(ty_i32(), 0, 0),
+                                                  LLVMConstInt(ty_i32(), i, 0)};
+                        LLVMValueRef eptr =
+                            LLVMBuildInBoundsGEP2(builder, lit_ty, tmp_ptr,
+                                                  indices, 2, "compound_agep");
+                        LLVMTypeRef ety = to_llvm_type(node->lhs->type->ptr_to);
+                        LLVMValueRef cast_val =
+                            cast_value(builder, val, cur->type, ety);
+                        LLVMBuildStore(builder, cast_val, eptr);
+                        cur = cur->next;
+                        i++;
+                    }
+                }
+            }
+
+            return tmp_ptr;
         } else if (node->lhs->kind == ND_MEMBER) {
             // &s.a
             // Get base address
@@ -1758,6 +1829,12 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
                 base_addr = LLVMGetNamedGlobal(module, var_name);
             } else if (node->lhs->lhs->kind == ND_MEMBER) {
                 // recursive nested struct: &s.a.b
+                Node* nested_addr = new_node(ND_ADDR, node->lhs->lhs, NULL);
+                nested_addr->type = new_type_ptr(node->lhs->lhs->type);
+                base_addr = codegen(ctx, nested_addr, builder, local_allocas,
+                                    has_return, module);
+                free(nested_addr);
+            } else if (node->lhs->lhs->kind == ND_COMPOUND) {
                 Node* nested_addr = new_node(ND_ADDR, node->lhs->lhs, NULL);
                 nested_addr->type = new_type_ptr(node->lhs->lhs->type);
                 base_addr = codegen(ctx, nested_addr, builder, local_allocas,

@@ -96,6 +96,12 @@ static char* run_all_tests() {
     mu_run_test(test_generate_vla_basic, "codegen: vla basic");
     mu_run_test(test_generate_adjacent_string_literals,
                 "codegen: adjacent string literals");
+    mu_run_test(test_generate_struct_compound_literal_member,
+                "codegen: struct compound literal member");
+    mu_run_test(test_generate_array_compound_literal_subscript,
+                "codegen: array compound literal subscript");
+    mu_run_test(test_generate_union_compound_literal_designator,
+                "codegen: union compound literal designator");
     mu_run_test(test_read_file_success, "file: read_file success");
     mu_run_test(test_read_file_not_found, "file: read_file not found");
     mu_run_test(test_lex_tokenize, "lex: tokenize");
@@ -203,6 +209,12 @@ static char* run_all_tests() {
     mu_run_test(test_parse_vla_decl, "parse: vla decl");
     mu_run_test(test_parse_adjacent_string_literals,
                 "parse: adjacent string literals");
+    mu_run_test(test_parse_struct_compound_literal_member,
+                "parse: struct compound literal member");
+    mu_run_test(test_parse_array_compound_literal_subscript,
+                "parse: array compound literal subscript");
+    mu_run_test(test_parse_union_compound_literal_designator,
+                "parse: union compound literal designator");
     mu_run_test(test_preprocess_noop, "preprocess: no-op");
     mu_run_test(test_preprocess_include, "preprocess: include");
     mu_run_test(test_preprocess_define, "preprocess: define");

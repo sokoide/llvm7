@@ -99,6 +99,7 @@ typedef enum {
     ND_POST_DEC,     // i--
     ND_CAST,         // (type)expr
     ND_INIT,         // Array initializer { ... }
+    ND_COMPOUND,     // (type){...} compound literal
     ND_CONTINUE,     // continue
     ND_GOTO,         // goto label;
     ND_LABEL,        // label: stmt

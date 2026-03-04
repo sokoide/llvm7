@@ -1928,3 +1928,86 @@ char* test_generate_adjacent_string_literals() {
         return "Expected 'f'+'r' for adjacent string literals";
     return NULL;
 }
+
+char* test_generate_struct_compound_literal_member() {
+    Context ctx = {0};
+    Token* head =
+        tokenize("int main() { return ((struct { int a; int b; }){1, 2}).b; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    LLVMExecutionEngineRef engine;
+    char* error = NULL;
+    LLVMCreateExecutionEngineForModule(&engine, module, &error);
+    int (*main_func)() = (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+    int result = main_func();
+    LLVMDisposeExecutionEngine(engine);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+
+    if (result != 2)
+        return "Expected 2 for struct compound literal member";
+    return NULL;
+}
+
+char* test_generate_array_compound_literal_subscript() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { return ((int[3]){3, 4, 5})[1]; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    LLVMExecutionEngineRef engine;
+    char* error = NULL;
+    LLVMCreateExecutionEngineForModule(&engine, module, &error);
+    int (*main_func)() = (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+    int result = main_func();
+    LLVMDisposeExecutionEngine(engine);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+
+    if (result != 4)
+        return "Expected 4 for array compound literal subscript";
+    return NULL;
+}
+
+char* test_generate_union_compound_literal_designator() {
+    Context ctx = {0};
+    Token* head = tokenize(
+        "int main() { return ((union { int a; char b; }){ .b = 5 }).b; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    LLVMExecutionEngineRef engine;
+    char* error = NULL;
+    LLVMCreateExecutionEngineForModule(&engine, module, &error);
+    int (*main_func)() = (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+    int result = main_func();
+    LLVMDisposeExecutionEngine(engine);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+
+    if (result != 5)
+        return "Expected 5 for union compound literal designator";
+    return NULL;
+}

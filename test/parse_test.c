@@ -1505,3 +1505,62 @@ char* test_parse_adjacent_string_literals() {
     free_tokens(tok);
     return NULL;
 }
+
+char* test_parse_struct_compound_literal_member() {
+    Context ctx = {0};
+    Token* tok = tokenize("int x = ((struct { int a; int b; }){1, 2}).b;");
+    ctx.current_token = tok;
+    Node* node = parse_stmt(&ctx);
+
+    mu_assert("node should be ND_DECL", node->kind == ND_DECL);
+    mu_assert("initializer should be member access",
+              node->init && node->init->kind == ND_MEMBER);
+    mu_assert("member base should be compound literal",
+              node->init->lhs && node->init->lhs->kind == ND_COMPOUND);
+    mu_assert("compound init should exist",
+              node->init->lhs->init && node->init->lhs->init->kind == ND_INIT);
+
+    free_ast(node);
+    free_tokens(tok);
+    return NULL;
+}
+
+char* test_parse_array_compound_literal_subscript() {
+    Context ctx = {0};
+    Token* tok = tokenize("int x = ((int[3]){3, 4, 5})[1];");
+    ctx.current_token = tok;
+    Node* node = parse_stmt(&ctx);
+
+    mu_assert("node should be ND_DECL", node->kind == ND_DECL);
+    mu_assert("initializer should be deref from subscript",
+              node->init && node->init->kind == ND_DEREF);
+    mu_assert("subscript base should involve array-to-ptr conversion",
+              node->init->lhs && node->init->lhs->kind == ND_ADD &&
+                  node->init->lhs->lhs &&
+                  node->init->lhs->lhs->kind == ND_ARRAY_TO_PTR &&
+                  node->init->lhs->lhs->lhs &&
+                  node->init->lhs->lhs->lhs->kind == ND_COMPOUND);
+
+    free_ast(node);
+    free_tokens(tok);
+    return NULL;
+}
+
+char* test_parse_union_compound_literal_designator() {
+    Context ctx = {0};
+    Token* tok = tokenize("int x = ((union { int a; char b; }){ .b = 5 }).b;");
+    ctx.current_token = tok;
+    Node* node = parse_stmt(&ctx);
+
+    mu_assert("node should be ND_DECL", node->kind == ND_DECL);
+    mu_assert("initializer should be member access",
+              node->init && node->init->kind == ND_MEMBER);
+    mu_assert("member base should be compound literal",
+              node->init->lhs && node->init->lhs->kind == ND_COMPOUND);
+    mu_assert("compound init should exist",
+              node->init->lhs->init && node->init->lhs->init->kind == ND_INIT);
+
+    free_ast(node);
+    free_tokens(tok);
+    return NULL;
+}

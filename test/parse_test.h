@@ -84,5 +84,8 @@ char* test_parse_scalar_compound_literal();
 char* test_parse_complex_decl();
 char* test_parse_vla_decl();
 char* test_parse_adjacent_string_literals();
+char* test_parse_struct_compound_literal_member();
+char* test_parse_array_compound_literal_subscript();
+char* test_parse_union_compound_literal_designator();
 
 #endif

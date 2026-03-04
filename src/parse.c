@@ -617,15 +617,12 @@ static int count_members(Type* ty) {
     return n;
 }
 
-static int find_member_index_by_tok(Type* ty, Token* tok) {
-    int i = 0;
-    Member* m = ty ? ty->members : NULL;
-    for (; m; m = m->next) {
+static Member* find_member_by_tok(Type* ty, Token* tok) {
+    for (Member* m = ty ? ty->members : NULL; m; m = m->next) {
         if (m->len == tok->len && strncmp(m->name, tok->str, tok->len) == 0)
-            return i;
-        i++;
+            return m;
     }
-    return -1;
+    return NULL;
 }
 
 static Node* new_zero_init_node(void) {
@@ -645,11 +642,14 @@ static Node* parse_initializer(Context* ctx, Type* target_type) {
     bool is_array =
         (target_type && target_type->ty == PTR && target_type->array_size > 0);
     bool is_struct = (target_type && target_type->ty == STRUCT);
+    bool is_union = (target_type && target_type->ty == UNION);
     int fixed_count = -1;
     if (is_array) {
         fixed_count = (int)target_type->array_size;
     } else if (is_struct) {
         fixed_count = count_members(target_type);
+    } else if (is_union) {
+        fixed_count = 1;
     }
 
     while (!consume(ctx, "}")) {
@@ -661,6 +661,7 @@ static Node* parse_initializer(Context* ctx, Type* target_type) {
 
         int index = next_index;
         bool has_designator = false;
+        Member* designated_member = NULL;
         if (consume(ctx, "[")) {
             index = expect_const_int(ctx);
             expect(ctx, "]");
@@ -673,15 +674,17 @@ static Node* parse_initializer(Context* ctx, Type* target_type) {
                         "Expected member name after '.' in initializer\n");
                 exit(1);
             }
-            if (!is_struct) {
-                fprintf(stderr, "'.member' designator requires struct type\n");
+            if (!is_struct && !is_union) {
+                fprintf(stderr,
+                        "'.member' designator requires struct/union type\n");
                 exit(1);
             }
-            index = find_member_index_by_tok(target_type, mtok);
-            if (index < 0) {
+            designated_member = find_member_by_tok(target_type, mtok);
+            if (!designated_member) {
                 fprintf(stderr, "Unknown struct member in initializer\n");
                 exit(1);
             }
+            index = is_union ? 0 : designated_member->index;
             expect(ctx, "=");
             has_designator = true;
         }
@@ -712,7 +715,20 @@ static Node* parse_initializer(Context* ctx, Type* target_type) {
         if (index + 1 > slot_count)
             slot_count = index + 1;
 
-        slots[index] = parse_expr(ctx);
+        Node* val = parse_expr(ctx);
+        if (is_union) {
+            Member* target_member = designated_member;
+            if (!target_member) {
+                target_member = target_type->members;
+            }
+            if (target_member) {
+                Node* cast = new_node(ND_CAST, val, NULL);
+                cast->type = target_member->type;
+                val = cast;
+            }
+        }
+
+        slots[index] = val;
         next_index = index + 1;
         if (!has_designator)
             next_index = index + 1;
@@ -1636,16 +1652,32 @@ Node* parse_unary(Context* ctx) {
         if (it) {
             consume(ctx, "(");
             Type* ty = parse_type(ctx);
+            while (consume(ctx, "[")) {
+                int size = 0;
+                if (!consume(ctx, "]")) {
+                    size = expect_const_int(ctx);
+                    expect(ctx, "]");
+                }
+                ty = new_type_array(ty, (size_t)size);
+            }
             expect(ctx, ")");
             if (ctx->current_token->kind == TK_RESERVED &&
                 ctx->current_token->len == 1 &&
                 ctx->current_token->str[0] == '{') {
                 Node* init = parse_initializer(ctx, ty);
+                if (ty->ty == PTR && ty->array_size == 0 && init &&
+                    init->kind == ND_INIT) {
+                    int cnt = 0;
+                    for (Node* n = init->lhs; n; n = n->next)
+                        cnt++;
+                    ty->array_size = (size_t)cnt;
+                }
                 if ((ty->ty == STRUCT || ty->ty == UNION) ||
                     (ty->ty == PTR && ty->array_size > 0)) {
-                    fprintf(stderr, "compound literal for aggregate type is "
-                                    "not supported yet\n");
-                    exit(1);
+                    Node* lit = new_node(ND_COMPOUND, NULL, NULL);
+                    lit->type = ty;
+                    lit->init = init;
+                    return lit;
                 }
                 Node* elem = init->lhs;
                 if (!elem) {

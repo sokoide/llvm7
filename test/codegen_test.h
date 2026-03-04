@@ -78,5 +78,8 @@ char* test_generate_scalar_compound_literal();
 char* test_generate_complex_basic();
 char* test_generate_vla_basic();
 char* test_generate_adjacent_string_literals();
+char* test_generate_struct_compound_literal_member();
+char* test_generate_array_compound_literal_subscript();
+char* test_generate_union_compound_literal_designator();
 
 #endif
