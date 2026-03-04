@@ -1733,3 +1733,59 @@ char* test_generate_goto_label() {
         return "Expected 0 for goto/label";
     return NULL;
 }
+
+char* test_generate_designated_initializer_array() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { int a[3] = { [2] = 3, [0] = 1 }; "
+                           "return a[0] + a[1] + a[2]; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    LLVMExecutionEngineRef engine;
+    char* error = NULL;
+    LLVMCreateExecutionEngineForModule(&engine, module, &error);
+    int (*main_func)() = (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+    int result = main_func();
+    LLVMDisposeExecutionEngine(engine);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+
+    if (result != 4)
+        return "Expected 4 for designated array initializer";
+    return NULL;
+}
+
+char* test_generate_designated_initializer_struct() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { struct { int a; int b; } s = { .b = "
+                           "5, .a = 2 }; return s.a + s.b; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    LLVMExecutionEngineRef engine;
+    char* error = NULL;
+    LLVMCreateExecutionEngineForModule(&engine, module, &error);
+    int (*main_func)() = (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+    int result = main_func();
+    LLVMDisposeExecutionEngine(engine);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+
+    if (result != 7)
+        return "Expected 7 for designated struct initializer";
+    return NULL;
+}

@@ -1283,8 +1283,11 @@ char* test_parse_shift() {
 
 char* test_parse_compound_bitwise() {
     Context ctx = {0};
-    LVar x = {.name = "x", .len = 1, .next = NULL};
-    ctx.locals = &x;
+    Token x_tok = {0};
+    x_tok.kind = TK_IDENT;
+    x_tok.str = "x";
+    x_tok.len = 1;
+    add_lvar(&ctx, &x_tok, new_type_int());
     // x &= 1
     Token* tok = tokenize("x &= 1;");
     ctx.current_token = tok;
@@ -1361,6 +1364,52 @@ char* test_parse_goto_label() {
 
     free_ast(n1);
     free_ast(n2);
+    free_tokens(tok);
+    return NULL;
+}
+
+char* test_parse_designated_initializer_array() {
+    Context ctx = {0};
+    Token* tok = tokenize("int a[3] = { [2] = 3, [0] = 1 };");
+    ctx.current_token = tok;
+    Node* node = parse_stmt(&ctx);
+
+    mu_assert("node should be ND_DECL", node->kind == ND_DECL);
+    mu_assert("initializer should be ND_INIT",
+              node->init && node->init->kind == ND_INIT);
+    mu_assert("init[0] should be 1", node->init->lhs &&
+                                         node->init->lhs->kind == ND_NUM &&
+                                         node->init->lhs->val == 1);
+    mu_assert("init[1] should be 0",
+              node->init->lhs->next && node->init->lhs->next->kind == ND_NUM &&
+                  node->init->lhs->next->val == 0);
+    mu_assert("init[2] should be 3",
+              node->init->lhs->next->next &&
+                  node->init->lhs->next->next->kind == ND_NUM &&
+                  node->init->lhs->next->next->val == 3);
+
+    free_ast(node);
+    free_tokens(tok);
+    return NULL;
+}
+
+char* test_parse_designated_initializer_struct() {
+    Context ctx = {0};
+    Token* tok = tokenize("struct { int a; int b; } s = { .b = 5, .a = 2 };");
+    ctx.current_token = tok;
+    Node* node = parse_stmt(&ctx);
+
+    mu_assert("node should be ND_DECL", node->kind == ND_DECL);
+    mu_assert("initializer should be ND_INIT",
+              node->init && node->init->kind == ND_INIT);
+    mu_assert("init.a should be 2", node->init->lhs &&
+                                        node->init->lhs->kind == ND_NUM &&
+                                        node->init->lhs->val == 2);
+    mu_assert("init.b should be 5", node->init->lhs->next &&
+                                        node->init->lhs->next->kind == ND_NUM &&
+                                        node->init->lhs->next->val == 5);
+
+    free_ast(node);
     free_tokens(tok);
     return NULL;
 }

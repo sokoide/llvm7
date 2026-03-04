@@ -77,5 +77,7 @@ char* test_parse_compound_bitwise();
 char* test_parse_union_decl();
 char* test_parse_bitfield_decl();
 char* test_parse_goto_label();
+char* test_parse_designated_initializer_array();
+char* test_parse_designated_initializer_struct();
 
 #endif

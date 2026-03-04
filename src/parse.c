@@ -593,21 +593,134 @@ Node* parse_global_var(Context* ctx) {
 
 Node* parse_expr(Context* ctx);
 
-static Node* parse_initializer(Context* ctx) {
+static int count_members(Type* ty) {
+    int n = 0;
+    Member* m = ty ? ty->members : NULL;
+    for (; m; m = m->next)
+        n++;
+    return n;
+}
+
+static int find_member_index_by_tok(Type* ty, Token* tok) {
+    int i = 0;
+    Member* m = ty ? ty->members : NULL;
+    for (; m; m = m->next) {
+        if (m->len == tok->len && strncmp(m->name, tok->str, tok->len) == 0)
+            return i;
+        i++;
+    }
+    return -1;
+}
+
+static Node* new_zero_init_node(void) {
+    Node* z = new_node_num(0);
+    return z;
+}
+
+static Node* parse_initializer(Context* ctx, Type* target_type) {
     expect(ctx, "{");
     Node* node = new_node(ND_INIT, NULL, NULL);
-    Node head;
-    head.next = NULL;
-    Node* cur = &head;
+    Node** slots = NULL;
+    int slot_count = 0;
+    int slot_cap = 0;
+    int next_index = 0;
+    bool first = true;
+
+    bool is_array =
+        (target_type && target_type->ty == PTR && target_type->array_size > 0);
+    bool is_struct = (target_type && target_type->ty == STRUCT);
+    int fixed_count = -1;
+    if (is_array) {
+        fixed_count = (int)target_type->array_size;
+    } else if (is_struct) {
+        fixed_count = count_members(target_type);
+    }
+
     while (!consume(ctx, "}")) {
-        if (cur != &head)
+        if (!first)
             expect(ctx, ",");
+        first = false;
         if (consume(ctx, "}"))
             break; // trailing comma
 
-        cur->next = parse_expr(ctx);
-        cur = cur->next;
+        int index = next_index;
+        bool has_designator = false;
+        if (consume(ctx, "[")) {
+            index = expect_const_int(ctx);
+            expect(ctx, "]");
+            expect(ctx, "=");
+            has_designator = true;
+        } else if (consume(ctx, ".")) {
+            Token* mtok = consume_ident(ctx);
+            if (!mtok) {
+                fprintf(stderr,
+                        "Expected member name after '.' in initializer\n");
+                exit(1);
+            }
+            if (!is_struct) {
+                fprintf(stderr, "'.member' designator requires struct type\n");
+                exit(1);
+            }
+            index = find_member_index_by_tok(target_type, mtok);
+            if (index < 0) {
+                fprintf(stderr, "Unknown struct member in initializer\n");
+                exit(1);
+            }
+            expect(ctx, "=");
+            has_designator = true;
+        }
+
+        if (index < 0) {
+            fprintf(stderr, "Invalid designator index\n");
+            exit(1);
+        }
+        if (fixed_count >= 0 && index >= fixed_count) {
+            fprintf(stderr, "Initializer index out of range\n");
+            exit(1);
+        }
+
+        if (index >= slot_cap) {
+            int new_cap = slot_cap ? slot_cap : 8;
+            while (new_cap <= index)
+                new_cap *= 2;
+            Node** new_slots = realloc(slots, sizeof(Node*) * new_cap);
+            if (!new_slots) {
+                perror("realloc");
+                exit(1);
+            }
+            for (int i = slot_cap; i < new_cap; i++)
+                new_slots[i] = NULL;
+            slots = new_slots;
+            slot_cap = new_cap;
+        }
+        if (index + 1 > slot_count)
+            slot_count = index + 1;
+
+        slots[index] = parse_expr(ctx);
+        next_index = index + 1;
+        if (!has_designator)
+            next_index = index + 1;
     }
+
+    int final_count = slot_count;
+    if (fixed_count > final_count)
+        final_count = fixed_count;
+
+    Node head;
+    head.next = NULL;
+    Node* cur = &head;
+    for (int i = 0; i < final_count; i++) {
+        Node* n = NULL;
+        if (i < slot_cap)
+            n = slots[i];
+        if (!n)
+            n = new_zero_init_node();
+        cur->next = n;
+        cur = n;
+        cur->next = NULL;
+    }
+    free(slots);
+
     node->lhs = head.next; // Use lhs for list body
     return node;
 }
@@ -760,7 +873,7 @@ void parse_program(Context* ctx) {
                 // Check if next token is '{'
                 Token* t = ctx->current_token;
                 if (t->kind == TK_RESERVED && t->len == 1 && t->str[0] == '{') {
-                    gvar_node->init = parse_initializer(ctx);
+                    gvar_node->init = parse_initializer(ctx, ty);
                     gvar_node->init->type = ty; // Set type for codegen
                 } else {
                     gvar_node->init = parse_expr(ctx);
@@ -813,7 +926,7 @@ Node* parse_declaration(Context* ctx, Type* ty) {
     if (consume(ctx, "=")) {
         if (ctx->current_token->kind == TK_RESERVED &&
             ctx->current_token->len == 1 && ctx->current_token->str[0] == '{') {
-            node->init = parse_initializer(ctx);
+            node->init = parse_initializer(ctx, ty);
             // If array size was 0, count elements
             if (node->type->ty == PTR && node->type->array_size == 0) {
                 int count = 0;
