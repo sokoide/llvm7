@@ -310,8 +310,14 @@ Type* try_parse_type(Context* ctx) {
             }
         }
         base = new_type_int();
-    } else if (consume(ctx, "struct")) {
-        bool is_union = false;
+    } else if (ctx->current_token->kind == TK_RESERVED &&
+               ((ctx->current_token->len == 6 &&
+                 strncmp(ctx->current_token->str, "struct", 6) == 0) ||
+                (ctx->current_token->len == 5 &&
+                 strncmp(ctx->current_token->str, "union", 5) == 0))) {
+        bool is_union = (ctx->current_token->len == 5 &&
+                         strncmp(ctx->current_token->str, "union", 5) == 0);
+        ctx->current_token = ctx->current_token->next;
         Token* tag = consume_ident(ctx);
         Type* str_type = NULL;
 
@@ -340,7 +346,6 @@ Type* try_parse_type(Context* ctx) {
             memset(&head, 0, sizeof(Member));
             Member* cur = &head;
             int index = 0;
-            int bit_used = 0;
             while (!consume(ctx, "}")) {
                 Type* mty = parse_type(ctx);
                 Token* mtok = consume_ident(ctx);
@@ -371,25 +376,14 @@ Type* try_parse_type(Context* ctx) {
                     }
                     m->is_bitfield = true;
                     m->bit_width = bw;
-                    if (!is_union) {
-                        if (bit_used + bw > 32) {
-                            index++;
-                            bit_used = 0;
-                        }
-                        m->index = index;
-                        m->bit_offset = bit_used;
-                        bit_used += bw;
-                        if (bit_used == 32) {
-                            index++;
-                            bit_used = 0;
-                        }
-                    } else {
+                    // Current backend models bitfields as independent integer
+                    // members. Keep sequential struct index and record metadata
+                    // for future packed-bitfield support.
+                    m->bit_offset = 0;
+                    if (is_union) {
                         m->index = 0;
-                        m->bit_offset = 0;
                     }
-                } else if (!is_union) {
-                    bit_used = 0;
-                } else {
+                } else if (is_union) {
                     m->index = 0;
                 }
                 expect(ctx, ";");
@@ -1259,6 +1253,15 @@ static int type_align(Type* ty) {
         }
         return max_align;
     }
+    if (ty->ty == UNION) {
+        int max_align = 1;
+        for (Member* m = ty->members; m; m = m->next) {
+            int a = type_align(m->type);
+            if (a > max_align)
+                max_align = a;
+        }
+        return max_align;
+    }
     if (ty->array_size > 0)
         return type_align(ty->ptr_to);
     return 4;
@@ -1296,6 +1299,20 @@ static int type_size(Type* ty) {
         // Final size is multiple of max_align
         size = ((size + max_align - 1) / max_align) * max_align;
         return size;
+    }
+    if (ty->ty == UNION) {
+        int max_size = 0;
+        int max_align = 1;
+        for (Member* m = ty->members; m; m = m->next) {
+            int s = type_size(m->type);
+            int a = type_align(m->type);
+            if (s > max_size)
+                max_size = s;
+            if (a > max_align)
+                max_align = a;
+        }
+        max_size = ((max_size + max_align - 1) / max_align) * max_align;
+        return max_size;
     }
     return 4;
 }
@@ -1341,8 +1358,9 @@ static Node* parse_postfix(Context* ctx) {
                 fprintf(stderr, "Expected member name after '.'\n");
                 exit(1);
             }
-            if (!node->type || node->type->ty != STRUCT) {
-                fprintf(stderr, "Left side of '.' is not a struct\n");
+            if (!node->type ||
+                (node->type->ty != STRUCT && node->type->ty != UNION)) {
+                fprintf(stderr, "Left side of '.' is not a struct/union\n");
                 exit(1);
             }
             Member* m = find_member(node->type, tok);
@@ -1365,9 +1383,10 @@ static Node* parse_postfix(Context* ctx) {
             }
             node = convert_array_to_ptr(node);
             if (!node->type || node->type->ty != PTR ||
-                node->type->ptr_to->ty != STRUCT) {
+                (node->type->ptr_to->ty != STRUCT &&
+                 node->type->ptr_to->ty != UNION)) {
                 fprintf(stderr,
-                        "Left side of '->' is not a pointer to struct\n");
+                        "Left side of '->' is not a pointer to struct/union\n");
                 exit(1);
             }
             // p->m is (*p).m
@@ -1413,15 +1432,16 @@ static Node* convert_array_to_ptr(Node* node) {
     return node;
 }
 
-static char* type_keywords[15] = {"int",      "char",   "void",   "long",
-                                  "bool",     "size_t", "enum",   "struct",
-                                  "const",    "static", "extern", "signed",
-                                  "unsigned", "double", "float"};
+static char* type_keywords[21] = {
+    "int",      "char",     "void",     "long",   "bool",  "_Bool",
+    "size_t",   "enum",     "struct",   "union",  "const", "static",
+    "extern",   "signed",   "unsigned", "double", "float", "inline",
+    "restrict", "volatile", "register"};
 
 static bool is_type(Context* ctx) {
     Token* tok = ctx->current_token;
     if (tok->kind == TK_RESERVED) {
-        int num_type_kw = 15;
+        int num_type_kw = 21;
         for (int i = 0; i < num_type_kw; i++) {
             if ((size_t)tok->len == strlen(type_keywords[i]) &&
                 strncmp(tok->str, type_keywords[i], tok->len) == 0)

@@ -68,5 +68,7 @@ char* test_generate_float_to_double();
 char* test_generate_double_to_float();
 char* test_generate_bitwise();
 char* test_generate_compound_bitwise();
+char* test_generate_union_overlap();
+char* test_generate_bitfield_access();
 
 #endif

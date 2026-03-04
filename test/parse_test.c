@@ -1303,3 +1303,41 @@ char* test_parse_compound_bitwise() {
 
     return NULL;
 }
+
+char* test_parse_union_decl() {
+    Context ctx = {0};
+    Token* tok = tokenize("union { int a; char b; } u;");
+    ctx.current_token = tok;
+    Node* node = parse_stmt(&ctx);
+
+    mu_assert("node kind should be ND_DECL", node->kind == ND_DECL);
+    mu_assert("decl type should be UNION", node->type->ty == UNION);
+    mu_assert("union should have members", node->type->members != NULL);
+
+    free_ast(node);
+    free_tokens(tok);
+    return NULL;
+}
+
+char* test_parse_bitfield_decl() {
+    Context ctx = {0};
+    Token* tok = tokenize("struct { unsigned int a:3; unsigned int b:5; } s;");
+    ctx.current_token = tok;
+    Node* node = parse_stmt(&ctx);
+
+    mu_assert("node kind should be ND_DECL", node->kind == ND_DECL);
+    mu_assert("decl type should be STRUCT", node->type->ty == STRUCT);
+    mu_assert("members should exist", node->type->members != NULL);
+    mu_assert("first member should be bitfield",
+              node->type->members->is_bitfield);
+    mu_assert("first width should be 3", node->type->members->bit_width == 3);
+    mu_assert("second member should be bitfield",
+              node->type->members->next &&
+                  node->type->members->next->is_bitfield);
+    mu_assert("second width should be 5",
+              node->type->members->next->bit_width == 5);
+
+    free_ast(node);
+    free_tokens(tok);
+    return NULL;
+}

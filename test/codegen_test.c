@@ -1648,3 +1648,60 @@ char* test_generate_compound_bitwise() {
 
     return NULL;
 }
+
+char* test_generate_union_overlap() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { union { int i; char c; } u; u.i = 0; "
+                           "u.c = 1; return u.i; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    LLVMExecutionEngineRef engine;
+    char* error = NULL;
+    LLVMCreateExecutionEngineForModule(&engine, module, &error);
+    int (*main_func)() = (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+    int result = main_func();
+    LLVMDisposeExecutionEngine(engine);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+
+    if (result != 1)
+        return "Expected 1 for union overlap";
+    return NULL;
+}
+
+char* test_generate_bitfield_access() {
+    Context ctx = {0};
+    Token* head =
+        tokenize("int main() { struct { unsigned int a:3; unsigned int "
+                 "b:5; } s; s.a = 5; s.b = 17; return s.a + s.b; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    LLVMExecutionEngineRef engine;
+    char* error = NULL;
+    LLVMCreateExecutionEngineForModule(&engine, module, &error);
+    int (*main_func)() = (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+    int result = main_func();
+    LLVMDisposeExecutionEngine(engine);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+
+    if (result != 22)
+        return "Expected 22 for bitfield access";
+    return NULL;
+}

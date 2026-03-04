@@ -11,6 +11,9 @@ typedef struct Macro Macro;
 struct Macro {
     char* name;
     char* value;
+    bool is_function;
+    char** params;
+    int param_count;
     Macro* next;
 };
 
@@ -102,17 +105,37 @@ static Macro* find_macro(PreprocessContext* ctx, const char* name, size_t len) {
     return NULL;
 }
 
+static void free_macro_fields(Macro* m) {
+    free(m->name);
+    free(m->value);
+    if (m->params) {
+        for (int i = 0; i < m->param_count; i++) {
+            free(m->params[i]);
+        }
+        free(m->params);
+    }
+}
+
 static void add_or_replace_macro(PreprocessContext* ctx, const char* name,
-                                 const char* value) {
+                                 const char* value, bool is_function,
+                                 char** params, int param_count) {
     size_t name_len = strlen(name);
     Macro* old = find_macro(ctx, name, name_len);
     if (old) {
         free(old->value);
+        if (old->params) {
+            for (int i = 0; i < old->param_count; i++)
+                free(old->params[i]);
+            free(old->params);
+        }
         old->value = strdup(value);
         if (!old->value) {
             perror("strdup");
             exit(1);
         }
+        old->is_function = is_function;
+        old->params = params;
+        old->param_count = param_count;
         return;
     }
 
@@ -127,25 +150,48 @@ static void add_or_replace_macro(PreprocessContext* ctx, const char* name,
         perror("strdup");
         exit(1);
     }
+    m->is_function = is_function;
+    m->params = params;
+    m->param_count = param_count;
     m->next = ctx->macros;
     ctx->macros = m;
+}
+
+static void undef_macro(PreprocessContext* ctx, const char* name, size_t len) {
+    Macro** pp = &ctx->macros;
+    while (*pp) {
+        Macro* m = *pp;
+        if (strncmp(m->name, name, len) == 0 && m->name[len] == '\0') {
+            *pp = m->next;
+            free_macro_fields(m);
+            free(m);
+            return;
+        }
+        pp = &m->next;
+    }
 }
 
 static void free_macros(Macro* m) {
     while (m) {
         Macro* next = m->next;
-        free(m->name);
-        free(m->value);
+        free_macro_fields(m);
         free(m);
         m = next;
     }
 }
 
 static char* get_dirname(const char* path) {
-    const char* p = strrchr(path, '/');
-    if (!p)
+    size_t slash_pos = 0;
+    bool found = false;
+    for (size_t i = 0; path[i] != '\0'; i++) {
+        if (path[i] == '/') {
+            slash_pos = i;
+            found = true;
+        }
+    }
+    if (!found)
         return strdup(".");
-    return dup_range(path, (size_t)(p - path));
+    return dup_range(path, slash_pos);
 }
 
 static char* try_read_include(const char* dir, const char* inc_name) {
@@ -162,6 +208,123 @@ static char* try_read_include(const char* dir, const char* inc_name) {
     char* content = read_file(path.data);
     free(path.data);
     return content;
+}
+
+static char* trim_copy(const char* s, size_t len) {
+    const char* b = s;
+    const char* e = s + len;
+    while (b < e && (*b == ' ' || *b == '\t'))
+        b++;
+    while (e > b && (e[-1] == ' ' || e[-1] == '\t'))
+        e--;
+    return dup_range(b, (size_t)(e - b));
+}
+
+static int find_param_index(Macro* m, const char* name, size_t len) {
+    for (int i = 0; i < m->param_count; i++) {
+        if (strlen(m->params[i]) == len &&
+            strncmp(m->params[i], name, len) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static char* expand_function_macro(Macro* m, char** args, int argc) {
+    StrBuf out;
+    sb_init(&out);
+    const char* p = m->value;
+    while (*p) {
+        if (is_ident_start(*p)) {
+            const char* start = p;
+            while (is_ident_char(*p))
+                p++;
+            size_t len = (size_t)(p - start);
+            int idx = find_param_index(m, start, len);
+            if (idx >= 0 && idx < argc) {
+                sb_append_n(&out, args[idx], strlen(args[idx]));
+            } else {
+                sb_append_n(&out, start, len);
+            }
+            continue;
+        }
+        sb_append_c(&out, *p++);
+    }
+    return out.data;
+}
+
+static char** parse_macro_args(const char** sp, const char* end,
+                               int* out_argc) {
+    const char* p = *sp;
+    if (p >= end || *p != '(') {
+        *out_argc = 0;
+        return NULL;
+    }
+    p++; // skip '('
+
+    int cap = 4;
+    int argc = 0;
+    char** args = malloc(sizeof(char*) * cap);
+    if (!args) {
+        perror("malloc");
+        exit(1);
+    }
+
+    while (1) {
+        p = skip_spaces(p, end);
+        if (p >= end) {
+            break;
+        }
+        if (*p == ')') {
+            p++;
+            break;
+        }
+
+        const char* arg_start = p;
+        int depth = 0;
+        while (p < end) {
+            if (*p == '(') {
+                depth++;
+                p++;
+                continue;
+            }
+            if (*p == ')') {
+                if (depth == 0)
+                    break;
+                depth--;
+                p++;
+                continue;
+            }
+            if (*p == ',' && depth == 0)
+                break;
+            p++;
+        }
+
+        if (argc == cap) {
+            cap *= 2;
+            char** np = realloc(args, sizeof(char*) * cap);
+            if (!np) {
+                perror("realloc");
+                exit(1);
+            }
+            args = np;
+        }
+        args[argc++] = trim_copy(arg_start, (size_t)(p - arg_start));
+
+        p = skip_spaces(p, end);
+        if (p < end && *p == ',') {
+            p++;
+            continue;
+        }
+        if (p < end && *p == ')') {
+            p++;
+            break;
+        }
+    }
+
+    *sp = p;
+    *out_argc = argc;
+    return args;
 }
 
 static char* preprocess_internal(const char* input, const char* filename,
@@ -310,8 +473,13 @@ static char* preprocess_internal(const char* input, const char* filename,
                     while (d < line_end && *d != closing)
                         d++;
                     if (d < line_end && *d == closing) {
-                        char* inc_name =
-                            dup_range(inc_start, (size_t)(d - inc_start));
+                        size_t inc_len = 0;
+                        const char* t = inc_start;
+                        while (t < d) {
+                            inc_len++;
+                            t++;
+                        }
+                        char* inc_name = dup_range(inc_start, inc_len);
                         char* inc_content = NULL;
 
                         if (closing == '"') {
@@ -352,13 +520,77 @@ static char* preprocess_internal(const char* input, const char* filename,
                         d++;
                     char* name =
                         dup_range(name_start, (size_t)(d - name_start));
-                    while (d < line_end && (*d == ' ' || *d == '\t'))
+                    bool is_function = false;
+                    char** params = NULL;
+                    int param_count = 0;
+
+                    // Function-like macro: no whitespace between name and '('
+                    if (d < line_end && *d == '(') {
+                        is_function = true;
                         d++;
-                    char* value = dup_range(d, (size_t)(line_end - d));
-                    add_or_replace_macro(ctx, name, value);
+                        int pcap = 4;
+                        params = malloc(sizeof(char*) * pcap);
+                        if (!params) {
+                            perror("malloc");
+                            exit(1);
+                        }
+                        while (1) {
+                            d = skip_spaces(d, line_end);
+                            if (d < line_end && *d == ')') {
+                                d++;
+                                break;
+                            }
+                            const char* pstart = d;
+                            if (!(d < line_end && is_ident_start(*d))) {
+                                fprintf(stderr, "invalid macro parameter\n");
+                                exit(1);
+                            }
+                            while (d < line_end && is_ident_char(*d))
+                                d++;
+                            if (param_count == pcap) {
+                                pcap *= 2;
+                                char** np =
+                                    realloc(params, sizeof(char*) * pcap);
+                                if (!np) {
+                                    perror("realloc");
+                                    exit(1);
+                                }
+                                params = np;
+                            }
+                            params[param_count++] =
+                                dup_range(pstart, (size_t)(d - pstart));
+                            d = skip_spaces(d, line_end);
+                            if (d < line_end && *d == ',') {
+                                d++;
+                                continue;
+                            }
+                            if (d < line_end && *d == ')') {
+                                d++;
+                                break;
+                            }
+                            fprintf(stderr, "invalid macro parameter list\n");
+                            exit(1);
+                        }
+                    } else {
+                        while (d < line_end && (*d == ' ' || *d == '\t'))
+                            d++;
+                    }
+
+                    char* value = trim_copy(d, (size_t)(line_end - d));
+                    add_or_replace_macro(ctx, name, value, is_function, params,
+                                         param_count);
                     free(name);
                     free(value);
                 }
+            } else if (kw_len == 5 && strncmp(kw_start, "undef", 5) == 0) {
+                is_directive = true;
+                while (d < line_end && (*d == ' ' || *d == '\t'))
+                    d++;
+                const char* name_start = d;
+                while (d < line_end && is_ident_char(*d))
+                    d++;
+                if (d > name_start)
+                    undef_macro(ctx, name_start, (size_t)(d - name_start));
             }
         }
 
@@ -415,7 +647,31 @@ static char* preprocess_internal(const char* input, const char* filename,
                     size_t id_len = (size_t)(s - id_start);
                     Macro* m = find_macro(ctx, id_start, id_len);
                     if (m) {
-                        sb_append_n(&out, m->value, strlen(m->value));
+                        if (m->is_function) {
+                            const char* call = s;
+                            call = skip_spaces(call, line_end);
+                            if (call < line_end && *call == '(') {
+                                int argc = 0;
+                                char** args =
+                                    parse_macro_args(&call, line_end, &argc);
+                                if (argc == m->param_count) {
+                                    char* ex =
+                                        expand_function_macro(m, args, argc);
+                                    sb_append_n(&out, ex, strlen(ex));
+                                    free(ex);
+                                    s = call;
+                                } else {
+                                    sb_append_n(&out, id_start, id_len);
+                                }
+                                for (int i = 0; i < argc; i++)
+                                    free(args[i]);
+                                free(args);
+                            } else {
+                                sb_append_n(&out, id_start, id_len);
+                            }
+                        } else {
+                            sb_append_n(&out, m->value, strlen(m->value));
+                        }
                     } else {
                         sb_append_n(&out, id_start, id_len);
                     }
@@ -447,9 +703,9 @@ static char* preprocess_internal(const char* input, const char* filename,
 
 char* preprocess(const char* input, const char* filename) {
     PreprocessContext ctx = {0};
-    add_or_replace_macro(&ctx, "__clang__", "1");
+    add_or_replace_macro(&ctx, "__clang__", "1", false, NULL, 0);
 #ifdef __APPLE__
-    add_or_replace_macro(&ctx, "__APPLE__", "1");
+    add_or_replace_macro(&ctx, "__APPLE__", "1", false, NULL, 0);
 #endif
     char* out = preprocess_internal(input, filename, &ctx);
     free_macros(ctx.macros);

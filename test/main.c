@@ -82,6 +82,8 @@ static char* run_all_tests() {
     mu_run_test(test_generate_bitwise, "codegen: bitwise operations");
     mu_run_test(test_generate_compound_bitwise,
                 "codegen: compound bitwise operations");
+    mu_run_test(test_generate_union_overlap, "codegen: union overlap");
+    mu_run_test(test_generate_bitfield_access, "codegen: bitfield access");
     mu_run_test(test_read_file_success, "file: read_file success");
     mu_run_test(test_read_file_not_found, "file: read_file not found");
     mu_run_test(test_lex_tokenize, "lex: tokenize");
@@ -175,6 +177,8 @@ static char* run_all_tests() {
     mu_run_test(test_parse_bitwise, "parse: bitwise");
     mu_run_test(test_parse_shift, "parse: shift");
     mu_run_test(test_parse_compound_bitwise, "parse: compound bitwise assign");
+    mu_run_test(test_parse_union_decl, "parse: union declaration");
+    mu_run_test(test_parse_bitfield_decl, "parse: bitfield declaration");
     mu_run_test(test_preprocess_noop, "preprocess: no-op");
     mu_run_test(test_preprocess_include, "preprocess: include");
     mu_run_test(test_preprocess_define, "preprocess: define");
@@ -185,6 +189,9 @@ static char* run_all_tests() {
                 "preprocess: macro scope per call");
     mu_run_test(test_preprocess_long_define_value,
                 "preprocess: long define value");
+    mu_run_test(test_preprocess_if_elif_expr, "preprocess: if/elif expression");
+    mu_run_test(test_preprocess_function_macro_and_undef,
+                "preprocess: function macro and undef");
     return NULL;
 }
 

@@ -110,3 +110,37 @@ char* test_preprocess_long_define_value() {
     free(output);
     return NULL;
 }
+
+char* test_preprocess_if_elif_expr() {
+    const char* input = "#define A 0\n"
+                        "#if A\n"
+                        "int x = 1;\n"
+                        "#elif defined(A)\n"
+                        "int x = 2;\n"
+                        "#else\n"
+                        "int x = 3;\n"
+                        "#endif\n";
+    char* output = preprocess(input, "expr.c");
+    mu_assert("elif branch should be selected",
+              strstr(output, "int x = 2;") != NULL);
+    mu_assert("if branch should be removed",
+              strstr(output, "int x = 1;") == NULL);
+    mu_assert("else branch should be removed",
+              strstr(output, "int x = 3;") == NULL);
+    free(output);
+    return NULL;
+}
+
+char* test_preprocess_function_macro_and_undef() {
+    const char* input = "#define ADD(x,y) ((x)+(y))\n"
+                        "int z = ADD(2, 3);\n"
+                        "#undef ADD\n"
+                        "int k = ADD;\n";
+    char* output = preprocess(input, "fn.c");
+    mu_assert("function-like macro should expand",
+              strstr(output, "int z = ((2)+(3));") != NULL);
+    mu_assert("undef should remove macro binding",
+              strstr(output, "int k = ADD;") != NULL);
+    free(output);
+    return NULL;
+}

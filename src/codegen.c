@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Forward declare to avoid requiring llvm-c/TargetMachine.h in selfhost
+// headers.
+extern char* LLVMGetDefaultTargetTriple(void);
+
 #define MODULE_NAME "sokoide_module"
 
 static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
@@ -47,6 +51,41 @@ static LLVMTypeRef ty_double(void) {
 
 static LLVMTypeRef ty_void(void) {
     return LLVMVoidTypeInContext(get_llvm_context());
+}
+
+static int codegen_type_size(Type* ty) {
+    if (!ty)
+        return 4;
+    if (ty->array_size > 0)
+        return codegen_type_size(ty->ptr_to) * (int)ty->array_size;
+    switch (ty->ty) {
+    case CHAR:
+        return 1;
+    case INT:
+    case FLOAT:
+        return 4;
+    case LONG:
+    case DOUBLE:
+    case PTR:
+        return 8;
+    case STRUCT: {
+        int size = 0;
+        for (Member* m = ty->members; m; m = m->next)
+            size += codegen_type_size(m->type);
+        return size > 0 ? size : 1;
+    }
+    case UNION: {
+        int max_size = 1;
+        for (Member* m = ty->members; m; m = m->next) {
+            int s = codegen_type_size(m->type);
+            if (s > max_size)
+                max_size = s;
+        }
+        return max_size;
+    }
+    default:
+        return 4;
+    }
 }
 
 /**
@@ -97,6 +136,27 @@ static LLVMTypeRef to_llvm_type(Type* ty) {
             free(types);
         }
         return named_struct;
+    }
+    if (ty->ty == UNION) {
+        if (ty->llvm_type) {
+            return (LLVMTypeRef)ty->llvm_type;
+        }
+        LLVMTypeRef named_union =
+            LLVMStructCreateNamed(get_llvm_context(), "union.anon");
+        ty->llvm_type = named_union;
+
+        Type* largest = NULL;
+        int max_size = 0;
+        for (Member* m = ty->members; m; m = m->next) {
+            int s = codegen_type_size(m->type);
+            if (s > max_size) {
+                max_size = s;
+                largest = m->type;
+            }
+        }
+        LLVMTypeRef elem = largest ? to_llvm_type(largest) : ty_i32();
+        LLVMStructSetBody(named_union, &elem, 1, false);
+        return named_union;
     }
     if (ty->ty == PTR) {
         if (ty->array_size > 0) {
@@ -442,6 +502,12 @@ LLVMModuleRef generate_module(Context* ctx) {
     // Create a new LLVM module with specified name
     LLVMModuleRef module =
         LLVMModuleCreateWithNameInContext(MODULE_NAME, get_llvm_context());
+    // Embed host target triple so downstream clang does not need to override.
+    char* target_triple = LLVMGetDefaultTargetTriple();
+    if (target_triple) {
+        LLVMSetTarget(module, target_triple);
+        LLVMDisposeMessage(target_triple);
+    }
     // Create an LLVM builder for constructing instructions
     // Create an LLVM builder for constructing instructions
     LLVMBuilderRef builder = LLVMCreateBuilderInContext(get_llvm_context());
@@ -1634,6 +1700,13 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             } else {
                 fprintf(stderr, "Unsupported base for member access\n");
                 exit(1);
+            }
+
+            if (node->lhs->lhs->type && node->lhs->lhs->type->ty == UNION) {
+                LLVMTypeRef member_ptr_ty =
+                    LLVMPointerType(to_llvm_type(node->lhs->member->type), 0);
+                return LLVMBuildBitCast(builder, base_addr, member_ptr_ty,
+                                        "union_member_ptr");
             }
 
             LLVMTypeRef struct_type = to_llvm_type(node->lhs->lhs->type);

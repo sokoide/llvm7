@@ -74,5 +74,7 @@ char* test_parse_uac();
 char* test_parse_bitwise();
 char* test_parse_shift();
 char* test_parse_compound_bitwise();
+char* test_parse_union_decl();
+char* test_parse_bitfield_decl();
 
 #endif
