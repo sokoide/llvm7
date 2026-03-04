@@ -18,6 +18,9 @@ static Node* parse_unary_no_array_conv(Context* ctx);
 static EnumConst* find_enum_const(Context* ctx, Token* tok);
 static Typedef* find_typedef(Context* ctx, Token* tok);
 static Node* clone_ast(Node* node);
+static Node* parse_sizeof_expr_node(Context* ctx, Node* node);
+static int type_size(Type* ty);
+static Node* find_defined_function(Context* ctx, Token* tok);
 
 Node* new_node(NodeKind kind, Node* lhs, Node* rhs) {
     Node* node = calloc(1, sizeof(Node));
@@ -64,11 +67,31 @@ Node* new_node_ident(Context* ctx, Token* tok) {
         return node;
     }
 
+    Node* fn = find_defined_function(ctx, tok);
+    if (fn) {
+        node->kind = ND_FUNCNAME;
+        node->tok = tok;
+        node->type = new_type_ptr(fn->type ? fn->type : new_type_int());
+        return node;
+    }
+
     // Undeclared variable - error
     fprintf(stderr, "Error: undeclared variable '");
     fwrite(tok->str, 1, tok->len, stderr);
     fprintf(stderr, "'\n");
     exit(1);
+}
+
+static Node* find_defined_function(Context* ctx, Token* tok) {
+    for (int i = 0; i < MAX_NODES; i++) {
+        Node* n = ctx->code[i];
+        if (!n || n->kind != ND_FUNCTION || !n->tok)
+            continue;
+        if (n->tok->len == tok->len &&
+            strncmp(n->tok->str, tok->str, tok->len) == 0)
+            return n;
+    }
+    return NULL;
 }
 
 void free_ast(Node* ast) {
@@ -95,6 +118,30 @@ static Node* clone_ast(Node* node) {
     cloned->cond = clone_ast(node->cond);
     cloned->init = clone_ast(node->init);
     return cloned;
+}
+
+static Node* parse_sizeof_expr_node(Context* ctx, Node* node) {
+    if (!node) {
+        return new_node_num(0);
+    }
+
+    if (node->kind == ND_ARRAY_TO_PTR)
+        node = node->lhs;
+
+    if (node->kind == ND_LVAR && node->type && node->type->ty == PTR &&
+        node->type->array_size == 0 && node->type->ptr_to && node->val >= 0 &&
+        node->val < MAX_NODES && ctx->vla_size_exprs[node->val]) {
+        Node* count = clone_ast(ctx->vla_size_exprs[node->val]);
+        Node* elem_size = new_node_num(type_size(node->type->ptr_to));
+        Node* mul = new_node(ND_MUL, count, elem_size);
+        mul->type = get_common_type(count->type, elem_size->type);
+        return mul;
+    }
+
+    Type* ty_res = node->type;
+    if (node->kind == ND_ARRAY_TO_PTR && node->lhs)
+        ty_res = node->lhs->type;
+    return new_node_num(type_size(ty_res));
 }
 
 // parse_type = "int" | "void" | type "*"
@@ -933,6 +980,37 @@ void parse_program(Context* ctx) {
 
 Node* parse_declaration(Context* ctx, Type* ty) {
     Token* tok = consume_ident(ctx);
+    bool is_func_ptr_decl = false;
+    if (!tok && consume(ctx, "(")) {
+        if (!consume(ctx, "*")) {
+            fprintf(stderr, "Expected '*' in parenthesized declarator\n");
+            exit(1);
+        }
+        tok = consume_ident(ctx);
+        if (!tok) {
+            fprintf(stderr,
+                    "Expected variable name in function pointer declarator\n");
+            exit(1);
+        }
+        expect(ctx, ")");
+        expect(ctx, "(");
+        if (!consume(ctx, ")")) {
+            while (1) {
+                Type* pty = try_parse_type(ctx);
+                if (!pty) {
+                    fprintf(stderr, "Expected parameter type in function "
+                                    "pointer declarator\n");
+                    exit(1);
+                }
+                consume_ident(ctx);
+                if (consume(ctx, ")"))
+                    break;
+                expect(ctx, ",");
+            }
+        }
+        ty = new_type_ptr(ty);
+        is_func_ptr_decl = true;
+    }
     if (!tok) {
         fprintf(stderr, "Expected variable name after type\n");
         exit(1);
@@ -941,7 +1019,7 @@ Node* parse_declaration(Context* ctx, Type* ty) {
     Node* vla_size = NULL;
     // Check for array definitions (e.g., int a[10], char x[3], int y[], int
     // vla[n])
-    if (consume(ctx, "[")) {
+    if (!is_func_ptr_decl && consume(ctx, "[")) {
         if (!consume(ctx, "]")) {
             vla_size = parse_expr(ctx);
             expect(ctx, "]");
@@ -967,6 +1045,9 @@ Node* parse_declaration(Context* ctx, Type* ty) {
     if (vla_size) {
         node->is_vla = true;
         node->rhs = vla_size;
+        if (lvar->offset >= 0 && lvar->offset < MAX_NODES) {
+            ctx->vla_size_exprs[lvar->offset] = clone_ast(vla_size);
+        }
     }
 
     if (consume(ctx, "=")) {
@@ -1516,6 +1597,18 @@ static Node* parse_postfix(Context* ctx) {
     Node* node = parse_primary(ctx);
 
     for (;;) {
+        if (consume(ctx, "(")) {
+            Node* node_args = NULL;
+            if (!consume(ctx, ")")) {
+                node_args = parse_args(ctx);
+                expect(ctx, ")");
+            }
+            Node* call = new_node(ND_CALL, node_args, node);
+            call->type = new_type_int();
+            node = call;
+            continue;
+        }
+
         if (consume(ctx, "[")) {
             // x[y] -> *(x+y)
             Node* index = parse_expr(ctx);
@@ -1710,16 +1803,10 @@ Node* parse_unary(Context* ctx) {
             }
             Node* node = parse_expr(ctx);
             expect(ctx, ")");
-            Type* ty_res = node->type;
-            if (node->kind == ND_ARRAY_TO_PTR)
-                ty_res = node->lhs->type;
-            return new_node_num(type_size(ty_res));
+            return parse_sizeof_expr_node(ctx, node);
         } else {
             Node* node = parse_unary(ctx);
-            Type* ty_res = node->type;
-            if (node->kind == ND_ARRAY_TO_PTR)
-                ty_res = node->lhs->type;
-            return new_node_num(type_size(ty_res));
+            return parse_sizeof_expr_node(ctx, node);
         }
     }
     if (consume(ctx, "++")) {
@@ -1786,10 +1873,10 @@ static Node* parse_unary_no_array_conv(Context* ctx) {
             }
             Node* node = parse_expr(ctx);
             expect(ctx, ")");
-            return new_node_num(type_size(node->type));
+            return parse_sizeof_expr_node(ctx, node);
         } else {
             Node* node = parse_unary_no_array_conv(ctx);
-            return new_node_num(type_size(node->type));
+            return parse_sizeof_expr_node(ctx, node);
         }
     } else if (consume(ctx, "*")) {
         Node* operand = parse_unary(ctx); // Deref DOES convert array to ptr
@@ -1870,7 +1957,9 @@ Node* parse_primary(Context* ctx) {
     }
 
     if (tok) {
-        if (consume(ctx, "(")) {
+        bool has_lvar = find_lvar(ctx, tok) != NULL;
+        bool has_gvar = find_gvar(ctx, tok) != NULL;
+        if (!has_lvar && !has_gvar && consume(ctx, "(")) {
             Node* node_args = NULL;
             if (!consume(ctx, ")")) {
                 // args

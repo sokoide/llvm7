@@ -1564,3 +1564,62 @@ char* test_parse_union_compound_literal_designator() {
     free_tokens(tok);
     return NULL;
 }
+
+char* test_parse_sizeof_vla_expr_runtime() {
+    Context ctx = {0};
+    Token* tok = tokenize("int n = 3; int a[n]; int x = sizeof(a);");
+    ctx.current_token = tok;
+
+    Node* n_decl = parse_stmt(&ctx);
+    Node* a_decl = parse_stmt(&ctx);
+    Node* x_decl = parse_stmt(&ctx);
+
+    mu_assert("a should be VLA decl",
+              a_decl->kind == ND_DECL && a_decl->is_vla);
+    mu_assert("x initializer should exist", x_decl->init != NULL);
+    mu_assert("sizeof(vla) should become runtime mul expr",
+              x_decl->init->kind == ND_MUL);
+
+    free_ast(n_decl);
+    free_ast(a_decl);
+    free_ast(x_decl);
+    free_tokens(tok);
+    return NULL;
+}
+
+char* test_parse_function_pointer_basic() {
+    Context ctx = {0};
+    Token* head = tokenize("int inc(int x) { return x + 1; } int main() { int "
+                           "(*fp)(int); fp = inc; "
+                           "return fp(5); }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    mu_assert("should have two functions", ctx.node_count == 2);
+    Node* main_fn = ctx.code[1];
+    mu_assert("second function should be main",
+              main_fn && main_fn->kind == ND_FUNCTION &&
+                  strncmp(main_fn->tok->str, "main", main_fn->tok->len) == 0);
+
+    Node* decl = main_fn->lhs;
+    mu_assert("first stmt should be decl", decl && decl->kind == ND_DECL);
+    mu_assert("decl type should be ptr", decl->type && decl->type->ty == PTR);
+
+    Node* assign = decl->next;
+    mu_assert("second stmt should be assignment expr stmt",
+              assign && assign->kind == ND_ASSIGN);
+    mu_assert("assign rhs should be function designator",
+              assign->rhs && assign->rhs->kind == ND_FUNCNAME);
+
+    Node* ret = assign->next;
+    mu_assert("third stmt should be return", ret && ret->kind == ND_RETURN);
+    mu_assert("return expr should be call",
+              ret->lhs && ret->lhs->kind == ND_CALL);
+    mu_assert("call should be indirect through expr",
+              ret->lhs->rhs && ret->lhs->rhs->kind == ND_LVAR);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    return NULL;
+}

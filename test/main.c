@@ -102,6 +102,10 @@ static char* run_all_tests() {
                 "codegen: array compound literal subscript");
     mu_run_test(test_generate_union_compound_literal_designator,
                 "codegen: union compound literal designator");
+    mu_run_test(test_generate_sizeof_vla_expr_runtime,
+                "codegen: sizeof vla runtime");
+    mu_run_test(test_generate_function_pointer_basic,
+                "codegen: function pointer basic");
     mu_run_test(test_read_file_success, "file: read_file success");
     mu_run_test(test_read_file_not_found, "file: read_file not found");
     mu_run_test(test_lex_tokenize, "lex: tokenize");
@@ -215,6 +219,10 @@ static char* run_all_tests() {
                 "parse: array compound literal subscript");
     mu_run_test(test_parse_union_compound_literal_designator,
                 "parse: union compound literal designator");
+    mu_run_test(test_parse_sizeof_vla_expr_runtime,
+                "parse: sizeof vla runtime");
+    mu_run_test(test_parse_function_pointer_basic,
+                "parse: function pointer basic");
     mu_run_test(test_preprocess_noop, "preprocess: no-op");
     mu_run_test(test_preprocess_include, "preprocess: include");
     mu_run_test(test_preprocess_define, "preprocess: define");

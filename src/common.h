@@ -80,6 +80,7 @@ typedef enum {
     ND_FOR,          // for
     ND_BLOCK,        // block
     ND_CALL,         // call
+    ND_FUNCNAME,     // function designator used as value
     ND_FUNCTION,     // function definition
     ND_DEREF,        // * (pointer dereference)
     ND_ADDR,         // & (address-of)
@@ -200,6 +201,7 @@ struct Context {
     Type* current_func_type; // Return type of current function being generated
     FuncType* func_types;    // Function types for opaque pointers support
     int scope_depth; // lexical scope depth for local variable visibility
+    Node* vla_size_exprs[MAX_NODES]; // local slot -> VLA element count expr
 };
 
 #endif

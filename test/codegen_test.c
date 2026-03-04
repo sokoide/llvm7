@@ -2011,3 +2011,60 @@ char* test_generate_union_compound_literal_designator() {
         return "Expected 5 for union compound literal designator";
     return NULL;
 }
+
+char* test_generate_sizeof_vla_expr_runtime() {
+    Context ctx = {0};
+    Token* head =
+        tokenize("int main() { int n = 3; int a[n]; return sizeof(a); }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    LLVMExecutionEngineRef engine;
+    char* error = NULL;
+    LLVMCreateExecutionEngineForModule(&engine, module, &error);
+    int (*main_func)() = (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+    int result = main_func();
+    LLVMDisposeExecutionEngine(engine);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+
+    if (result != 12)
+        return "Expected 12 for sizeof(VLA) runtime behavior";
+    return NULL;
+}
+
+char* test_generate_function_pointer_basic() {
+    Context ctx = {0};
+    Token* head = tokenize("int inc(int x) { return x + 1; } int main() { int "
+                           "(*fp)(int); fp = inc; "
+                           "return fp(5); }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    LLVMExecutionEngineRef engine;
+    char* error = NULL;
+    LLVMCreateExecutionEngineForModule(&engine, module, &error);
+    int (*main_func)() = (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+    int result = main_func();
+    LLVMDisposeExecutionEngine(engine);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+
+    if (result != 6)
+        return "Expected 6 for basic function pointer call";
+    return NULL;
+}

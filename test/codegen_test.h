@@ -81,5 +81,7 @@ char* test_generate_adjacent_string_literals();
 char* test_generate_struct_compound_literal_member();
 char* test_generate_array_compound_literal_subscript();
 char* test_generate_union_compound_literal_designator();
+char* test_generate_sizeof_vla_expr_runtime();
+char* test_generate_function_pointer_basic();
 
 #endif

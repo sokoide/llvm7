@@ -893,6 +893,19 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         }
         return LLVMConstInt(ty_i32(), 0, 0);
     }
+    case ND_FUNCNAME: {
+        char func_name[64];
+        int len = node->tok->len < 63 ? node->tok->len : 63;
+        strncpy(func_name, node->tok->str, len);
+        func_name[len] = '\0';
+
+        LLVMValueRef func = LLVMGetNamedFunction(module, func_name);
+        if (!func) {
+            fprintf(stderr, "Function not found: %s\n", func_name);
+            exit(1);
+        }
+        return func;
+    }
     case ND_ASSIGN: {
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
@@ -1186,6 +1199,57 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
     }
     case ND_CALL: {
+        if (node->rhs) {
+            int arg_count = 0;
+            Node* arg = node->lhs;
+            while (arg != NULL) {
+                arg_count++;
+                arg = arg->next;
+            }
+
+            LLVMValueRef* args = NULL;
+            LLVMTypeRef* param_types = NULL;
+            if (arg_count > 0) {
+                args = malloc(arg_count * sizeof(LLVMValueRef));
+                param_types = malloc(arg_count * sizeof(LLVMTypeRef));
+                arg = node->lhs;
+                for (int i = 0; i < arg_count; i++) {
+                    args[i] = codegen(ctx, arg, builder, local_allocas,
+                                      has_return, module);
+                    param_types[i] = LLVMTypeOf(args[i]);
+                    arg = arg->next;
+                }
+            }
+
+            Type* ret_ty_c = new_type_int();
+            if (node->rhs->type && node->rhs->type->ty == PTR &&
+                node->rhs->type->ptr_to) {
+                ret_ty_c = node->rhs->type->ptr_to;
+            }
+            LLVMTypeRef func_type = LLVMFunctionType(
+                to_llvm_type(ret_ty_c), param_types, arg_count, false);
+            LLVMValueRef callee = codegen(ctx, node->rhs, builder,
+                                          local_allocas, has_return, module);
+            LLVMValueRef callee_cast = LLVMBuildBitCast(
+                builder, callee, LLVMPointerType(func_type, 0), "fptr_cast");
+
+            LLVMTypeRef ret_type = LLVMGetReturnType(func_type);
+            LLVMValueRef result;
+            if (LLVMGetTypeKind(ret_type) == LLVMVoidTypeKind) {
+                result = LLVMBuildCall2(builder, func_type, callee_cast, args,
+                                        arg_count, "");
+            } else {
+                result = LLVMBuildCall2(builder, func_type, callee_cast, args,
+                                        arg_count, "calltmp");
+            }
+
+            if (args)
+                free(args);
+            if (param_types)
+                free(param_types);
+            return result;
+        }
+
         char func_name[64];
         int len = node->tok->len < 63 ? node->tok->len : 63;
         strncpy(func_name, node->tok->str, len);
