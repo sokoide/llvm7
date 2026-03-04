@@ -591,6 +591,14 @@ static char* preprocess_internal(const char* input, const char* filename,
                     d++;
                 if (d > name_start)
                     undef_macro(ctx, name_start, (size_t)(d - name_start));
+            } else if (kw_len == 6 && strncmp(kw_start, "pragma", 6) == 0) {
+                // Ignore pragmas for now.
+                is_directive = true;
+            } else if (kw_len == 5 && strncmp(kw_start, "error", 5) == 0) {
+                is_directive = true;
+                const char* msg = skip_spaces(d, line_end);
+                fprintf(stderr, "#error: %.*s\n", (int)(line_end - msg), msg);
+                exit(1);
             }
         }
 

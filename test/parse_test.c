@@ -1341,3 +1341,26 @@ char* test_parse_bitfield_decl() {
     free_tokens(tok);
     return NULL;
 }
+
+char* test_parse_goto_label() {
+    Context ctx = {0};
+    Token* tok = tokenize("goto L; L: return 1;");
+    ctx.current_token = tok;
+
+    Node* n1 = parse_stmt(&ctx);
+    mu_assert("first stmt should be goto", n1->kind == ND_GOTO);
+    mu_assert("goto label token should exist", n1->tok != NULL);
+    mu_assert("goto label should be L",
+              n1->tok->len == 1 && n1->tok->str[0] == 'L');
+
+    Node* n2 = parse_stmt(&ctx);
+    mu_assert("second stmt should be label", n2->kind == ND_LABEL);
+    mu_assert("label token should exist", n2->tok != NULL);
+    mu_assert("label stmt should wrap return",
+              n2->lhs && n2->lhs->kind == ND_RETURN);
+
+    free_ast(n1);
+    free_ast(n2);
+    free_tokens(tok);
+    return NULL;
+}

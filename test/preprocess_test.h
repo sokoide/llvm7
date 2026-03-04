@@ -11,5 +11,6 @@ char* test_preprocess_macro_scope_is_per_call();
 char* test_preprocess_long_define_value();
 char* test_preprocess_if_elif_expr();
 char* test_preprocess_function_macro_and_undef();
+char* test_preprocess_pragma_ignored();
 
 #endif

@@ -70,5 +70,6 @@ char* test_generate_bitwise();
 char* test_generate_compound_bitwise();
 char* test_generate_union_overlap();
 char* test_generate_bitfield_access();
+char* test_generate_goto_label();
 
 #endif

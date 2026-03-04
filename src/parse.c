@@ -834,6 +834,19 @@ Node* parse_declaration(Context* ctx, Type* ty) {
 Node* parse_stmt(Context* ctx) {
     Node* stmt_node;
 
+    // label: statement
+    if (ctx->current_token->kind == TK_IDENT && ctx->current_token->next &&
+        ctx->current_token->next->kind == TK_RESERVED &&
+        ctx->current_token->next->len == 1 &&
+        ctx->current_token->next->str[0] == ':') {
+        Token* label_tok = ctx->current_token;
+        ctx->current_token = ctx->current_token->next->next; // consume ident:
+        Node* body = parse_stmt(ctx);
+        Node* label_node = new_node(ND_LABEL, body, NULL);
+        label_node->tok = label_tok;
+        return label_node;
+    }
+
     // Check for type declaration: e.g. int x; struct { ... } s;
     {
         Type* ty = try_parse_type(ctx);
@@ -956,6 +969,16 @@ Node* parse_stmt(Context* ctx) {
     } else if (consume(ctx, "continue")) {
         expect(ctx, ";");
         return new_node(ND_CONTINUE, NULL, NULL);
+    } else if (consume(ctx, "goto")) {
+        Token* label_tok = consume_ident(ctx);
+        if (!label_tok) {
+            fprintf(stderr, "Expected label name after goto\n");
+            exit(1);
+        }
+        expect(ctx, ";");
+        Node* n = new_node(ND_GOTO, NULL, NULL);
+        n->tok = label_tok;
+        return n;
     } else if (consume(ctx, "{")) {
         return parse_block_stmt(ctx);
     } else {

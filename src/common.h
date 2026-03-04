@@ -100,6 +100,8 @@ typedef enum {
     ND_CAST,         // (type)expr
     ND_INIT,         // Array initializer { ... }
     ND_CONTINUE,     // continue
+    ND_GOTO,         // goto label;
+    ND_LABEL,        // label: stmt
     ND_ADD_ASSIGN,   // +=
     ND_SUB_ASSIGN,   // -=
     ND_MUL_ASSIGN,   // *=
@@ -188,6 +190,7 @@ struct Context {
     void* current_switch_inst;      // Switch instruction for current context
     void* current_break_label;      // Current jump target for break
     void* current_continue_label;   // Current jump target for continue
+    void* current_label_map;        // Function-scope label map for goto/label
     int node_count;                 // Number of statements
     const char* strings[MAX_NODES]; // string literal data
     int string_lens[MAX_NODES];     // string literal lengths

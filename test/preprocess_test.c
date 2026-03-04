@@ -144,3 +144,14 @@ char* test_preprocess_function_macro_and_undef() {
     free(output);
     return NULL;
 }
+
+char* test_preprocess_pragma_ignored() {
+    const char* input = "#pragma once\nint x = 1;\n";
+    char* output = preprocess(input, "p.c");
+    mu_assert("pragma line should not remain",
+              strstr(output, "#pragma") == NULL);
+    mu_assert("normal code should remain",
+              strstr(output, "int x = 1;") != NULL);
+    free(output);
+    return NULL;
+}

@@ -15,8 +15,48 @@ extern char* LLVMGetDefaultTargetTriple(void);
 static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
                             LLVMValueRef* local_allocas, bool* has_return,
                             LLVMModuleRef module);
+static LLVMContextRef get_llvm_context(void);
 
 static LLVMContextRef g_llvm_ctx = NULL;
+
+typedef struct LabelEntry LabelEntry;
+struct LabelEntry {
+    LabelEntry* next;
+    const char* name;
+    int len;
+    LLVMBasicBlockRef bb;
+};
+
+static LLVMBasicBlockRef get_or_create_label_bb(Context* ctx, LLVMValueRef func,
+                                                Token* tok) {
+    LabelEntry* head = (LabelEntry*)ctx->current_label_map;
+    for (LabelEntry* e = head; e; e = e->next) {
+        if (e->len == tok->len && strncmp(e->name, tok->str, tok->len) == 0) {
+            return e->bb;
+        }
+    }
+    LabelEntry* e = calloc(1, sizeof(LabelEntry));
+    if (!e) {
+        perror("calloc");
+        exit(1);
+    }
+    e->name = tok->str;
+    e->len = tok->len;
+    e->bb = LLVMAppendBasicBlockInContext(get_llvm_context(), func, "label");
+    e->next = head;
+    ctx->current_label_map = e;
+    return e->bb;
+}
+
+static void free_label_map(Context* ctx) {
+    LabelEntry* e = (LabelEntry*)ctx->current_label_map;
+    while (e) {
+        LabelEntry* n = e->next;
+        free(e);
+        e = n;
+    }
+    ctx->current_label_map = NULL;
+}
 
 static LLVMContextRef get_llvm_context(void) {
     if (g_llvm_ctx == NULL) {
@@ -701,6 +741,7 @@ LLVMModuleRef generate_module(Context* ctx) {
         LLVMBasicBlockRef entry =
             LLVMAppendBasicBlockInContext(get_llvm_context(), func, "entry");
         LLVMPositionBuilderAtEnd(builder, entry);
+        ctx->current_label_map = NULL;
 
         // Local variable space per function
         LLVMValueRef local_allocas[1024]; // Max 100 locals for now
@@ -761,6 +802,7 @@ LLVMModuleRef generate_module(Context* ctx) {
                 LLVMBuildRet(builder, default_val);
             }
         }
+        free_label_map(ctx);
     }
 
     // Removed mandatory main check to allow library compilation
@@ -1612,6 +1654,34 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             "unreachable");
         LLVMPositionBuilderAtEnd(builder, dead_bb_cont);
         return LLVMConstInt(ty_i32(), 0, 0);
+    case ND_GOTO: {
+        LLVMValueRef func =
+            LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder));
+        LLVMBasicBlockRef label_bb =
+            get_or_create_label_bb(ctx, func, node->tok);
+        LLVMBuildBr(builder, label_bb);
+        // Following code is unreachable
+        LLVMBasicBlockRef dead_bb = LLVMAppendBasicBlockInContext(
+            get_llvm_context(), func, "unreachable");
+        LLVMPositionBuilderAtEnd(builder, dead_bb);
+        return LLVMConstInt(ty_i32(), 0, 0);
+    }
+    case ND_LABEL: {
+        LLVMValueRef func =
+            LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder));
+        LLVMBasicBlockRef label_bb =
+            get_or_create_label_bb(ctx, func, node->tok);
+        LLVMBasicBlockRef cur_bb = LLVMGetInsertBlock(builder);
+        if (LLVMGetBasicBlockTerminator(cur_bb) == NULL) {
+            LLVMBuildBr(builder, label_bb);
+        }
+        LLVMPositionBuilderAtEnd(builder, label_bb);
+        if (node->lhs) {
+            return codegen(ctx, node->lhs, builder, local_allocas, has_return,
+                           module);
+        }
+        return LLVMConstInt(ty_i32(), 0, 0);
+    }
     case ND_BLOCK: {
         // Execute statements in sequence
         LLVMValueRef result = LLVMConstInt(ty_i32(), 0, 0);
