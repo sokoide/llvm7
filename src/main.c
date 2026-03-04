@@ -6,6 +6,7 @@
 #include "file.h"
 #include "lex.h"
 #include "parse.h"
+#include "preprocess.h"
 
 // Declare stdio initialization function (Removed)
 
@@ -43,10 +44,13 @@ int main(int argc, const char** argv) {
     // printf("Compiling: %s\n", source);
     printf("Output: %s\n\n", output_file);
 
+    // Preprocess
+    char* preprocessed = preprocess(source, input_file);
+
     // Create context and tokenize
     Context ctx;
     memset(&ctx, 0, sizeof(ctx));
-    ctx.current_token = tokenize(source);
+    ctx.current_token = tokenize(preprocessed);
 
     // Parse AST
     parse_program(&ctx);
@@ -65,6 +69,7 @@ int main(int argc, const char** argv) {
 
     // Clean up
     free((void*)source);
+    free(preprocessed);
     for (int i = 0; i < ctx.node_count; i++) {
         free_ast(ctx.code[i]);
     }

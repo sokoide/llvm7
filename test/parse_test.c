@@ -1186,3 +1186,120 @@ char* test_parse_do_while() {
     free_tokens(tok);
     return NULL;
 }
+
+char* test_parse_uac() {
+    Context ctx = {0};
+    // unsigned int u; int i; u + i
+    Token* tok_u = tokenize("unsigned int u;");
+    ctx.current_token = tok_u;
+    Node* decl_u = parse_stmt(&ctx);
+
+    Token* tok_i = tokenize("int i;");
+    ctx.current_token = tok_i;
+    Node* decl_i = parse_stmt(&ctx);
+
+    Token* tok_add = tokenize("u + i;");
+    ctx.current_token = tok_add;
+    Node* node_add = parse_stmt(&ctx);
+
+    mu_assert("node_add should be ND_ADD", node_add->kind == ND_ADD);
+    mu_assert("result of u + i should be unsigned",
+              node_add->type->is_unsigned);
+    mu_assert("result of u + i should be INT", node_add->type->ty == INT);
+
+    // long l; unsigned int u; l + u -> long (signed)
+    Token* tok_l = tokenize("long l;");
+    ctx.current_token = tok_l;
+    Node* decl_l = parse_stmt(&ctx);
+
+    Token* tok_add2 = tokenize("l + u;");
+    ctx.current_token = tok_add2;
+    Node* node_add2 = parse_stmt(&ctx);
+
+    mu_assert("result of l + u should be long", node_add2->type->ty == LONG);
+    mu_assert("result of l + u should be signed",
+              !node_add2->type->is_unsigned);
+
+    return NULL;
+}
+
+char* test_parse_bitwise() {
+    Context ctx = {0};
+    // 1 | 2 ^ 3 & 4
+    Token* tok = tokenize("1 | 2 ^ 3 & 4;");
+    ctx.current_token = tok;
+    Node* node = parse_stmt(&ctx);
+
+    // Should be: (1 | (2 ^ (3 & 4)))
+    mu_assert("node should be ND_BITOR", node->kind == ND_BITOR);
+    mu_assert("lhs of | should be 1",
+              node->lhs->kind == ND_NUM && node->lhs->val == 1);
+    mu_assert("rhs of | should be ND_BITXOR", node->rhs->kind == ND_BITXOR);
+    mu_assert("lhs of ^ should be 2",
+              node->rhs->lhs->kind == ND_NUM && node->rhs->lhs->val == 2);
+    mu_assert("rhs of ^ should be ND_BITAND",
+              node->rhs->rhs->kind == ND_BITAND);
+    mu_assert("lhs of & should be 3", node->rhs->rhs->lhs->kind == ND_NUM &&
+                                          node->rhs->rhs->lhs->val == 3);
+    mu_assert("rhs of & should be 4", node->rhs->rhs->rhs->kind == ND_NUM &&
+                                          node->rhs->rhs->rhs->val == 4);
+
+    // Unary bitwise NOT: ~1
+    Token* tok_not = tokenize("~1;");
+    ctx.current_token = tok_not;
+    Node* node_not = parse_stmt(&ctx);
+    mu_assert("node_not should be ND_BITNOT", node_not->kind == ND_BITNOT);
+    mu_assert("operand of ~ should be 1",
+              node_not->lhs->kind == ND_NUM && node_not->lhs->val == 1);
+
+    return NULL;
+}
+
+char* test_parse_shift() {
+    Context ctx = {0};
+    // 1 << 2 + 3
+    Token* tok = tokenize("1 << 2 + 3;");
+    ctx.current_token = tok;
+    Node* node = parse_stmt(&ctx);
+
+    // Should be: (1 << (2 + 3))
+    mu_assert("node should be ND_SHL", node->kind == ND_SHL);
+    mu_assert("lhs of << should be 1",
+              node->lhs->kind == ND_NUM && node->lhs->val == 1);
+    mu_assert("rhs of << should be ND_ADD", node->rhs->kind == ND_ADD);
+
+    // 1 + 2 << 3
+    Token* tok2 = tokenize("1 + 2 << 3;");
+    ctx.current_token = tok2;
+    Node* node2 = parse_stmt(&ctx);
+    // Should be: ((1 + 2) << 3)
+    mu_assert("node2 should be ND_SHL", node2->kind == ND_SHL);
+    mu_assert("lhs of node2 << should be ND_ADD", node2->lhs->kind == ND_ADD);
+    mu_assert("rhs of node2 << should be 3",
+              node2->rhs->kind == ND_NUM && node2->rhs->val == 3);
+
+    return NULL;
+}
+
+char* test_parse_compound_bitwise() {
+    Context ctx = {0};
+    LVar x = {.name = "x", .len = 1, .next = NULL};
+    ctx.locals = &x;
+    // x &= 1
+    Token* tok = tokenize("x &= 1;");
+    ctx.current_token = tok;
+    Node* node = parse_stmt(&ctx);
+
+    mu_assert("node should be ND_ASSIGN", node->kind == ND_ASSIGN);
+    mu_assert("rhs should be ND_BITAND", node->rhs->kind == ND_BITAND);
+    mu_assert("lhs of &= should be x", node->lhs->kind == ND_LVAR);
+
+    // x <<= 2
+    Token* tok2 = tokenize("x <<= 2;");
+    ctx.current_token = tok2;
+    Node* node2 = parse_stmt(&ctx);
+    mu_assert("node2 should be ND_ASSIGN", node2->kind == ND_ASSIGN);
+    mu_assert("rhs of node2 should be ND_SHL", node2->rhs->kind == ND_SHL);
+
+    return NULL;
+}

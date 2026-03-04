@@ -61,9 +61,12 @@ char* test_generate_do_while();
 char* test_generate_ternary_float();
 char* test_generate_ternary_mixed();
 char* test_generate_ternary_int_double_common_type();
+char* test_generate_unsigned();
 char* test_generate_float_add();
 char* test_generate_float_sub();
 char* test_generate_float_to_double();
 char* test_generate_double_to_float();
+char* test_generate_bitwise();
+char* test_generate_compound_bitwise();
 
 #endif

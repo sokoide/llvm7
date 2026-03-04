@@ -75,5 +75,6 @@ extern Type* new_type_double(void);
 extern Type* new_type_float(void);
 extern Type* new_type_ptr(Type* base);
 extern Node* new_node_fnum(double fval, Type* ty);
+extern Type* get_common_type(Type* ty1, Type* ty2);
 
 #endif

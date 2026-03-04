@@ -111,8 +111,8 @@ static LLVMTypeRef to_llvm_type(Type* ty) {
 }
 
 // Helper to match types for binary operations
-static void match_types(LLVMBuilderRef builder, LLVMValueRef* lhs,
-                        LLVMValueRef* rhs) {
+static void match_types(LLVMBuilderRef builder, LLVMValueRef* lhs, Type* lty_c,
+                        LLVMValueRef* rhs, Type* rty_c) {
     LLVMTypeRef lty = LLVMTypeOf(*lhs);
     LLVMTypeRef rty = LLVMTypeOf(*rhs);
 
@@ -158,15 +158,22 @@ static void match_types(LLVMBuilderRef builder, LLVMValueRef* lhs,
         // Integer promotion/truncation
         unsigned lw = LLVMGetIntTypeWidth(lty);
         unsigned rw = LLVMGetIntTypeWidth(rty);
-        if (lw < rw)
-            *lhs = LLVMBuildSExt(builder, *lhs, rty, "sext");
-        else if (lw > rw)
-            *rhs = LLVMBuildSExt(builder, *rhs, lty, "sext");
+        if (lw < rw) {
+            if (lty_c && lty_c->is_unsigned)
+                *lhs = LLVMBuildZExt(builder, *lhs, rty, "zext");
+            else
+                *lhs = LLVMBuildSExt(builder, *lhs, rty, "sext");
+        } else if (lw > rw) {
+            if (rty_c && rty_c->is_unsigned)
+                *rhs = LLVMBuildZExt(builder, *rhs, lty, "zext");
+            else
+                *rhs = LLVMBuildSExt(builder, *rhs, lty, "sext");
+        }
     }
 }
 
 static LLVMValueRef cast_value(LLVMBuilderRef builder, LLVMValueRef val,
-                               LLVMTypeRef dest_ty) {
+                               Type* src_ty_c, LLVMTypeRef dest_ty) {
     LLVMTypeRef src_ty = LLVMTypeOf(val);
     if (src_ty == dest_ty)
         return val;
@@ -175,9 +182,13 @@ static LLVMValueRef cast_value(LLVMBuilderRef builder, LLVMValueRef val,
     LLVMTypeKind dest_kind = LLVMGetTypeKind(dest_ty);
 
     if (dest_kind == LLVMDoubleTypeKind && src_kind == LLVMIntegerTypeKind) {
+        if (src_ty_c && src_ty_c->is_unsigned)
+            return LLVMBuildUIToFP(builder, val, dest_ty, "cast_uitofp");
         return LLVMBuildSIToFP(builder, val, dest_ty, "cast_sitofp");
     }
     if (dest_kind == LLVMFloatTypeKind && src_kind == LLVMIntegerTypeKind) {
+        if (src_ty_c && src_ty_c->is_unsigned)
+            return LLVMBuildUIToFP(builder, val, dest_ty, "cast_uitofp");
         return LLVMBuildSIToFP(builder, val, dest_ty, "cast_sitofp");
     }
     if (dest_kind == LLVMIntegerTypeKind && src_kind == LLVMDoubleTypeKind) {
@@ -202,8 +213,11 @@ static LLVMValueRef cast_value(LLVMBuilderRef builder, LLVMValueRef val,
     if (dest_kind == LLVMIntegerTypeKind && src_kind == LLVMIntegerTypeKind) {
         unsigned src_w = LLVMGetIntTypeWidth(src_ty);
         unsigned dest_w = LLVMGetIntTypeWidth(dest_ty);
-        if (src_w < dest_w)
+        if (src_w < dest_w) {
+            if (src_ty_c && src_ty_c->is_unsigned)
+                return LLVMBuildZExt(builder, val, dest_ty, "cast_zext");
             return LLVMBuildSExt(builder, val, dest_ty, "cast_sext");
+        }
         if (src_w > dest_w)
             return LLVMBuildTrunc(builder, val, dest_ty, "cast_trunc");
     }
@@ -722,9 +736,15 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             LLVMTypeRef var_type = to_llvm_type(node->type);
             LLVMValueRef loaded =
                 LLVMBuildLoad2(builder, var_type, alloca_ptr, "loadtmp");
-            // Sign-extend char (i8) to int (i32) for use in expressions
+            // Extend char (i8) to int (i32) for use in expressions
             if (node->type && node->type->ty == CHAR) {
-                loaded = LLVMBuildSExt(builder, loaded, ty_i32(), "sext_char");
+                if (node->type->is_unsigned) {
+                    loaded =
+                        LLVMBuildZExt(builder, loaded, ty_i32(), "zext_char");
+                } else {
+                    loaded =
+                        LLVMBuildSExt(builder, loaded, ty_i32(), "sext_char");
+                }
             }
             return loaded;
         }
@@ -745,9 +765,15 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             LLVMTypeRef var_type = to_llvm_type(node->type);
             LLVMValueRef loaded =
                 LLVMBuildLoad2(builder, var_type, gvar, "gload");
-            // Sign-extend char (i8) to int (i32) for use in expressions
+            // Extend char (i8) to int (i32) for use in expressions
             if (node->type && node->type->ty == CHAR) {
-                loaded = LLVMBuildSExt(builder, loaded, ty_i32(), "sext_char");
+                if (node->type->is_unsigned) {
+                    loaded =
+                        LLVMBuildZExt(builder, loaded, ty_i32(), "zext_char");
+                } else {
+                    loaded =
+                        LLVMBuildSExt(builder, loaded, ty_i32(), "sext_char");
+                }
             }
             return loaded;
         }
@@ -757,8 +783,8 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
 
-        LLVMValueRef store_val =
-            cast_value(builder, rhs, to_llvm_type(node->lhs->type));
+        LLVMValueRef store_val = cast_value(builder, rhs, node->rhs->type,
+                                            to_llvm_type(node->lhs->type));
 
         if (node->lhs->kind == ND_DEREF) {
             // *ptr = value - store through pointer
@@ -812,7 +838,7 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             return LLVMBuildInBoundsGEP2(builder, elem_type, rhs, &lhs, 1,
                                          "ptradd");
         }
-        match_types(builder, &lhs, &rhs);
+        match_types(builder, &lhs, node->lhs->type, &rhs, node->rhs->type);
         LLVMTypeKind k = LLVMGetTypeKind(LLVMTypeOf(lhs));
         if (k == LLVMDoubleTypeKind || k == LLVMFloatTypeKind) {
             return LLVMBuildFAdd(builder, lhs, rhs, "faddtmp");
@@ -838,7 +864,7 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             return LLVMBuildInBoundsGEP2(builder, elem_type, lhs, &neg_rhs, 1,
                                          "ptrsub");
         }
-        match_types(builder, &lhs, &rhs);
+        match_types(builder, &lhs, node->lhs->type, &rhs, node->rhs->type);
         LLVMTypeKind k = LLVMGetTypeKind(LLVMTypeOf(lhs));
         if (k == LLVMDoubleTypeKind || k == LLVMFloatTypeKind) {
             return LLVMBuildFSub(builder, lhs, rhs, "fsubtmp");
@@ -850,7 +876,7 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
-        match_types(builder, &lhs, &rhs);
+        match_types(builder, &lhs, node->lhs->type, &rhs, node->rhs->type);
         LLVMTypeKind k = LLVMGetTypeKind(LLVMTypeOf(lhs));
         if (k == LLVMDoubleTypeKind || k == LLVMFloatTypeKind) {
             return LLVMBuildFMul(builder, lhs, rhs, "fmultmp");
@@ -862,10 +888,13 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
-        match_types(builder, &lhs, &rhs);
+        match_types(builder, &lhs, node->lhs->type, &rhs, node->rhs->type);
         LLVMTypeKind k = LLVMGetTypeKind(LLVMTypeOf(lhs));
         if (k == LLVMDoubleTypeKind || k == LLVMFloatTypeKind) {
             return LLVMBuildFDiv(builder, lhs, rhs, "fdivtmp");
+        }
+        if (node->type->is_unsigned) {
+            return LLVMBuildUDiv(builder, lhs, rhs, "udivtmp");
         }
         return LLVMBuildSDiv(builder, lhs, rhs, "divtmp");
     }
@@ -874,23 +903,79 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
-        match_types(builder, &lhs, &rhs);
+        match_types(builder, &lhs, node->lhs->type, &rhs, node->rhs->type);
+        if (node->type->is_unsigned) {
+            return LLVMBuildURem(builder, lhs, rhs, "uremtmp");
+        }
         return LLVMBuildSRem(builder, lhs, rhs, "modtmp");
+    }
+    case ND_BITAND: {
+        LLVMValueRef lhs =
+            codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
+        LLVMValueRef rhs =
+            codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
+        match_types(builder, &lhs, node->lhs->type, &rhs, node->rhs->type);
+        return LLVMBuildAnd(builder, lhs, rhs, "andtmp");
+    }
+    case ND_BITOR: {
+        LLVMValueRef lhs =
+            codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
+        LLVMValueRef rhs =
+            codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
+        match_types(builder, &lhs, node->lhs->type, &rhs, node->rhs->type);
+        return LLVMBuildOr(builder, lhs, rhs, "ortmp");
+    }
+    case ND_BITXOR: {
+        LLVMValueRef lhs =
+            codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
+        LLVMValueRef rhs =
+            codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
+        match_types(builder, &lhs, node->lhs->type, &rhs, node->rhs->type);
+        return LLVMBuildXor(builder, lhs, rhs, "xortmp");
+    }
+    case ND_BITNOT: {
+        LLVMValueRef lhs =
+            codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
+        return LLVMBuildNot(builder, lhs, "nottmp");
+    }
+    case ND_SHL: {
+        LLVMValueRef lhs =
+            codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
+        LLVMValueRef rhs =
+            codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
+        match_types(builder, &lhs, node->lhs->type, &rhs, node->rhs->type);
+        return LLVMBuildShl(builder, lhs, rhs, "shltmp");
+    }
+    case ND_SHR: {
+        LLVMValueRef lhs =
+            codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
+        LLVMValueRef rhs =
+            codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
+        match_types(builder, &lhs, node->lhs->type, &rhs, node->rhs->type);
+        if (node->type->is_unsigned) {
+            return LLVMBuildLShr(builder, lhs, rhs, "lshrtmp");
+        }
+        return LLVMBuildAShr(builder, lhs, rhs, "ashrtmp");
     }
     case ND_LT: {
         LLVMValueRef lhs =
             codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
-        match_types(builder, &lhs, &rhs);
+        match_types(builder, &lhs, node->lhs->type, &rhs, node->rhs->type);
         LLVMTypeKind k = LLVMGetTypeKind(LLVMTypeOf(lhs));
         if (k == LLVMDoubleTypeKind || k == LLVMFloatTypeKind) {
             LLVMValueRef res =
                 LLVMBuildFCmp(builder, LLVMRealOLT, lhs, rhs, "fcmptmp");
             return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
         }
-        LLVMValueRef res =
-            LLVMBuildICmp(builder, LLVMIntSLT, lhs, rhs, "lttmp");
+        Type* common_ty = get_common_type(node->lhs->type, node->rhs->type);
+        LLVMValueRef res;
+        if (common_ty->is_unsigned) {
+            res = LLVMBuildICmp(builder, LLVMIntULT, lhs, rhs, "ulttmp");
+        } else {
+            res = LLVMBuildICmp(builder, LLVMIntSLT, lhs, rhs, "lttmp");
+        }
         return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
     }
     case ND_LE: {
@@ -898,15 +983,20 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
-        match_types(builder, &lhs, &rhs);
+        match_types(builder, &lhs, node->lhs->type, &rhs, node->rhs->type);
         LLVMTypeKind k = LLVMGetTypeKind(LLVMTypeOf(lhs));
         if (k == LLVMDoubleTypeKind || k == LLVMFloatTypeKind) {
             LLVMValueRef res =
                 LLVMBuildFCmp(builder, LLVMRealOLE, lhs, rhs, "fcmptmp");
             return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
         }
-        LLVMValueRef res =
-            LLVMBuildICmp(builder, LLVMIntSLE, lhs, rhs, "letmp");
+        Type* common_ty = get_common_type(node->lhs->type, node->rhs->type);
+        LLVMValueRef res;
+        if (common_ty->is_unsigned) {
+            res = LLVMBuildICmp(builder, LLVMIntULE, lhs, rhs, "uletmp");
+        } else {
+            res = LLVMBuildICmp(builder, LLVMIntSLE, lhs, rhs, "letmp");
+        }
         return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
     }
     case ND_EQ: {
@@ -914,7 +1004,7 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
-        match_types(builder, &lhs, &rhs);
+        match_types(builder, &lhs, node->lhs->type, &rhs, node->rhs->type);
         LLVMTypeKind k = LLVMGetTypeKind(LLVMTypeOf(lhs));
         if (k == LLVMDoubleTypeKind || k == LLVMFloatTypeKind) {
             LLVMValueRef res =
@@ -929,7 +1019,7 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
-        match_types(builder, &lhs, &rhs);
+        match_types(builder, &lhs, node->lhs->type, &rhs, node->rhs->type);
         LLVMTypeKind k = LLVMGetTypeKind(LLVMTypeOf(lhs));
         if (k == LLVMDoubleTypeKind || k == LLVMFloatTypeKind) {
             LLVMValueRef res =
@@ -944,15 +1034,20 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
-        match_types(builder, &lhs, &rhs);
+        match_types(builder, &lhs, node->lhs->type, &rhs, node->rhs->type);
         LLVMTypeKind k = LLVMGetTypeKind(LLVMTypeOf(lhs));
         if (k == LLVMDoubleTypeKind || k == LLVMFloatTypeKind) {
             LLVMValueRef res =
                 LLVMBuildFCmp(builder, LLVMRealOGE, lhs, rhs, "fcmptmp");
             return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
         }
-        LLVMValueRef res =
-            LLVMBuildICmp(builder, LLVMIntSGE, lhs, rhs, "getmp");
+        Type* common_ty = get_common_type(node->lhs->type, node->rhs->type);
+        LLVMValueRef res;
+        if (common_ty->is_unsigned) {
+            res = LLVMBuildICmp(builder, LLVMIntUGE, lhs, rhs, "ugetmp");
+        } else {
+            res = LLVMBuildICmp(builder, LLVMIntSGE, lhs, rhs, "getmp");
+        }
         return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
     }
     case ND_GT: {
@@ -960,15 +1055,20 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
-        match_types(builder, &lhs, &rhs);
+        match_types(builder, &lhs, node->lhs->type, &rhs, node->rhs->type);
         LLVMTypeKind k = LLVMGetTypeKind(LLVMTypeOf(lhs));
         if (k == LLVMDoubleTypeKind || k == LLVMFloatTypeKind) {
             LLVMValueRef res =
                 LLVMBuildFCmp(builder, LLVMRealOGT, lhs, rhs, "fcmptmp");
             return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
         }
-        LLVMValueRef res =
-            LLVMBuildICmp(builder, LLVMIntSGT, lhs, rhs, "gttmp");
+        Type* common_ty = get_common_type(node->lhs->type, node->rhs->type);
+        LLVMValueRef res;
+        if (common_ty->is_unsigned) {
+            res = LLVMBuildICmp(builder, LLVMIntUGT, lhs, rhs, "ugttmp");
+        } else {
+            res = LLVMBuildICmp(builder, LLVMIntSGT, lhs, rhs, "gttmp");
+        }
         return LLVMBuildZExt(builder, res, ty_i32(), "zexttmp");
     }
     case ND_CALL: {
@@ -988,14 +1088,17 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         // Generate argument values
         LLVMValueRef* args = NULL;
         LLVMTypeRef* param_types = NULL;
+        Node** arg_nodes = NULL;
         if (arg_count > 0) {
             args = malloc(arg_count * sizeof(LLVMValueRef));
             param_types = malloc(arg_count * sizeof(LLVMTypeRef));
+            arg_nodes = malloc(arg_count * sizeof(Node*));
             arg = node->lhs;
             for (int i = 0; i < arg_count; i++) {
                 args[i] = codegen(ctx, arg, builder, local_allocas, has_return,
                                   module);
                 param_types[i] = LLVMTypeOf(args[i]);
+                arg_nodes[i] = arg;
                 arg = arg->next;
             }
         }
@@ -1073,7 +1176,8 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
                     break;
 
                 LLVMTypeRef dest_ty = dest_param_types[i];
-                args[i] = cast_value(builder, args[i], dest_ty);
+                args[i] =
+                    cast_value(builder, args[i], arg_nodes[i]->type, dest_ty);
             }
             if (dest_param_types)
                 free(dest_param_types);
@@ -1093,6 +1197,8 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             free(args);
         if (param_types)
             free(param_types);
+        if (arg_nodes)
+            free(arg_nodes);
         return result;
     }
     case ND_PRE_INC:
@@ -1129,7 +1235,7 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         } else {
             // Integer arithmetic
             LLVMValueRef one = LLVMConstInt(ty_i32(), 1, 0);
-            match_types(builder, &old_val, &one);
+            match_types(builder, &old_val, node->lhs->type, &one, NULL);
             if (node->kind == ND_PRE_INC || node->kind == ND_POST_INC) {
                 new_val = LLVMBuildAdd(builder, old_val, one, "incdec.new");
             } else {
@@ -1553,7 +1659,8 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
     case ND_CAST: {
         LLVMValueRef val =
             codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
-        return cast_value(builder, val, to_llvm_type(node->type));
+        return cast_value(builder, val, node->lhs->type,
+                          to_llvm_type(node->type));
     }
     case ND_DECL: {
         if (node->init) {
@@ -1600,7 +1707,8 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
                         elem_ty = to_llvm_type(node->type->ptr_to);
                     }
 
-                    LLVMValueRef cast_val = cast_value(builder, val, elem_ty);
+                    LLVMValueRef cast_val =
+                        cast_value(builder, val, cur->type, elem_ty);
                     LLVMBuildStore(builder, cast_val, element_ptr);
                     cur = cur->next;
                     i++;
@@ -1608,8 +1716,8 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             } else {
                 LLVMValueRef val = codegen(ctx, node->init, builder,
                                            local_allocas, has_return, module);
-                LLVMValueRef cast_val =
-                    cast_value(builder, val, to_llvm_type(node->type));
+                LLVMValueRef cast_val = cast_value(
+                    builder, val, node->init->type, to_llvm_type(node->type));
                 LLVMBuildStore(builder, cast_val, alloca_ptr);
             }
         }
@@ -1622,7 +1730,8 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             // Verify return type matches function return type
             if (ctx->current_func_type) {
                 LLVMTypeRef func_ret_ty = to_llvm_type(ctx->current_func_type);
-                ret_val = cast_value(builder, ret_val, func_ret_ty);
+                ret_val =
+                    cast_value(builder, ret_val, node->lhs->type, func_ret_ty);
             }
             LLVMBuildRet(builder, ret_val);
         } else {
@@ -1746,7 +1855,8 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         LLVMPositionBuilderAtEnd(builder, end_bb);
 
         // Match types for PHI using the same promotion rules as binary ops.
-        match_types(builder, &then_val, &else_val);
+        match_types(builder, &then_val, node->lhs->type, &else_val,
+                    node->rhs->type);
         LLVMTypeRef then_ty = LLVMTypeOf(then_val);
 
         LLVMValueRef phi = LLVMBuildPhi(builder, then_ty, "ternary_res");

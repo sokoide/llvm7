@@ -206,3 +206,45 @@ char* test_lex_float() {
     free_tokens(head);
     return NULL;
 }
+
+char* test_lex_bitwise() {
+    Token* head = tokenize("& | ^ ~ << >> &= |= ^= <<= >>=");
+    Token* curr = head;
+
+    mu_assert("token should be &",
+              curr->kind == TK_RESERVED && strncmp(curr->str, "&", 1) == 0);
+    curr = curr->next;
+    mu_assert("token should be |",
+              curr->kind == TK_RESERVED && strncmp(curr->str, "|", 1) == 0);
+    curr = curr->next;
+    mu_assert("token should be ^",
+              curr->kind == TK_RESERVED && strncmp(curr->str, "^", 1) == 0);
+    curr = curr->next;
+    mu_assert("token should be ~",
+              curr->kind == TK_RESERVED && strncmp(curr->str, "~", 1) == 0);
+    curr = curr->next;
+    mu_assert("token should be <<",
+              curr->kind == TK_RESERVED && strncmp(curr->str, "<<", 2) == 0);
+    curr = curr->next;
+    mu_assert("token should be >>",
+              curr->kind == TK_RESERVED && strncmp(curr->str, ">>", 2) == 0);
+    curr = curr->next;
+    mu_assert("token should be &=",
+              curr->kind == TK_RESERVED && strncmp(curr->str, "&=", 2) == 0);
+    curr = curr->next;
+    mu_assert("token should be |=",
+              curr->kind == TK_RESERVED && strncmp(curr->str, "|=", 2) == 0);
+    curr = curr->next;
+    mu_assert("token should be ^=",
+              curr->kind == TK_RESERVED && strncmp(curr->str, "^=", 2) == 0);
+    curr = curr->next;
+    mu_assert("token should be <<=",
+              curr->kind == TK_RESERVED && strncmp(curr->str, "<<=", 3) == 0);
+    curr = curr->next;
+    mu_assert("token should be >>=",
+              curr->kind == TK_RESERVED && strncmp(curr->str, ">>=", 3) == 0);
+    curr = curr->next;
+
+    free_tokens(head);
+    return NULL;
+}

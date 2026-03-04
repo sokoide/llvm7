@@ -7,6 +7,10 @@
 static Node* parse_logor(Context* ctx);
 static Node* parse_conditional(Context* ctx);
 static Node* parse_logand(Context* ctx);
+static Node* parse_bit_or(Context* ctx);
+static Node* parse_bit_xor(Context* ctx);
+static Node* parse_bit_and(Context* ctx);
+static Node* parse_shift(Context* ctx);
 static Node* convert_array_to_ptr(Node* node);
 static Node* parse_unary_no_array_conv(Context* ctx);
 static EnumConst* find_enum_const(Context* ctx, Token* tok);
@@ -150,6 +154,45 @@ Node* new_node_fnum(double fval, Type* ty) {
     return node;
 }
 
+static int get_type_rank(Type* ty) {
+    if (ty->ty == DOUBLE)
+        return 100;
+    if (ty->ty == FLOAT)
+        return 90;
+    if (ty->ty == LONG)
+        return 80;
+    if (ty->ty == INT)
+        return 70;
+    if (ty->ty == CHAR)
+        return 60;
+    return 0;
+}
+
+Type* get_common_type(Type* ty1, Type* ty2) {
+    if (ty1->ty == PTR)
+        return ty1;
+    if (ty2->ty == PTR)
+        return ty2;
+
+    int r1 = get_type_rank(ty1);
+    int r2 = get_type_rank(ty2);
+
+    if (r1 > r2)
+        return ty1;
+    if (r2 > r1)
+        return ty2;
+
+    // Ranks are equal (same base type), check signedness
+    if (ty1->is_unsigned || ty2->is_unsigned) {
+        Type* res = calloc(1, sizeof(Type));
+        *res = *ty1; // Copy type
+        res->is_unsigned = true;
+        return res;
+    }
+
+    return ty1;
+}
+
 static EnumConst* find_enum_const(Context* ctx, Token* tok) {
     for (EnumConst* ec = ctx->enum_consts; ec; ec = ec->next) {
         if (ec->len == tok->len && strncmp(ec->name, tok->str, ec->len) == 0)
@@ -197,11 +240,20 @@ static StructTag* find_tag(Context* ctx, Token* tok) {
 // Try to parse a type, returns NULL if not a type
 Type* try_parse_type(Context* ctx) {
     // Skip common qualifiers
+    bool is_unsigned = false;
     bool has_qualifier = false;
-    while (consume(ctx, "const") || consume(ctx, "static") ||
-           consume(ctx, "extern") || consume(ctx, "signed") ||
-           consume(ctx, "unsigned")) {
-        has_qualifier = true;
+    while (1) {
+        if (consume(ctx, "const") || consume(ctx, "static") ||
+            consume(ctx, "extern") || consume(ctx, "signed")) {
+            has_qualifier = true;
+            continue;
+        }
+        if (consume(ctx, "unsigned")) {
+            is_unsigned = true;
+            has_qualifier = true;
+            continue;
+        }
+        break;
     }
 
     // Parse base type
@@ -230,6 +282,7 @@ Type* try_parse_type(Context* ctx) {
     } else if (consume(ctx, "size_t")) {
         base = calloc(1, sizeof(Type));
         base->ty = LONG;
+        base->is_unsigned = true;
     } else if (consume(ctx, "enum")) {
         // ... (keep rest of enum logic)
         consume_ident(ctx); // Ignore tag
@@ -330,6 +383,10 @@ Type* try_parse_type(Context* ctx) {
 
     if (base == NULL) {
         return NULL;
+    }
+
+    if (is_unsigned) {
+        base->is_unsigned = true;
     }
 
     // Parse pointers
@@ -899,10 +956,10 @@ static Node* parse_logor(Context* ctx) {
 
 // logand = equality ("&&" equality)*
 static Node* parse_logand(Context* ctx) {
-    Node* node = parse_equality(ctx);
+    Node* node = parse_bit_or(ctx);
     for (;;) {
         if (consume(ctx, "&&")) {
-            Node* rhs = parse_equality(ctx);
+            Node* rhs = parse_bit_or(ctx);
             node = new_node(ND_LOGAND, node, rhs);
             node->type = new_type_int();
         } else {
@@ -919,12 +976,8 @@ static Node* parse_conditional(Context* ctx) {
         ternary->lhs = parse_expr(ctx);
         expect(ctx, ":");
         ternary->rhs = parse_conditional(ctx);
-        // Type inference: use type of lhs (simplification)
-        if (ternary->lhs && ternary->lhs->type) {
-            ternary->type = ternary->lhs->type;
-        } else {
-            ternary->type = new_type_int();
-        }
+        // Type inference for ternary
+        ternary->type = get_common_type(ternary->lhs->type, ternary->rhs->type);
         return ternary;
     }
     return node;
@@ -959,12 +1012,75 @@ Node* parse_assign(Context* ctx) {
         node = new_node(ND_ASSIGN, lhs,
                         new_node(ND_DIV, lhs_copy,
                                  convert_array_to_ptr(parse_assign(ctx))));
+    } else if (consume(ctx, "&=")) {
+        Node* lhs = node;
+        Node* lhs_copy = clone_ast(lhs);
+        node = new_node(ND_ASSIGN, lhs,
+                        new_node(ND_BITAND, lhs_copy,
+                                 convert_array_to_ptr(parse_assign(ctx))));
+    } else if (consume(ctx, "|=")) {
+        Node* lhs = node;
+        Node* lhs_copy = clone_ast(lhs);
+        node = new_node(ND_ASSIGN, lhs,
+                        new_node(ND_BITOR, lhs_copy,
+                                 convert_array_to_ptr(parse_assign(ctx))));
+    } else if (consume(ctx, "^=")) {
+        Node* lhs = node;
+        Node* lhs_copy = clone_ast(lhs);
+        node = new_node(ND_ASSIGN, lhs,
+                        new_node(ND_BITXOR, lhs_copy,
+                                 convert_array_to_ptr(parse_assign(ctx))));
+    } else if (consume(ctx, "<<=")) {
+        Node* lhs = node;
+        Node* lhs_copy = clone_ast(lhs);
+        node = new_node(ND_ASSIGN, lhs,
+                        new_node(ND_SHL, lhs_copy,
+                                 convert_array_to_ptr(parse_assign(ctx))));
+    } else if (consume(ctx, ">>=")) {
+        Node* lhs = node;
+        Node* lhs_copy = clone_ast(lhs);
+        node = new_node(ND_ASSIGN, lhs,
+                        new_node(ND_SHR, lhs_copy,
+                                 convert_array_to_ptr(parse_assign(ctx))));
     }
 
     if (node && node->kind == ND_ASSIGN) {
         if (node->lhs) {
             node->type = node->lhs->type;
         }
+    }
+    return node;
+}
+
+static Node* parse_bit_or(Context* ctx) {
+    Node* node = parse_bit_xor(ctx);
+    while (consume(ctx, "|")) {
+        Node* lhs = convert_array_to_ptr(node);
+        Node* rhs = convert_array_to_ptr(parse_bit_xor(ctx));
+        node = new_node(ND_BITOR, lhs, rhs);
+        node->type = get_common_type(lhs->type, rhs->type);
+    }
+    return node;
+}
+
+static Node* parse_bit_xor(Context* ctx) {
+    Node* node = parse_bit_and(ctx);
+    while (consume(ctx, "^")) {
+        Node* lhs = convert_array_to_ptr(node);
+        Node* rhs = convert_array_to_ptr(parse_bit_and(ctx));
+        node = new_node(ND_BITXOR, lhs, rhs);
+        node->type = get_common_type(lhs->type, rhs->type);
+    }
+    return node;
+}
+
+static Node* parse_bit_and(Context* ctx) {
+    Node* node = parse_equality(ctx);
+    while (consume(ctx, "&")) {
+        Node* lhs = convert_array_to_ptr(node);
+        Node* rhs = convert_array_to_ptr(parse_equality(ctx));
+        node = new_node(ND_BITAND, lhs, rhs);
+        node->type = get_common_type(lhs->type, rhs->type);
     }
     return node;
 }
@@ -987,24 +1103,43 @@ Node* parse_equality(Context* ctx) {
 }
 
 Node* parse_relational(Context* ctx) {
-    Node* node = parse_add(ctx);
+    Node* node = parse_shift(ctx);
     while (1) {
         if (consume(ctx, "<=")) {
             node = new_node(ND_LE, convert_array_to_ptr(node),
-                            convert_array_to_ptr(parse_add(ctx)));
+                            convert_array_to_ptr(parse_shift(ctx)));
             node->type = new_type_int();
         } else if (consume(ctx, ">=")) {
             node = new_node(ND_GE, convert_array_to_ptr(node),
-                            convert_array_to_ptr(parse_add(ctx)));
+                            convert_array_to_ptr(parse_shift(ctx)));
             node->type = new_type_int();
         } else if (consume(ctx, "<")) {
             node = new_node(ND_LT, convert_array_to_ptr(node),
-                            convert_array_to_ptr(parse_add(ctx)));
+                            convert_array_to_ptr(parse_shift(ctx)));
             node->type = new_type_int();
         } else if (consume(ctx, ">")) {
             node = new_node(ND_GT, convert_array_to_ptr(node),
-                            convert_array_to_ptr(parse_add(ctx)));
+                            convert_array_to_ptr(parse_shift(ctx)));
             node->type = new_type_int();
+        } else {
+            return node;
+        }
+    }
+}
+
+static Node* parse_shift(Context* ctx) {
+    Node* node = parse_add(ctx);
+    for (;;) {
+        if (consume(ctx, "<<")) {
+            Node* lhs = convert_array_to_ptr(node);
+            Node* rhs = convert_array_to_ptr(parse_add(ctx));
+            node = new_node(ND_SHL, lhs, rhs);
+            node->type = lhs->type;
+        } else if (consume(ctx, ">>")) {
+            Node* lhs = convert_array_to_ptr(node);
+            Node* rhs = convert_array_to_ptr(parse_add(ctx));
+            node = new_node(ND_SHR, lhs, rhs);
+            node->type = lhs->type;
         } else {
             return node;
         }
@@ -1022,12 +1157,8 @@ Node* parse_add(Context* ctx) {
                 newNode->type = node->type;
             } else if (rhs->type && rhs->type->ty == PTR) {
                 newNode->type = rhs->type;
-            } else if (node->type && node->type->ty == DOUBLE) {
-                newNode->type = node->type;
-            } else if (rhs->type && rhs->type->ty == DOUBLE) {
-                newNode->type = rhs->type;
             } else {
-                newNode->type = new_type_int();
+                newNode->type = get_common_type(node->type, rhs->type);
             }
             node = newNode;
         } else if (consume(ctx, "-")) {
@@ -1036,12 +1167,8 @@ Node* parse_add(Context* ctx) {
             Node* newNode = new_node(ND_SUB, node, rhs);
             if (node->type && node->type->ty == PTR) {
                 newNode->type = node->type;
-            } else if (node->type && node->type->ty == DOUBLE) {
-                newNode->type = node->type;
-            } else if (rhs->type && rhs->type->ty == DOUBLE) {
-                newNode->type = rhs->type;
             } else {
-                newNode->type = new_type_int();
+                newNode->type = get_common_type(node->type, rhs->type);
             }
             node = newNode;
         } else {
@@ -1057,28 +1184,17 @@ Node* parse_mul(Context* ctx) {
             Node* lhs = convert_array_to_ptr(node);
             Node* rhs = convert_array_to_ptr(parse_unary(ctx));
             node = new_node(ND_MUL, lhs, rhs);
-            if (lhs->type && lhs->type->ty == DOUBLE) {
-                node->type = lhs->type;
-            } else if (rhs->type && rhs->type->ty == DOUBLE) {
-                node->type = rhs->type;
-            } else {
-                node->type = new_type_int();
-            }
+            node->type = get_common_type(lhs->type, rhs->type);
         } else if (consume(ctx, "/")) {
             Node* lhs = convert_array_to_ptr(node);
             Node* rhs = convert_array_to_ptr(parse_unary(ctx));
             node = new_node(ND_DIV, lhs, rhs);
-            if (lhs->type && lhs->type->ty == DOUBLE) {
-                node->type = lhs->type;
-            } else if (rhs->type && rhs->type->ty == DOUBLE) {
-                node->type = rhs->type;
-            } else {
-                node->type = new_type_int();
-            }
+            node->type = get_common_type(lhs->type, rhs->type);
         } else if (consume(ctx, "%")) {
-            node = new_node(ND_MOD, convert_array_to_ptr(node),
-                            convert_array_to_ptr(parse_unary(ctx)));
-            node->type = new_type_int();
+            Node* lhs = convert_array_to_ptr(node);
+            Node* rhs = convert_array_to_ptr(parse_unary(ctx));
+            node = new_node(ND_MOD, lhs, rhs);
+            node->type = get_common_type(lhs->type, rhs->type);
         } else {
             return node;
         }
@@ -1370,6 +1486,12 @@ Node* parse_unary(Context* ctx) {
         node->type = new_type_int();
         return node;
     }
+    if (consume(ctx, "~")) {
+        Node* operand = convert_array_to_ptr(parse_unary(ctx));
+        Node* node = new_node(ND_BITNOT, operand, NULL);
+        node->type = operand->type;
+        return node;
+    }
     return parse_postfix(ctx);
 }
 
@@ -1520,7 +1642,11 @@ Node* parse_primary(Context* ctx) {
                               is_single ? new_type_float() : new_type_double());
             ctx->current_token = ctx->current_token->next;
         } else {
+            Token* num_tok = ctx->current_token;
             num_node = new_node_num(expect_number(ctx));
+            if (num_tok->is_unsigned) {
+                num_node->type->is_unsigned = true;
+            }
         }
 
         // Check for [ after number

@@ -31,6 +31,7 @@ struct Token {
     int val;
     double fval;
     bool is_float;
+    bool is_unsigned;
     const char* str;
     int len;
     int line;
@@ -39,6 +40,7 @@ struct Token {
 
 struct Type {
     enum { INT, CHAR, VOID, PTR, STRUCT, LONG, DOUBLE, FLOAT } ty;
+    bool is_unsigned;
     struct Type* ptr_to;
     size_t array_size;
     struct Member* members; // For STRUCT
@@ -57,6 +59,12 @@ typedef enum {
     ND_NE,           // !=
     ND_GE,           // >=
     ND_GT,           // >
+    ND_BITAND,       // &
+    ND_BITOR,        // |
+    ND_BITXOR,       // ^
+    ND_BITNOT,       // ~
+    ND_SHL,          // <<
+    ND_SHR,          // >>
     ND_ASSIGN,       // = (assignment)
     ND_LVAR,         // local var
     ND_GVAR,         // global var

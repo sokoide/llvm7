@@ -51,11 +51,12 @@ int kw_len[31] = {6, 2, 4, 5, 3, 3, 4, 4, 6, 6, 7, 4, 6, 6, 5, 4,
                   4, 6, 4, 4, 5, 6, 4, 7, 5, 8, 8, 6, 6, 5, 2};
 int NUM_KEYWORDS = 31;
 
-char* three_char_ops[1] = {"..."};
-int NUM_THREE_CHAR_OPS = 1;
+char* three_char_ops[3] = {"...", "<<=", ">>="};
+int NUM_THREE_CHAR_OPS = 3;
 
-static char* two_char_ops[] = {"==", "!=", "<=", ">=", "&&", "||", "->",
-                               "++", "--", "+=", "-=", "*=", "/=", "<<"};
+static char* two_char_ops[] = {
+    "==", "!=", "<=", ">=", "&&", "||", "->", "++", "--",
+    "+=", "-=", "*=", "/=", "<<", ">>", "&=", "|=", "^="};
 
 static int NUM_TWO_CHAR_OPS = sizeof(two_char_ops) / sizeof(two_char_ops[0]);
 
@@ -214,7 +215,7 @@ Token* tokenize(const char* p) {
         }
 
         // Check for single-character operators and delimiters
-        char* single_char_ops = "+-*/()<>;={},&|[].!:=?%.\0";
+        char* single_char_ops = "+-*/()<>;={},&|[].!:=?%^~\0";
         if (strchr(single_char_ops, *p)) {
             cur = new_token_at(TK_RESERVED, cur, p, 1, source, p);
             p++;
@@ -325,6 +326,10 @@ Token* tokenize(const char* p) {
                 cur->fval = strtod(start, NULL);
             } else {
                 cur->fval = (double)cur->val;
+            }
+            if (*p == 'u' || *p == 'U') {
+                cur->is_unsigned = true;
+                p++;
             }
             continue;
         }

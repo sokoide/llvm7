@@ -1436,3 +1436,215 @@ char* test_generate_ternary_int_double_common_type() {
         return "Expected 2.5 (common type should be double)";
     return NULL;
 }
+
+char* test_generate_unsigned() {
+    // 4294967295u / 2u
+    {
+        Context ctx = {0};
+        Token* head =
+            tokenize("unsigned int main() { return 4294967295u / 2u; }");
+        ctx.current_token = head;
+        parse_program(&ctx);
+
+        LLVMModuleRef module = generate_module(&ctx);
+        LLVMLinkInMCJIT();
+        LLVMInitializeNativeTarget();
+        LLVMInitializeNativeAsmPrinter();
+
+        LLVMExecutionEngineRef engine;
+        char* error = NULL;
+        LLVMCreateExecutionEngineForModule(&engine, module, &error);
+        unsigned int (*main_func)() =
+            (unsigned int (*)(void))LLVMGetFunctionAddress(engine, "main");
+        unsigned int result = main_func();
+        LLVMDisposeExecutionEngine(engine);
+
+        for (int i = 0; i < ctx.node_count; i++)
+            free_ast(ctx.code[i]);
+        free_tokens(head);
+
+        if (result != 2147483647u)
+            return "Expected 2147483647u";
+    }
+
+    // -1 < 1u -> false (0)
+    {
+        Context ctx = {0};
+        Token* head = tokenize("int main() { return -1 < 1u; }");
+        ctx.current_token = head;
+        parse_program(&ctx);
+
+        LLVMModuleRef module = generate_module(&ctx);
+        LLVMLinkInMCJIT();
+        LLVMInitializeNativeTarget();
+        LLVMInitializeNativeAsmPrinter();
+
+        LLVMExecutionEngineRef engine;
+        char* error = NULL;
+        LLVMCreateExecutionEngineForModule(&engine, module, &error);
+        int (*main_func)() =
+            (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+        int result = main_func();
+        LLVMDisposeExecutionEngine(engine);
+
+        for (int i = 0; i < ctx.node_count; i++)
+            free_ast(ctx.code[i]);
+        free_tokens(head);
+
+        if (result != 0)
+            return "Expected -1 < 1u to be false (0)";
+    }
+
+    return NULL;
+}
+
+char* test_generate_bitwise() {
+    // 1 | 2 ^ 3 & 4
+    // 3 & 4 = 0
+    // 2 ^ 0 = 2
+    // 1 | 2 = 3
+    {
+        Context ctx = {0};
+        Token* head = tokenize("int main() { return 1 | 2 ^ 3 & 4; }");
+        ctx.current_token = head;
+        parse_program(&ctx);
+
+        LLVMModuleRef module = generate_module(&ctx);
+        LLVMLinkInMCJIT();
+        LLVMInitializeNativeTarget();
+        LLVMInitializeNativeAsmPrinter();
+
+        LLVMExecutionEngineRef engine;
+        char* error = NULL;
+        LLVMCreateExecutionEngineForModule(&engine, module, &error);
+        int (*main_func)() =
+            (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+        int result = main_func();
+        LLVMDisposeExecutionEngine(engine);
+
+        for (int i = 0; i < ctx.node_count; i++)
+            free_ast(ctx.code[i]);
+        free_tokens(head);
+
+        if (result != 3)
+            return "Expected 3 for bitwise precedence";
+    }
+
+    // Unary ~: ~0
+    {
+        Context ctx = {0};
+        Token* head = tokenize("int main() { return ~0; }");
+        ctx.current_token = head;
+        parse_program(&ctx);
+
+        LLVMModuleRef module = generate_module(&ctx);
+        LLVMLinkInMCJIT();
+        LLVMInitializeNativeTarget();
+        LLVMInitializeNativeAsmPrinter();
+
+        LLVMExecutionEngineRef engine;
+        char* error = NULL;
+        LLVMCreateExecutionEngineForModule(&engine, module, &error);
+        int (*main_func)() =
+            (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+        int result = main_func();
+        LLVMDisposeExecutionEngine(engine);
+
+        for (int i = 0; i < ctx.node_count; i++)
+            free_ast(ctx.code[i]);
+        free_tokens(head);
+
+        if (result != -1)
+            return "Expected -1 for ~0";
+    }
+
+    // Shift: 1 << 2 + 3 -> 1 << 5 = 32
+    {
+        Context ctx = {0};
+        Token* head = tokenize("int main() { return 1 << 2 + 3; }");
+        ctx.current_token = head;
+        parse_program(&ctx);
+
+        LLVMModuleRef module = generate_module(&ctx);
+        LLVMLinkInMCJIT();
+        LLVMInitializeNativeTarget();
+        LLVMInitializeNativeAsmPrinter();
+
+        LLVMExecutionEngineRef engine;
+        char* error = NULL;
+        LLVMCreateExecutionEngineForModule(&engine, module, &error);
+        int (*main_func)() =
+            (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+        int result = main_func();
+        LLVMDisposeExecutionEngine(engine);
+
+        for (int i = 0; i < ctx.node_count; i++)
+            free_ast(ctx.code[i]);
+        free_tokens(head);
+
+        if (result != 32)
+            return "Expected 32 for 1 << 2 + 3";
+    }
+
+    return NULL;
+}
+
+char* test_generate_compound_bitwise() {
+    // int x = 3; x &= 1; -> 1
+    {
+        Context ctx = {0};
+        Token* head = tokenize("int main() { int x = 3; x &= 1; return x; }");
+        ctx.current_token = head;
+        parse_program(&ctx);
+
+        LLVMModuleRef module = generate_module(&ctx);
+        LLVMLinkInMCJIT();
+        LLVMInitializeNativeTarget();
+        LLVMInitializeNativeAsmPrinter();
+
+        LLVMExecutionEngineRef engine;
+        char* error = NULL;
+        LLVMCreateExecutionEngineForModule(&engine, module, &error);
+        int (*main_func)() =
+            (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+        int result = main_func();
+        LLVMDisposeExecutionEngine(engine);
+
+        for (int i = 0; i < ctx.node_count; i++)
+            free_ast(ctx.code[i]);
+        free_tokens(head);
+
+        if (result != 1)
+            return "Expected 1 for 3 &= 1";
+    }
+
+    // int x = 1; x <<= 2; -> 4
+    {
+        Context ctx = {0};
+        Token* head = tokenize("int main() { int x = 1; x <<= 2; return x; }");
+        ctx.current_token = head;
+        parse_program(&ctx);
+
+        LLVMModuleRef module = generate_module(&ctx);
+        LLVMLinkInMCJIT();
+        LLVMInitializeNativeTarget();
+        LLVMInitializeNativeAsmPrinter();
+
+        LLVMExecutionEngineRef engine;
+        char* error = NULL;
+        LLVMCreateExecutionEngineForModule(&engine, module, &error);
+        int (*main_func)() =
+            (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+        int result = main_func();
+        LLVMDisposeExecutionEngine(engine);
+
+        for (int i = 0; i < ctx.node_count; i++)
+            free_ast(ctx.code[i]);
+        free_tokens(head);
+
+        if (result != 4)
+            return "Expected 4 for 1 <<= 2";
+    }
+
+    return NULL;
+}

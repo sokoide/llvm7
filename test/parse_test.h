@@ -70,5 +70,9 @@ char* test_scope_depth_is_context_local();
 char* test_parse_double();
 char* test_parse_float();
 char* test_parse_do_while();
+char* test_parse_uac();
+char* test_parse_bitwise();
+char* test_parse_shift();
+char* test_parse_compound_bitwise();
 
 #endif
