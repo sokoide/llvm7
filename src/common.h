@@ -156,6 +156,7 @@ struct Node {
     bool is_default;  // for ND_DEFAULT
     bool is_do_while; // for ND_WHILE: distinguish do-while from while
     bool is_extern;   // for extern global var
+    bool is_vla;      // for ND_DECL: variable-length array declaration
     bool is_variadic; // for ND_FUNCTION: variadic function
     bool is_vararg;   // Variadic function default: false
     void* llvm_label; // LLVMBasicBlockRef for ND_CASE/ND_BREAK/etc.

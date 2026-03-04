@@ -1872,3 +1872,31 @@ char* test_generate_complex_basic() {
         return "Expected 3 for basic _Complex handling";
     return NULL;
 }
+
+char* test_generate_vla_basic() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { int n = 3; int a[n]; a[0] = 7; a[2] = "
+                           "5; return a[0] + a[2]; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    LLVMExecutionEngineRef engine;
+    char* error = NULL;
+    LLVMCreateExecutionEngineForModule(&engine, module, &error);
+    int (*main_func)() = (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+    int result = main_func();
+    LLVMDisposeExecutionEngine(engine);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+
+    if (result != 12)
+        return "Expected 12 for VLA basic usage";
+    return NULL;
+}

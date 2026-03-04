@@ -922,14 +922,24 @@ Node* parse_declaration(Context* ctx, Type* ty) {
         exit(1);
     }
 
-    // Check for array definitions (e.g., int a[10], char x[3], int y[])
+    Node* vla_size = NULL;
+    // Check for array definitions (e.g., int a[10], char x[3], int y[], int
+    // vla[n])
     if (consume(ctx, "[")) {
-        int size = 0;
         if (!consume(ctx, "]")) {
-            size = expect_const_int(ctx);
+            vla_size = parse_expr(ctx);
             expect(ctx, "]");
+            if (vla_size && vla_size->kind == ND_NUM) {
+                int size = vla_size->val;
+                ty = new_type_array(ty, size);
+                vla_size = NULL;
+            } else {
+                // Runtime-sized local array is represented as pointer variable.
+                ty = new_type_ptr(ty);
+            }
+        } else {
+            ty = new_type_array(ty, 0);
         }
-        ty = new_type_array(ty, size);
     }
 
     // Add variable to locals
@@ -938,8 +948,16 @@ Node* parse_declaration(Context* ctx, Type* ty) {
     node->tok = tok;
     node->val = lvar->offset;
     node->type = ty;
+    if (vla_size) {
+        node->is_vla = true;
+        node->rhs = vla_size;
+    }
 
     if (consume(ctx, "=")) {
+        if (node->is_vla) {
+            fprintf(stderr, "VLA initializer is not supported\n");
+            exit(1);
+        }
         if (ctx->current_token->kind == TK_RESERVED &&
             ctx->current_token->len == 1 && ctx->current_token->str[0] == '{') {
             node->init = parse_initializer(ctx, ty);

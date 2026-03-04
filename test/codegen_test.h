@@ -76,5 +76,6 @@ char* test_generate_designated_initializer_struct();
 char* test_generate_long_double();
 char* test_generate_scalar_compound_literal();
 char* test_generate_complex_basic();
+char* test_generate_vla_basic();
 
 #endif

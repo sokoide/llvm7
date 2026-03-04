@@ -1812,6 +1812,34 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
                           to_llvm_type(node->type));
     }
     case ND_DECL: {
+        if (node->is_vla) {
+            if (node->val < 0 || node->val >= 1024) {
+                fprintf(stderr, "ND_DECL(VLA): node->val %d out of bounds\n",
+                        node->val);
+                exit(1);
+            }
+            LLVMValueRef slot_ptr = local_allocas[node->val];
+            if (!slot_ptr) {
+                fprintf(stderr, "ND_DECL(VLA): local slot is NULL\n");
+                exit(1);
+            }
+            LLVMValueRef count = codegen(ctx, node->rhs, builder, local_allocas,
+                                         has_return, module);
+            LLVMTypeRef count_ty = LLVMTypeOf(count);
+            if (LLVMGetTypeKind(count_ty) != LLVMIntegerTypeKind) {
+                count = LLVMBuildFPToSI(builder, count, ty_i64(), "vla_fp2int");
+            } else if (LLVMGetIntTypeWidth(count_ty) < 64) {
+                count = LLVMBuildSExt(builder, count, ty_i64(), "vla_sext");
+            } else if (LLVMGetIntTypeWidth(count_ty) > 64) {
+                count = LLVMBuildTrunc(builder, count, ty_i64(), "vla_trunc");
+            }
+            LLVMTypeRef elem_ty = to_llvm_type(node->type->ptr_to);
+            LLVMValueRef arr_ptr =
+                LLVMBuildArrayAlloca(builder, elem_ty, count, "vla_alloca");
+            LLVMBuildStore(builder, arr_ptr, slot_ptr);
+            return LLVMConstInt(ty_i32(), 0, 0);
+        }
+
         if (node->init) {
             if (node->val < 0 || node->val >= 1024) {
                 fprintf(stderr, "ND_DECL: node->val %d out of bounds\n",

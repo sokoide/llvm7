@@ -1465,3 +1465,24 @@ char* test_parse_complex_decl() {
     free_tokens(tok);
     return NULL;
 }
+
+char* test_parse_vla_decl() {
+    Context ctx = {0};
+    Token* tok = tokenize("int n = 3; int a[n];");
+    ctx.current_token = tok;
+
+    Node* n_decl = parse_stmt(&ctx);
+    Node* a_decl = parse_stmt(&ctx);
+
+    mu_assert("n decl should be ND_DECL", n_decl->kind == ND_DECL);
+    mu_assert("a decl should be ND_DECL", a_decl->kind == ND_DECL);
+    mu_assert("a should be marked VLA", a_decl->is_vla);
+    mu_assert("a VLA size expression should exist", a_decl->rhs != NULL);
+    mu_assert("a type should be pointer for runtime VLA",
+              a_decl->type && a_decl->type->ty == PTR);
+
+    free_ast(n_decl);
+    free_ast(a_decl);
+    free_tokens(tok);
+    return NULL;
+}
