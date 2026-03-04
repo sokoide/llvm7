@@ -230,11 +230,59 @@ static int find_param_index(Macro* m, const char* name, size_t len) {
     return -1;
 }
 
+static void sb_append_escaped_quoted(StrBuf* out, const char* s) {
+    sb_append_c(out, '"');
+    for (const char* p = s; *p; p++) {
+        if (*p == '\\' || *p == '"')
+            sb_append_c(out, '\\');
+        sb_append_c(out, *p);
+    }
+    sb_append_c(out, '"');
+}
+
+static void trim_trailing_space(StrBuf* out) {
+    while (out->len > 0) {
+        char c = out->data[out->len - 1];
+        if (c == ' ' || c == '\t') {
+            out->len--;
+            out->data[out->len] = '\0';
+            continue;
+        }
+        break;
+    }
+}
+
 static char* expand_function_macro(Macro* m, char** args, int argc) {
     StrBuf out;
     sb_init(&out);
     const char* p = m->value;
     while (*p) {
+        if (*p == '#' && p[1] == '#') {
+            // Token pasting: remove previous trailing spaces and suppress
+            // following spaces.
+            trim_trailing_space(&out);
+            p += 2;
+            while (*p == ' ' || *p == '\t')
+                p++;
+            continue;
+        }
+        if (*p == '#') {
+            const char* q = p + 1;
+            while (*q == ' ' || *q == '\t')
+                q++;
+            if (is_ident_start(*q)) {
+                const char* start = q;
+                while (is_ident_char(*q))
+                    q++;
+                size_t len = (size_t)(q - start);
+                int idx = find_param_index(m, start, len);
+                if (idx >= 0 && idx < argc) {
+                    sb_append_escaped_quoted(&out, args[idx]);
+                    p = q;
+                    continue;
+                }
+            }
+        }
         if (is_ident_start(*p)) {
             const char* start = p;
             while (is_ident_char(*p))

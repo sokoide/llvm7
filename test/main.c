@@ -237,6 +237,8 @@ static char* run_all_tests() {
     mu_run_test(test_preprocess_function_macro_and_undef,
                 "preprocess: function macro and undef");
     mu_run_test(test_preprocess_pragma_ignored, "preprocess: pragma ignored");
+    mu_run_test(test_preprocess_stringification, "preprocess: stringification");
+    mu_run_test(test_preprocess_token_pasting, "preprocess: token pasting");
     return NULL;
 }
 

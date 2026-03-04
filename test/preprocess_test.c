@@ -155,3 +155,24 @@ char* test_preprocess_pragma_ignored() {
     free(output);
     return NULL;
 }
+
+char* test_preprocess_stringification() {
+    const char* input = "#define STR(x) #x\n"
+                        "char* s = STR(hello world);\n";
+    char* output = preprocess(input, "str.c");
+    mu_assert("stringification should quote argument",
+              strstr(output, "char* s = \"hello world\";") != NULL);
+    free(output);
+    return NULL;
+}
+
+char* test_preprocess_token_pasting() {
+    const char* input = "#define CAT(a,b) a##b\n"
+                        "int foobar = 7;\n"
+                        "int x = CAT(foo,bar);\n";
+    char* output = preprocess(input, "paste.c");
+    mu_assert("token pasting should concatenate identifiers",
+              strstr(output, "int x = foobar;") != NULL);
+    free(output);
+    return NULL;
+}
