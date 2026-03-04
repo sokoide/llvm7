@@ -1789,3 +1789,31 @@ char* test_generate_designated_initializer_struct() {
         return "Expected 7 for designated struct initializer";
     return NULL;
 }
+
+char* test_generate_long_double() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { long double x = 1.5; long double y = "
+                           "2.25; return (int)(x + y); }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    LLVMExecutionEngineRef engine;
+    char* error = NULL;
+    LLVMCreateExecutionEngineForModule(&engine, module, &error);
+    int (*main_func)() = (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+    int result = main_func();
+    LLVMDisposeExecutionEngine(engine);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+
+    if (result != 3)
+        return "Expected 3 for long double arithmetic";
+    return NULL;
+}

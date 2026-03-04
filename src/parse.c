@@ -275,9 +275,14 @@ Type* try_parse_type(Context* ctx) {
         base = calloc(1, sizeof(Type));
         base->ty = VOID;
     } else if (consume(ctx, "long")) {
-        consume(ctx, "long"); // Support 'long long'
-        base = calloc(1, sizeof(Type));
-        base->ty = LONG;
+        if (consume(ctx, "double")) {
+            // Treat long double as double in current backend.
+            base = new_type_double();
+        } else {
+            consume(ctx, "long"); // Support 'long long'
+            base = calloc(1, sizeof(Type));
+            base->ty = LONG;
+        }
     } else if (consume(ctx, "_Bool") || consume(ctx, "bool") ||
                (ctx->current_token->kind == TK_IDENT &&
                 ctx->current_token->len == 4 &&

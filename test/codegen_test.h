@@ -73,5 +73,6 @@ char* test_generate_bitfield_access();
 char* test_generate_goto_label();
 char* test_generate_designated_initializer_array();
 char* test_generate_designated_initializer_struct();
+char* test_generate_long_double();
 
 #endif

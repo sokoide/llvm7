@@ -131,10 +131,11 @@ clang demo/stdio.s -o demo/stdio -lc
 - プリプロセッサ（`#include`、`#define`、関数形式マクロ、`#undef`、`#ifdef`/`#ifndef`/`#if`/`#elif`/`#else`/`#endif`、`#pragma` 無視、`#error`）。
 - ビットフィールド宣言（現在の実装ではビット単位パッキングは未対応で、独立メンバとして扱います）。
 - 指定イニシャライザ（配列の `[index] = value`、構造体の `.member = value`）。
+- `long double`（現状は `double` と同等精度で処理）。
 
 ## C99未実装（優先度4以降）
 
-- `long double`、`_Complex`、可変長配列 (VLA)。
+- `_Complex`、可変長配列 (VLA)。
 - 複合リテラル。
 - `switch` の一部高度ケース、関数ポインタの複雑な宣言・呼び出し。
 - プリプロセッサの高度機能（`##`、`#`、再帰展開の完全互換など）。
