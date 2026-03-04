@@ -1900,3 +1900,31 @@ char* test_generate_vla_basic() {
         return "Expected 12 for VLA basic usage";
     return NULL;
 }
+
+char* test_generate_adjacent_string_literals() {
+    Context ctx = {0};
+    Token* head = tokenize(
+        "int main() { char* s = \"foo\" \"bar\"; return s[0] + s[5]; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    LLVMExecutionEngineRef engine;
+    char* error = NULL;
+    LLVMCreateExecutionEngineForModule(&engine, module, &error);
+    int (*main_func)() = (int (*)(void))LLVMGetFunctionAddress(engine, "main");
+    int result = main_func();
+    LLVMDisposeExecutionEngine(engine);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+
+    if (result != ('f' + 'r'))
+        return "Expected 'f'+'r' for adjacent string literals";
+    return NULL;
+}

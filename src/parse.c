@@ -1799,12 +1799,30 @@ Node* parse_primary(Context* ctx) {
 
     // String literal
     if (ctx->current_token->kind == TK_STR) {
-        Token* tok = ctx->current_token;
-        ctx->current_token = ctx->current_token->next;
+        int total_len = 0;
+        Token* t = ctx->current_token;
+        while (t && t->kind == TK_STR) {
+            total_len += t->len;
+            t = t->next;
+        }
+
+        char* merged = calloc((size_t)total_len + 1, 1);
+        if (!merged) {
+            perror("calloc");
+            exit(1);
+        }
+        int off = 0;
+        while (ctx->current_token->kind == TK_STR) {
+            Token* tok = ctx->current_token;
+            memcpy(merged + off, tok->str, (size_t)tok->len);
+            off += tok->len;
+            ctx->current_token = ctx->current_token->next;
+        }
+
         // Add string to context's string vector
         int idx = ctx->string_count++;
-        ctx->strings[idx] = tok->str;
-        ctx->string_lens[idx] = tok->len;
+        ctx->strings[idx] = merged;
+        ctx->string_lens[idx] = total_len;
         // Create ND_STR node
         Node* node = calloc(1, sizeof(Node));
         node->kind = ND_STR;

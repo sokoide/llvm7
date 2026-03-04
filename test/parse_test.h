@@ -83,5 +83,6 @@ char* test_parse_long_double_decl();
 char* test_parse_scalar_compound_literal();
 char* test_parse_complex_decl();
 char* test_parse_vla_decl();
+char* test_parse_adjacent_string_literals();
 
 #endif

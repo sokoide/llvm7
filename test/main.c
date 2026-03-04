@@ -94,6 +94,8 @@ static char* run_all_tests() {
                 "codegen: scalar compound literal");
     mu_run_test(test_generate_complex_basic, "codegen: complex basic");
     mu_run_test(test_generate_vla_basic, "codegen: vla basic");
+    mu_run_test(test_generate_adjacent_string_literals,
+                "codegen: adjacent string literals");
     mu_run_test(test_read_file_success, "file: read_file success");
     mu_run_test(test_read_file_not_found, "file: read_file not found");
     mu_run_test(test_lex_tokenize, "lex: tokenize");
@@ -199,6 +201,8 @@ static char* run_all_tests() {
                 "parse: scalar compound literal");
     mu_run_test(test_parse_complex_decl, "parse: complex decl");
     mu_run_test(test_parse_vla_decl, "parse: vla decl");
+    mu_run_test(test_parse_adjacent_string_literals,
+                "parse: adjacent string literals");
     mu_run_test(test_preprocess_noop, "preprocess: no-op");
     mu_run_test(test_preprocess_include, "preprocess: include");
     mu_run_test(test_preprocess_define, "preprocess: define");

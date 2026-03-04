@@ -1486,3 +1486,22 @@ char* test_parse_vla_decl() {
     free_tokens(tok);
     return NULL;
 }
+
+char* test_parse_adjacent_string_literals() {
+    Context ctx = {0};
+    Token* tok = tokenize("char* s = \"foo\" \"bar\";");
+    ctx.current_token = tok;
+    Node* node = parse_stmt(&ctx);
+
+    mu_assert("node should be ND_DECL", node->kind == ND_DECL);
+    mu_assert("initializer should be ND_STR",
+              node->init && node->init->kind == ND_STR);
+    mu_assert("one string should be recorded", ctx.string_count == 1);
+    mu_assert("concatenated length should be 6", ctx.string_lens[0] == 6);
+    mu_assert("concatenated content should be foobar",
+              strncmp(ctx.strings[0], "foobar", 6) == 0);
+
+    free_ast(node);
+    free_tokens(tok);
+    return NULL;
+}
