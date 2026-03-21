@@ -43,7 +43,7 @@ struct Token {
 };
 
 struct Type {
-    enum { INT, CHAR, VOID, PTR, STRUCT, UNION, LONG, DOUBLE, FLOAT } ty;
+    enum { INT, CHAR, VOID, PTR, STRUCT, UNION, LONG, DOUBLE, FLOAT, BOOL } ty;
     bool is_unsigned;
     struct Type* ptr_to;
     size_t array_size;

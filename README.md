@@ -119,7 +119,8 @@ clang demo/stdio.s -o demo/stdio -lc
 
 ## サポートされている C の機能
 
-- `int`/`char`/`float`/`double`/`long`/`void` と、`unsigned`/`signed`、`const`/`volatile`/`restrict`/`inline`/`register`/`_Bool` などのキーワード認識。
+- `int`/`char`/`float`/`double`/`long`/`void`/`_Bool` と、`unsigned`/`signed`、`const`/`volatile`/`restrict`/`inline`/`register` などの型・修飾子のサポート（`_Bool` は 1 バイトで 0/1 への正規化変換に対応）。
+- `<stdbool.h>` による `bool`, `true`, `false` の提供。
 - ポインタ・配列・構造体・`union`・列挙型の定義・代入・読み出し。
 - グローバル変数とローカル変数。ローカルはスタックに `alloca` し、初期化式は `=` または配列リテラルで記述可。
 - 制御構文: `if`、`else`、`while`、`for`、`return`、`break`、`continue`。入れ子構造とブロック `{}` に対応。
@@ -139,8 +140,12 @@ clang demo/stdio.s -o demo/stdio -lc
 
 ## C99未実装
 
-- 可変長配列 (VLA) の高度ケース（多次元、初期化子）。
-- `switch` の一部高度ケース、関数ポインタの複雑な宣言・呼び出し（多段ネスト、可変引数絡みなど）。
-- プリプロセッサの高度機能（`##`、`#`、再帰展開の完全互換など）。
-- ビットフィールドの厳密なABI互換パッキング/符号拡張。
-- 標準ライブラリのヘッダ全体は含まれず、必要なら `selfhost/include` 以下のミニマルな宣言を使って手動で補ってください。
+- **`long long` の厳密な区別**: 現在 `long long` は `long` と同じ 64 ビット型として処理されています。
+- **`__func__` 予約識別子**: 関数内でその関数名を表す `__func__` が未実装です。
+- **フレキシブル配列メンバ**: 構造体の最後のメンバとしての `int a[];` 形式が未実装です。
+- **可変長配列 (VLA) の高度ケース**: 多次元配列、初期化子、および関数引数における `static` 修飾などが未実装です。
+- **`inline` および `restrict` 修飾子**: キーワードは認識しますが、セマンティクス（最適化ヒントなど）は LLVM に渡されていません。
+- **複素数型 (`_Complex`, `_Imaginary`)**: 現在は実数部のみを処理する不完全な実装です。
+- **16進浮動小数点定数**: `0x1.p+3` のような形式のパースが未実装です。
+- **`_Pragma` 演算子**: `#pragma` 指示文は無視されますが、演算子形式の `_Pragma` は未実装です。
+- **標準ライブラリの不完全性**: `<complex.h>`, `<tgmath.h>`, `<fenv.h>` などのヘッダや機能が不足しています。

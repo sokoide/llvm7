@@ -70,6 +70,7 @@ extern Node* parse_params(Context* ctx, bool* is_vararg);
 extern Type* parse_type(Context* ctx);
 extern Type* try_parse_type(Context* ctx);
 extern Type* new_type_int(void);
+extern Type* new_type_bool(void);
 extern Type* new_type_char(void);
 extern Type* new_type_double(void);
 extern Type* new_type_float(void);

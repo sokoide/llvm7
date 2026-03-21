@@ -106,6 +106,7 @@ static char* run_all_tests() {
                 "codegen: sizeof vla runtime");
     mu_run_test(test_generate_function_pointer_basic,
                 "codegen: function pointer basic");
+    mu_run_test(test_generate_bool_basic, "codegen: bool basic");
     mu_run_test(test_read_file_success, "file: read_file success");
     mu_run_test(test_read_file_not_found, "file: read_file not found");
     mu_run_test(test_lex_tokenize, "lex: tokenize");

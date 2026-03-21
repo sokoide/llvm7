@@ -155,6 +155,14 @@ Type* new_type_char(void) {
     return t;
 }
 
+// Helper to create a new bool type
+Type* new_type_bool(void) {
+    Type* t = calloc(1, sizeof(Type));
+    t->ty = BOOL;
+    t->ptr_to = NULL;
+    return t;
+}
+
 // Helper to create a new int type
 Type* new_type_int(void) {
     Type* t = calloc(1, sizeof(Type));
@@ -215,6 +223,8 @@ static int get_type_rank(Type* ty) {
         return 70;
     if (ty->ty == CHAR)
         return 60;
+    if (ty->ty == BOOL)
+        return 50;
     return 0;
 }
 
@@ -346,7 +356,7 @@ Type* try_parse_type(Context* ctx) {
                 ctx->current_token->len == 4 &&
                 strncmp(ctx->current_token->str, "bool", 4) == 0)) {
         consume(ctx, "bool");
-        base = new_type_int();
+        base = new_type_bool();
     } else if (consume(ctx, "size_t")) {
         base = calloc(1, sizeof(Type));
         base->ty = LONG;
@@ -1501,6 +1511,8 @@ static int type_align(Type* ty) {
         return 4;
     if (ty->ty == CHAR)
         return 1;
+    if (ty->ty == BOOL)
+        return 1;
     if (ty->ty == INT)
         return 4;
     if (ty->ty == FLOAT)
@@ -1541,6 +1553,8 @@ static int type_size(Type* ty) {
         return type_size(ty->ptr_to) * ty->array_size;
 
     if (ty->ty == CHAR)
+        return 1;
+    if (ty->ty == BOOL)
         return 1;
     if (ty->ty == INT)
         return 4;

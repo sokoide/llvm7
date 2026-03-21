@@ -100,6 +100,7 @@ static int codegen_type_size(Type* ty) {
         return codegen_type_size(ty->ptr_to) * (int)ty->array_size;
     switch (ty->ty) {
     case CHAR:
+    case BOOL:
         return 1;
     case INT:
     case FLOAT:
@@ -145,6 +146,9 @@ static LLVMTypeRef to_llvm_type(Type* ty) {
         return ty_void();
     }
     if (ty->ty == CHAR) {
+        return ty_i8();
+    }
+    if (ty->ty == BOOL) {
         return ty_i8();
     }
     if (ty->ty == LONG) {
@@ -272,8 +276,31 @@ static void match_types(LLVMBuilderRef builder, LLVMValueRef* lhs, Type* lty_c,
     }
 }
 
+static LLVMValueRef convert_to_bool(LLVMBuilderRef builder, LLVMValueRef val) {
+    LLVMTypeRef ty = LLVMTypeOf(val);
+    LLVMTypeKind kind = LLVMGetTypeKind(ty);
+    if (kind == LLVMPointerTypeKind) {
+        return LLVMBuildIsNotNull(builder, val, "ptr_bool");
+    }
+    if (kind == LLVMIntegerTypeKind) {
+        LLVMValueRef zero = LLVMConstInt(ty, 0, false);
+        return LLVMBuildICmp(builder, LLVMIntNE, val, zero, "int_bool");
+    }
+    if (kind == LLVMFloatTypeKind || kind == LLVMDoubleTypeKind) {
+        LLVMValueRef zero = LLVMConstReal(ty, 0.0);
+        return LLVMBuildFCmp(builder, LLVMRealUNE, val, zero, "float_bool");
+    }
+    return val;
+}
+
 static LLVMValueRef cast_value(LLVMBuilderRef builder, LLVMValueRef val,
-                               Type* src_ty_c, LLVMTypeRef dest_ty) {
+                               Type* src_ty_c, LLVMTypeRef dest_ty,
+                               Type* dest_ty_c) {
+    if (dest_ty_c && dest_ty_c->ty == BOOL) {
+        LLVMValueRef b = convert_to_bool(builder, val);
+        return LLVMBuildZExt(builder, b, to_llvm_type(dest_ty_c), "bool_to_i8");
+    }
+
     LLVMTypeRef src_ty = LLVMTypeOf(val);
     if (src_ty == dest_ty)
         return val;
@@ -323,19 +350,6 @@ static LLVMValueRef cast_value(LLVMBuilderRef builder, LLVMValueRef val,
     }
     if (dest_kind == LLVMPointerTypeKind && src_kind == LLVMPointerTypeKind) {
         return LLVMBuildBitCast(builder, val, dest_ty, "cast_bitcast");
-    }
-    return val;
-}
-
-// Helper to convert value to i1 boolean for conditions
-static LLVMValueRef convert_to_bool(LLVMBuilderRef builder, LLVMValueRef val) {
-    LLVMTypeRef ty = LLVMTypeOf(val);
-    if (LLVMGetTypeKind(ty) == LLVMPointerTypeKind) {
-        return LLVMBuildIsNotNull(builder, val, "ptr_bool");
-    }
-    if (LLVMGetTypeKind(ty) == LLVMIntegerTypeKind) {
-        LLVMValueRef zero = LLVMConstInt(ty, 0, false);
-        return LLVMBuildICmp(builder, LLVMIntNE, val, zero, "int_bool");
     }
     return val;
 }
@@ -910,8 +924,9 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         LLVMValueRef rhs =
             codegen(ctx, node->rhs, builder, local_allocas, has_return, module);
 
-        LLVMValueRef store_val = cast_value(builder, rhs, node->rhs->type,
-                                            to_llvm_type(node->lhs->type));
+        LLVMValueRef store_val =
+            cast_value(builder, rhs, node->rhs->type,
+                       to_llvm_type(node->lhs->type), node->lhs->type);
 
         if (node->lhs->kind == ND_DEREF) {
             // *ptr = value - store through pointer
@@ -1354,8 +1369,8 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
                     break;
 
                 LLVMTypeRef dest_ty = dest_param_types[i];
-                args[i] =
-                    cast_value(builder, args[i], arg_nodes[i]->type, dest_ty);
+                args[i] = cast_value(builder, args[i], arg_nodes[i]->type,
+                                     dest_ty, NULL);
             }
             if (dest_param_types)
                 free(dest_param_types);
@@ -1836,9 +1851,10 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
                         Member* m = node->lhs->type->members;
                         for (int j = 0; j < i && m; j++)
                             m = m->next;
-                        LLVMTypeRef mty = to_llvm_type(m ? m->type : NULL);
+                        Type* mty_c = m ? m->type : NULL;
+                        LLVMTypeRef mty = to_llvm_type(mty_c);
                         LLVMValueRef cast_val =
-                            cast_value(builder, val, cur->type, mty);
+                            cast_value(builder, val, cur->type, mty, mty_c);
                         LLVMBuildStore(builder, cast_val, mptr);
                         cur = cur->next;
                         i++;
@@ -1866,9 +1882,10 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
                         LLVMValueRef eptr =
                             LLVMBuildInBoundsGEP2(builder, lit_ty, tmp_ptr,
                                                   indices, 2, "compound_agep");
-                        LLVMTypeRef ety = to_llvm_type(node->lhs->type->ptr_to);
+                        Type* ety_c = node->lhs->type->ptr_to;
+                        LLVMTypeRef ety = to_llvm_type(ety_c);
                         LLVMValueRef cast_val =
-                            cast_value(builder, val, cur->type, ety);
+                            cast_value(builder, val, cur->type, ety, ety_c);
                         LLVMBuildStore(builder, cast_val, eptr);
                         cur = cur->next;
                         i++;
@@ -1950,7 +1967,7 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         LLVMValueRef val =
             codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
         return cast_value(builder, val, node->lhs->type,
-                          to_llvm_type(node->type));
+                          to_llvm_type(node->type), node->type);
     }
     case ND_DECL: {
         if (node->is_vla) {
@@ -2007,6 +2024,7 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
                                                has_return, module);
                     LLVMValueRef element_ptr;
                     LLVMTypeRef elem_ty;
+                    Type* elem_ty_c;
 
                     if (node->type->ty == STRUCT) {
                         element_ptr = LLVMBuildStructGEP2(
@@ -2015,18 +2033,20 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
                         Member* m = node->type->members;
                         for (int j = 0; j < i && m; j++)
                             m = m->next;
-                        elem_ty = to_llvm_type(m ? m->type : NULL);
+                        elem_ty_c = m ? m->type : NULL;
+                        elem_ty = to_llvm_type(elem_ty_c);
                     } else {
                         LLVMValueRef indices[] = {LLVMConstInt(ty_i32(), 0, 0),
                                                   LLVMConstInt(ty_i32(), i, 0)};
                         element_ptr =
                             LLVMBuildInBoundsGEP2(builder, var_type, alloca_ptr,
                                                   indices, 2, "init_agep");
-                        elem_ty = to_llvm_type(node->type->ptr_to);
+                        elem_ty_c = node->type->ptr_to;
+                        elem_ty = to_llvm_type(elem_ty_c);
                     }
 
                     LLVMValueRef cast_val =
-                        cast_value(builder, val, cur->type, elem_ty);
+                        cast_value(builder, val, cur->type, elem_ty, elem_ty_c);
                     LLVMBuildStore(builder, cast_val, element_ptr);
                     cur = cur->next;
                     i++;
@@ -2034,8 +2054,9 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             } else {
                 LLVMValueRef val = codegen(ctx, node->init, builder,
                                            local_allocas, has_return, module);
-                LLVMValueRef cast_val = cast_value(
-                    builder, val, node->init->type, to_llvm_type(node->type));
+                LLVMValueRef cast_val =
+                    cast_value(builder, val, node->init->type,
+                               to_llvm_type(node->type), node->type);
                 LLVMBuildStore(builder, cast_val, alloca_ptr);
             }
         }
@@ -2048,8 +2069,8 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             // Verify return type matches function return type
             if (ctx->current_func_type) {
                 LLVMTypeRef func_ret_ty = to_llvm_type(ctx->current_func_type);
-                ret_val =
-                    cast_value(builder, ret_val, node->lhs->type, func_ret_ty);
+                ret_val = cast_value(builder, ret_val, node->lhs->type,
+                                     func_ret_ty, ctx->current_func_type);
             }
             LLVMBuildRet(builder, ret_val);
         } else {

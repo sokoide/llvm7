@@ -2068,3 +2068,23 @@ char* test_generate_function_pointer_basic() {
         return "Expected 6 for basic function pointer call";
     return NULL;
 }
+
+char* test_generate_bool_basic() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { _Bool b = 5; _Bool z = 0; return b + "
+                           "z + sizeof(_Bool); }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+    mu_assert("Expected 2 (1 + 0 + 1)", result == 2);
+    return NULL;
+}
