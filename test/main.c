@@ -241,6 +241,18 @@ static char* run_all_tests() {
     mu_run_test(test_preprocess_token_pasting, "preprocess: token pasting");
     mu_run_test(test_preprocess_recursive_macro_expansion,
                 "preprocess: recursive macro expansion");
+    mu_run_test(test_preprocess_variadic_macro_basic,
+                "preprocess: variadic macro basic");
+    mu_run_test(test_preprocess_variadic_macro_single_arg,
+                "preprocess: variadic macro single arg");
+    mu_run_test(test_preprocess_variadic_macro_in_stringify,
+                "preprocess: variadic macro in stringify");
+    mu_run_test(test_preprocess_variadic_macro_zero_fixed_params,
+                "preprocess: variadic macro zero fixed params");
+    mu_run_test(test_preprocess_variadic_macro_stringify_va_args,
+                "preprocess: variadic macro stringify __VA_ARGS__");
+    mu_run_test(test_preprocess_variadic_macro_gnu_comma_suppression,
+                "preprocess: variadic macro gnu comma suppression");
     return NULL;
 }
 

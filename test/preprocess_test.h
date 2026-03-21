@@ -15,5 +15,11 @@ char* test_preprocess_pragma_ignored();
 char* test_preprocess_stringification();
 char* test_preprocess_token_pasting();
 char* test_preprocess_recursive_macro_expansion();
+char* test_preprocess_variadic_macro_basic();
+char* test_preprocess_variadic_macro_single_arg();
+char* test_preprocess_variadic_macro_in_stringify();
+char* test_preprocess_variadic_macro_zero_fixed_params();
+char* test_preprocess_variadic_macro_stringify_va_args();
+char* test_preprocess_variadic_macro_gnu_comma_suppression();
 
 #endif

@@ -12,6 +12,7 @@ struct Macro {
     char* name;
     char* value;
     bool is_function;
+    bool is_variadic;
     char** params;
     int param_count;
     Macro* next;
@@ -118,7 +119,8 @@ static void free_macro_fields(Macro* m) {
 
 static void add_or_replace_macro(PreprocessContext* ctx, const char* name,
                                  const char* value, bool is_function,
-                                 char** params, int param_count) {
+                                 bool is_variadic, char** params,
+                                 int param_count) {
     size_t name_len = strlen(name);
     Macro* old = find_macro(ctx, name, name_len);
     if (old) {
@@ -134,6 +136,7 @@ static void add_or_replace_macro(PreprocessContext* ctx, const char* name,
             exit(1);
         }
         old->is_function = is_function;
+        old->is_variadic = is_variadic;
         old->params = params;
         old->param_count = param_count;
         return;
@@ -151,6 +154,7 @@ static void add_or_replace_macro(PreprocessContext* ctx, const char* name,
         exit(1);
     }
     m->is_function = is_function;
+    m->is_variadic = is_variadic;
     m->params = params;
     m->param_count = param_count;
     m->next = ctx->macros;
@@ -284,6 +288,51 @@ static char* expand_function_macro(Macro* m, char** args, int argc) {
                     p = q;
                     continue;
                 }
+                // #__VA_ARGS__ stringification
+                if (m->is_variadic && len == 11 &&
+                    strncmp(start, "__VA_ARGS__", 11) == 0) {
+                    StrBuf joined;
+                    sb_init(&joined);
+                    int fixed_count = m->param_count;
+                    for (int i = fixed_count; i < argc; i++) {
+                        if (i > fixed_count)
+                            sb_append_c(&joined, ',');
+                        sb_append_n(&joined, args[i], strlen(args[i]));
+                    }
+                    sb_append_escaped_quoted(&out, joined.data);
+                    free(joined.data);
+                    p = q;
+                    continue;
+                }
+            }
+        }
+        // , ##__VA_ARGS__ GCC extension: suppress preceding comma when empty
+        if (*p == ',' && m->is_variadic) {
+            const char* q = p + 1;
+            while (*q == ' ' || *q == '\t')
+                q++;
+            if (q[0] == '#' && q[1] == '#') {
+                const char* r = q + 2;
+                while (*r == ' ' || *r == '\t')
+                    r++;
+                if (strncmp(r, "__VA_ARGS__", 11) == 0 &&
+                    !is_ident_char(r[11])) {
+                    if (argc <= m->param_count) {
+                        // No variadic args: suppress comma
+                        p = r + 11;
+                        continue;
+                    }
+                    // Has variadic args: emit ", args..."
+                    sb_append_c(&out, ',');
+                    int fixed_count = m->param_count;
+                    for (int i = fixed_count; i < argc; i++) {
+                        if (i > fixed_count)
+                            sb_append_c(&out, ',');
+                        sb_append_n(&out, args[i], strlen(args[i]));
+                    }
+                    p = r + 11;
+                    continue;
+                }
             }
         }
         if (is_ident_start(*p)) {
@@ -291,6 +340,18 @@ static char* expand_function_macro(Macro* m, char** args, int argc) {
             while (is_ident_char(*p))
                 p++;
             size_t len = (size_t)(p - start);
+            // Check for __VA_ARGS__
+            if (m->is_variadic && len == 11 &&
+                strncmp(start, "__VA_ARGS__", 11) == 0) {
+                // Append variadic args (all args after fixed params)
+                int fixed_count = m->param_count;
+                for (int i = fixed_count; i < argc; i++) {
+                    if (i > fixed_count)
+                        sb_append_c(&out, ',');
+                    sb_append_n(&out, args[i], strlen(args[i]));
+                }
+                continue;
+            }
             int idx = find_param_index(m, start, len);
             if (idx >= 0 && idx < argc) {
                 sb_append_n(&out, args[idx], strlen(args[idx]));
@@ -622,6 +683,7 @@ static char* preprocess_internal(const char* input, const char* filename,
                     char* name =
                         dup_range(name_start, (size_t)(d - name_start));
                     bool is_function = false;
+                    bool is_variadic = false;
                     char** params = NULL;
                     int param_count = 0;
 
@@ -640,6 +702,24 @@ static char* preprocess_internal(const char* input, const char* filename,
                             if (d < line_end && *d == ')') {
                                 d++;
                                 break;
+                            }
+                            // Check for ... (variadic)
+                            if ((line_end - d) >= 3 && d[0] == '.' &&
+                                d[1] == '.' && d[2] == '.') {
+                                is_variadic = true;
+                                d += 3;
+                                d = skip_spaces(d, line_end);
+                                if (d < line_end && *d == ',') {
+                                    d++;
+                                    continue;
+                                }
+                                if (d < line_end && *d == ')') {
+                                    d++;
+                                    break;
+                                }
+                                fprintf(stderr,
+                                        "variadic macro ... must be last\n");
+                                exit(1);
                             }
                             const char* pstart = d;
                             if (!(d < line_end && is_ident_start(*d))) {
@@ -678,8 +758,8 @@ static char* preprocess_internal(const char* input, const char* filename,
                     }
 
                     char* value = trim_copy(d, (size_t)(line_end - d));
-                    add_or_replace_macro(ctx, name, value, is_function, params,
-                                         param_count);
+                    add_or_replace_macro(ctx, name, value, is_function,
+                                         is_variadic, params, param_count);
                     free(name);
                     free(value);
                 }
@@ -763,7 +843,13 @@ static char* preprocess_internal(const char* input, const char* filename,
                                 int argc = 0;
                                 char** args =
                                     parse_macro_args(&call, line_end, &argc);
-                                if (argc == m->param_count) {
+                                // For variadic macros, accept argc >=
+                                // param_count For non-variadic, require argc ==
+                                // param_count
+                                bool arg_count_ok =
+                                    m->is_variadic ? (argc >= m->param_count)
+                                                   : (argc == m->param_count);
+                                if (arg_count_ok) {
                                     char* ex =
                                         expand_function_macro(m, args, argc);
                                     char* re =
@@ -817,9 +903,9 @@ static char* preprocess_internal(const char* input, const char* filename,
 
 char* preprocess(const char* input, const char* filename) {
     PreprocessContext ctx = {0};
-    add_or_replace_macro(&ctx, "__clang__", "1", false, NULL, 0);
+    add_or_replace_macro(&ctx, "__clang__", "1", false, false, NULL, 0);
 #ifdef __APPLE__
-    add_or_replace_macro(&ctx, "__APPLE__", "1", false, NULL, 0);
+    add_or_replace_macro(&ctx, "__APPLE__", "1", false, false, NULL, 0);
 #endif
     char* out = preprocess_internal(input, filename, &ctx);
     free_macros(ctx.macros);

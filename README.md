@@ -129,7 +129,7 @@ clang demo/stdio.s -o demo/stdio -lc
 - `typedef` による型エイリアス、`struct`/`enum` タグ、列挙子の解決。
 - 関数ポインタの基本ケース（ローカル宣言 `int (*fp)(int);`、代入、間接呼び出し `fp(...)`）。
 - 文字列リテラル・文字リテラルのエスケープ処理、行コメント `//` とブロックコメント `/* ... */`。
-- プリプロセッサ（`#include`、`#define`、関数形式マクロ、`#undef`、`#ifdef`/`#ifndef`/`#if`/`#elif`/`#else`/`#endif`、`#pragma` 無視、`#error`）。
+- プリプロセッサ（`#include`、`#define`、関数形式マクロ、`#undef`、`#ifdef`/`#ifndef`/`#if`/`#elif`/`#else`/`#endif`、`#pragma` 無視、`#error`）。可変長マクロ引数（`...`）と `__VA_ARGS__` もサポート。
 - ビットフィールド宣言（現在の実装ではビット単位パッキングは未対応で、独立メンバとして扱います）。
 - 指定イニシャライザ（配列の `[index] = value`、構造体の `.member = value`）。
 - 複合リテラル（スカラー/構造体/union/配列、`(int[]){...}` の要素数推論を含む）。

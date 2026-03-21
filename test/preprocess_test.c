@@ -187,3 +187,75 @@ char* test_preprocess_recursive_macro_expansion() {
     free(output);
     return NULL;
 }
+
+char* test_preprocess_variadic_macro_basic() {
+    const char* input = "#define DEBUG(fmt, ...) fmt, __VA_ARGS__\n"
+                        "int x = DEBUG(1, 2, 3);\n";
+    char* output = preprocess(input, "var.c");
+    // Note: variadic args preserve original spacing from parse_macro_args
+    // which trims spaces, so "2, 3" becomes "2,3"
+    mu_assert("variadic macro should expand __VA_ARGS__",
+              strstr(output, "int x = 1, 2,3;") != NULL);
+    free(output);
+    return NULL;
+}
+
+char* test_preprocess_variadic_macro_single_arg() {
+    // Case: only format argument, no variadic args
+    // In C99, __VA_ARGS__ expands to nothing when empty
+    const char* input = "#define LOG(fmt, ...) fmt\n"
+                        "int x = LOG(42);\n";
+    char* output = preprocess(input, "var2.c");
+    mu_assert("variadic macro with no extra args should work",
+              strstr(output, "int x = 42;") != NULL);
+    free(output);
+    return NULL;
+}
+
+char* test_preprocess_variadic_macro_in_stringify() {
+    const char* input = "#define PRINT(fmt, ...) printf(fmt, __VA_ARGS__)\n"
+                        "PRINT(\"%d %d\", a, b);\n";
+    char* output = preprocess(input, "var3.c");
+    // Note: variadic args preserve original spacing from parse_macro_args
+    // which trims spaces, so "a, b" becomes "a,b"
+    mu_assert("variadic macro with printf-style call should expand",
+              strstr(output, "printf(\"%d %d\", a,b);") != NULL);
+    free(output);
+    return NULL;
+}
+
+char* test_preprocess_variadic_macro_zero_fixed_params() {
+    // #define VA_ONLY(...) with no fixed params
+    const char* input = "#define VA_ONLY(...) __VA_ARGS__\n"
+                        "int x = VA_ONLY(a, b, c);\n";
+    char* output = preprocess(input, "var4.c");
+    mu_assert("variadic-only macro should expand all args",
+              strstr(output, "int x = a,b,c;") != NULL);
+    free(output);
+    return NULL;
+}
+
+char* test_preprocess_variadic_macro_stringify_va_args() {
+    // #__VA_ARGS__ should stringify all variadic args as one string
+    const char* input = "#define TOSTR(fmt, ...) #__VA_ARGS__\n"
+                        "const char* s = TOSTR(fmt, 1, 2);\n";
+    char* output = preprocess(input, "var5.c");
+    mu_assert("stringify of __VA_ARGS__ should produce quoted string",
+              strstr(output, "const char* s = \"1,2\";") != NULL);
+    free(output);
+    return NULL;
+}
+
+char* test_preprocess_variadic_macro_gnu_comma_suppression() {
+    // , ##__VA_ARGS__ GCC extension: suppress comma when no variadic args
+    const char* input = "#define LOG(fmt, ...) printf(fmt, ##__VA_ARGS__)\n"
+                        "LOG(\"hello\");\n"
+                        "LOG(\"val=%d\", 42);\n";
+    char* output = preprocess(input, "var6.c");
+    mu_assert("no variadic args: comma should be suppressed",
+              strstr(output, "printf(\"hello\");") != NULL);
+    mu_assert("with variadic args: comma and args should appear",
+              strstr(output, "printf(\"val=%d\",42);") != NULL);
+    free(output);
+    return NULL;
+}
