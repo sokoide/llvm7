@@ -204,7 +204,7 @@ struct Context {
     int scope_depth; // lexical scope depth for local variable visibility
     Node* vla_size_exprs[MAX_NODES]; // local slot -> VLA element count expr
     const char* current_func_name;   // Name of current function being generated
-    int current_func_name_len;        // Length of current function name
+    int current_func_name_len;       // Length of current function name
 };
 
 #endif

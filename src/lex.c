@@ -43,17 +43,16 @@ static char decode_escape_char(const char** pp) {
 }
 
 // Keyword table (selfhost-compatible: no anonymous struct)
-char* kw_str[41] = {"return",   "if",       "else",   "while",   "for",
-                    "int",      "char",     "void",   "sizeof",  "struct",
-                    "typedef",  "enum",     "static", "extern",  "const",
-                    "long",     "bool",     "size_t", "NULL",    "true",
-                    "false",    "switch",   "case",   "default", "break",
-                    "continue", "unsigned", "signed", "double",  "float",
-                    "do",       "goto",     "union",  "inline",  "restrict",
-                    "volatile", "register", "_Bool",  "_Complex", "__func__",
-                    "_Pragma"};
-int kw_len[41] = {6, 2, 4, 5, 3, 3, 4, 4, 6, 6, 7, 4, 6, 6, 5, 4, 4, 6, 4, 4,
-                  5, 6, 4, 7, 5, 8, 8, 6, 6, 5, 2, 4, 5, 6, 8, 8, 8, 5, 8, 8, 7};
+char* kw_str[41] = {
+    "return",   "if",       "else",     "while",    "for",      "int",
+    "char",     "void",     "sizeof",   "struct",   "typedef",  "enum",
+    "static",   "extern",   "const",    "long",     "bool",     "size_t",
+    "NULL",     "true",     "false",    "switch",   "case",     "default",
+    "break",    "continue", "unsigned", "signed",   "double",   "float",
+    "do",       "goto",     "union",    "inline",   "restrict", "volatile",
+    "register", "_Bool",    "_Complex", "__func__", "_Pragma"};
+int kw_len[41] = {6, 2, 4, 5, 3, 3, 4, 4, 6, 6, 7, 4, 6, 6, 5, 4, 4, 6, 4, 4, 5,
+                  6, 4, 7, 5, 8, 8, 6, 6, 5, 2, 4, 5, 6, 8, 8, 8, 5, 8, 8, 7};
 int NUM_KEYWORDS = 41;
 
 char* three_char_ops[3] = {"...", "<<=", ">>="};
@@ -288,44 +287,67 @@ Token* tokenize(const char* p) {
             continue;
         }
 
-        // Hexadecimal floating-point constant (C99): 0x1.8p1, 0x1p3, etc.
+        // Hexadecimal floating-point or integer constant (C99)
         if (strncmp(p, "0x", 2) == 0 || strncmp(p, "0X", 2) == 0) {
             const char* start = p;
-            p += 2; // Skip '0x'
+            p += 2;
 
-            // Parse hexadecimal mantissa (digits and optional decimal point)
-            while ((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f') ||
-                   (*p >= 'A' && *p <= 'F')) {
+            bool has_dot = false;
+            while (isxdigit(*p))
                 p++;
-            }
             if (*p == '.') {
+                has_dot = true;
                 p++;
-                while ((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f') ||
-                       (*p >= 'A' && *p <= 'F')) {
+                while (isxdigit(*p))
                     p++;
-                }
             }
 
-            // Must have 'p' or 'P' for binary exponent
+            // Hex float must have exponent 'p' or 'P'
             if (*p == 'p' || *p == 'P') {
                 p++;
-                if (*p == '+' || *p == '-') {
+                if (*p == '+' || *p == '-')
+                    p++;
+                while (isdigit(*p))
+                    p++;
+
+                // Optional suffix
+                if (*p == 'l' || *p == 'L' || *p == 'f' || *p == 'F') {
                     p++;
                 }
-                while (isdigit(*p)) {
-                    p++;
-                }
+
+                cur =
+                    new_token_at(TK_NUM, cur, start, p - start, source, start);
+                cur->is_float = true;
+                cur->fval = strtod(start, NULL);
+                continue;
             }
 
-            // Optional suffix
-            if (*p == 'l' || *p == 'L' || *p == 'f' || *p == 'F') {
+            // Not a hex float. If it had a dot, we backtrack to before the dot
+            // to treat it as a hex integer followed by a dot.
+            if (has_dot) {
+                p = start + 2;
+                while (isxdigit(*p))
+                    p++;
+            }
+
+            // Hex integer
+            cur = new_token_at(TK_NUM, cur, start, p - start, source, start);
+            cur->is_float = false;
+            cur->uval = strtoull(start, NULL, 16);
+            cur->fval = (double)cur->uval;
+            if (cur->uval <= (unsigned long long)LLVM7_INT_MAX) {
+                cur->val = (int)cur->uval;
+            } else {
+                cur->val = LLVM7_INT_MAX;
+            }
+
+            // Optional integer suffixes
+            while (*p == 'u' || *p == 'U' || *p == 'l' || *p == 'L') {
+                if (*p == 'u' || *p == 'U')
+                    cur->is_unsigned = true;
                 p++;
             }
-
-            // Parse using strtod (C99 supports hex floats)
-            cur = new_token_at(TK_NUM, cur, start, p - start, source, start);
-            cur->is_float = true;
-            cur->fval = strtod(start, NULL);
+            cur->len = (int)(p - start);
             continue;
         }
 

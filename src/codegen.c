@@ -768,7 +768,8 @@ LLVMModuleRef generate_module(Context* ctx) {
         // Create __func__ string constant for this function
         char func_name_var[64];
         snprintf(func_name_var, sizeof(func_name_var), ".funcstr.%.*s",
-                 ctx->current_func_name_len < 63 ? ctx->current_func_name_len : 63,
+                 ctx->current_func_name_len < 63 ? ctx->current_func_name_len
+                                                 : 63,
                  ctx->current_func_name);
         LLVMValueRef func_str_gvar = LLVMGetNamedGlobal(module, func_name_var);
         if (!func_str_gvar) {
@@ -779,7 +780,8 @@ LLVMModuleRef generate_module(Context* ctx) {
             func_name_data[func_name_len] = '\0';
             LLVMValueRef func_str_const = LLVMConstStringInContext(
                 get_llvm_context(), func_name_data, func_name_len + 1, true);
-            LLVMTypeRef func_str_type = LLVMArrayType(ty_i8(), func_name_len + 1);
+            LLVMTypeRef func_str_type =
+                LLVMArrayType(ty_i8(), func_name_len + 1);
             func_str_gvar = LLVMAddGlobal(module, func_str_type, func_name_var);
             LLVMSetInitializer(func_str_gvar, func_str_const);
             LLVMSetGlobalConstant(func_str_gvar, true);
@@ -2123,11 +2125,14 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
     }
     case ND_FUNCSTR: {
         // __func__ - predefined identifier for function name
-        // The __func__ string constant is created in generate_module for each function
+        // The __func__ string constant is created in generate_module for each
+        // function
         if (ctx->current_func_name) {
             char func_name_var[64];
             snprintf(func_name_var, sizeof(func_name_var), ".funcstr.%.*s",
-                     ctx->current_func_name_len < 63 ? ctx->current_func_name_len : 63,
+                     ctx->current_func_name_len < 63
+                         ? ctx->current_func_name_len
+                         : 63,
                      ctx->current_func_name);
             LLVMValueRef gstr = LLVMGetNamedGlobal(module, func_name_var);
             if (gstr) {
@@ -2135,8 +2140,8 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
                 LLVMValueRef indices[] = {LLVMConstInt(ty_i32(), 0, false),
                                           LLVMConstInt(ty_i32(), 0, false)};
                 LLVMTypeRef str_type = LLVMGlobalGetValueType(gstr);
-                return LLVMBuildInBoundsGEP2(builder, str_type, gstr, indices, 2,
-                                             "func_ptr");
+                return LLVMBuildInBoundsGEP2(builder, str_type, gstr, indices,
+                                             2, "func_ptr");
             }
         }
         return LLVMConstPointerNull(LLVMPointerType(ty_i8(), 0));

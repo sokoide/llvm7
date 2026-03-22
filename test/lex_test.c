@@ -328,3 +328,16 @@ char* test_lex_hex_float_uppercase() {
     free_tokens(head);
     return NULL;
 }
+
+char* test_lex_hex_int() {
+    // Test hexadecimal integer: 0x123 = 291
+    Token* head = tokenize("0x123");
+    Token* curr = head;
+
+    mu_assert("first token should be TK_NUM", curr->kind == TK_NUM);
+    mu_assert("first token should not be float", !curr->is_float);
+    mu_assert("0x123 should equal 291", curr->uval == 291);
+
+    free_tokens(head);
+    return NULL;
+}
