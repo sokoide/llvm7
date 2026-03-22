@@ -198,6 +198,8 @@ selfhost_demo_check: selfhost
 			example07) expected=3 ;; \
 			example08) expected=13 ;; \
 			example09) expected=4 ;; \
+			example13) expected=0 ;; \
+			example14) expected=0 ;; \
 		esac; \
 		if [ -n "$$expected" ]; then \
 			clang $(SELFHOST_DEMO_DIR)/ll/$$base.ll -o $(SELFHOST_DEMO_DIR)/bin/$$base `llvm-config --ldflags --libs --system-libs` -lc || exit 1; \

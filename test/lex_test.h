@@ -16,5 +16,9 @@ char* test_lex_float();
 char* test_lex_bitwise();
 char* test_lex_no_unsigned_suffix_on_float();
 char* test_lex_large_unsigned_literal();
+char* test_lex_hex_float();
+char* test_lex_hex_float_with_fraction();
+char* test_lex_hex_float_negative_exp();
+char* test_lex_hex_float_uppercase();
 
 #endif

@@ -124,6 +124,10 @@ static char* run_all_tests() {
                 "lex: reject float unsigned suffix");
     mu_run_test(test_lex_large_unsigned_literal,
                 "lex: keep large unsigned literal");
+    mu_run_test(test_lex_hex_float, "lex: hex float basic");
+    mu_run_test(test_lex_hex_float_with_fraction, "lex: hex float with fraction");
+    mu_run_test(test_lex_hex_float_negative_exp, "lex: hex float negative exp");
+    mu_run_test(test_lex_hex_float_uppercase, "lex: hex float uppercase");
     mu_run_test(test_new_node_num, "parse: new_node_num");
     mu_run_test(test_new_node, "parse: new_node");
     mu_run_test(test_unary_num, "parse: unary num");

@@ -43,17 +43,18 @@ static char decode_escape_char(const char** pp) {
 }
 
 // Keyword table (selfhost-compatible: no anonymous struct)
-char* kw_str[39] = {"return",   "if",       "else",   "while",   "for",
+char* kw_str[41] = {"return",   "if",       "else",   "while",   "for",
                     "int",      "char",     "void",   "sizeof",  "struct",
                     "typedef",  "enum",     "static", "extern",  "const",
                     "long",     "bool",     "size_t", "NULL",    "true",
                     "false",    "switch",   "case",   "default", "break",
                     "continue", "unsigned", "signed", "double",  "float",
                     "do",       "goto",     "union",  "inline",  "restrict",
-                    "volatile", "register", "_Bool",  "_Complex"};
-int kw_len[39] = {6, 2, 4, 5, 3, 3, 4, 4, 6, 6, 7, 4, 6, 6, 5, 4, 4, 6, 4, 4,
-                  5, 6, 4, 7, 5, 8, 8, 6, 6, 5, 2, 4, 5, 6, 8, 8, 8, 5, 8};
-int NUM_KEYWORDS = 39;
+                    "volatile", "register", "_Bool",  "_Complex", "__func__",
+                    "_Pragma"};
+int kw_len[41] = {6, 2, 4, 5, 3, 3, 4, 4, 6, 6, 7, 4, 6, 6, 5, 4, 4, 6, 4, 4,
+                  5, 6, 4, 7, 5, 8, 8, 6, 6, 5, 2, 4, 5, 6, 8, 8, 8, 5, 8, 8, 7};
+int NUM_KEYWORDS = 41;
 
 char* three_char_ops[3] = {"...", "<<=", ">>="};
 int NUM_THREE_CHAR_OPS = 3;
@@ -284,6 +285,47 @@ Token* tokenize(const char* p) {
             // valid token. For TK_NUM, expect_number() uses cur->val. So
             // kind=TK_NUM, len=0 is fine IF nobody uses len to match it. Wait,
             // the previous logic was creating a SECOND token!
+            continue;
+        }
+
+        // Hexadecimal floating-point constant (C99): 0x1.8p1, 0x1p3, etc.
+        if (strncmp(p, "0x", 2) == 0 || strncmp(p, "0X", 2) == 0) {
+            const char* start = p;
+            p += 2; // Skip '0x'
+
+            // Parse hexadecimal mantissa (digits and optional decimal point)
+            while ((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f') ||
+                   (*p >= 'A' && *p <= 'F')) {
+                p++;
+            }
+            if (*p == '.') {
+                p++;
+                while ((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f') ||
+                       (*p >= 'A' && *p <= 'F')) {
+                    p++;
+                }
+            }
+
+            // Must have 'p' or 'P' for binary exponent
+            if (*p == 'p' || *p == 'P') {
+                p++;
+                if (*p == '+' || *p == '-') {
+                    p++;
+                }
+                while (isdigit(*p)) {
+                    p++;
+                }
+            }
+
+            // Optional suffix
+            if (*p == 'l' || *p == 'L' || *p == 'f' || *p == 'F') {
+                p++;
+            }
+
+            // Parse using strtod (C99 supports hex floats)
+            cur = new_token_at(TK_NUM, cur, start, p - start, source, start);
+            cur->is_float = true;
+            cur->fval = strtod(start, NULL);
             continue;
         }
 

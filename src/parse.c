@@ -1923,6 +1923,31 @@ Node* parse_primary(Context* ctx) {
         return new_node_num(1);
     }
 
+    // __func__ - predefined identifier for function name
+    if (consume(ctx, "__func__")) {
+        Node* node = calloc(1, sizeof(Node));
+        node->kind = ND_FUNCSTR;
+        node->type = new_type_ptr(new_type_char()); // char* type
+        return node;
+    }
+
+    // _Pragma operator - _Pragma("string") - ignored in this implementation
+    if (consume(ctx, "_Pragma")) {
+        expect(ctx, "(");
+        // Consume the string literal
+        if (ctx->current_token->kind == TK_STR) {
+            ctx->current_token = ctx->current_token->next;
+        } else {
+            // _Pragma requires a string literal
+            fprintf(stderr, "_Pragma requires a string literal\n");
+            exit(1);
+        }
+        expect(ctx, ")");
+        // _Pragma produces no value, but it's an expression
+        // Return a no-op node (0)
+        return new_node_num(0);
+    }
+
     // "(" expr ")"
     if (consume(ctx, "(")) {
         Node* node = parse_expr(ctx);

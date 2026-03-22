@@ -110,6 +110,7 @@ typedef enum {
     ND_DIV_ASSIGN,   // /=
     ND_COND,         // ?:
     ND_ELLIPSIS,     // ... (variadic arguments marker)
+    ND_FUNCSTR,      // __func__ (function name as string literal)
 } NodeKind;
 
 typedef struct LVar LVar;
@@ -202,6 +203,8 @@ struct Context {
     FuncType* func_types;    // Function types for opaque pointers support
     int scope_depth; // lexical scope depth for local variable visibility
     Node* vla_size_exprs[MAX_NODES]; // local slot -> VLA element count expr
+    const char* current_func_name;   // Name of current function being generated
+    int current_func_name_len;        // Length of current function name
 };
 
 #endif

@@ -276,3 +276,55 @@ char* test_lex_large_unsigned_literal() {
     free_tokens(head);
     return NULL;
 }
+
+char* test_lex_hex_float() {
+    // Test hexadecimal floating-point constant: 0x1p3 = 8.0
+    Token* head = tokenize("0x1p3");
+    Token* curr = head;
+
+    mu_assert("first token should be TK_NUM", curr->kind == TK_NUM);
+    mu_assert("first token should be float", curr->is_float);
+    mu_assert("0x1p3 should equal 8.0", curr->fval == 8.0);
+
+    free_tokens(head);
+    return NULL;
+}
+
+char* test_lex_hex_float_with_fraction() {
+    // Test hexadecimal floating-point constant: 0x1.8p1 = 3.0
+    Token* head = tokenize("0x1.8p1");
+    Token* curr = head;
+
+    mu_assert("first token should be TK_NUM", curr->kind == TK_NUM);
+    mu_assert("first token should be float", curr->is_float);
+    mu_assert("0x1.8p1 should equal 3.0", curr->fval == 3.0);
+
+    free_tokens(head);
+    return NULL;
+}
+
+char* test_lex_hex_float_negative_exp() {
+    // Test hexadecimal floating-point constant: 0xAp-2 = 2.5
+    Token* head = tokenize("0xAp-2");
+    Token* curr = head;
+
+    mu_assert("first token should be TK_NUM", curr->kind == TK_NUM);
+    mu_assert("first token should be float", curr->is_float);
+    mu_assert("0xAp-2 should equal 2.5", curr->fval == 2.5);
+
+    free_tokens(head);
+    return NULL;
+}
+
+char* test_lex_hex_float_uppercase() {
+    // Test uppercase: 0X1P3 = 8.0
+    Token* head = tokenize("0X1P3");
+    Token* curr = head;
+
+    mu_assert("first token should be TK_NUM", curr->kind == TK_NUM);
+    mu_assert("first token should be float", curr->is_float);
+    mu_assert("0X1P3 should equal 8.0", curr->fval == 8.0);
+
+    free_tokens(head);
+    return NULL;
+}

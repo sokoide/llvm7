@@ -703,6 +703,10 @@ LLVMModuleRef generate_module(Context* ctx) {
             ctx->current_func_type = NULL;
         }
 
+        // Set current function name in context for __func__
+        ctx->current_func_name = func_node->tok->str;
+        ctx->current_func_name_len = func_node->tok->len;
+
         // Get function name
         char func_name[64];
         int len = func_node->tok->len < 63 ? func_node->tok->len : 63;
@@ -760,6 +764,29 @@ LLVMModuleRef generate_module(Context* ctx) {
         // Local variable space per function
         LLVMValueRef local_allocas[1024]; // Max 100 locals for now
         memset(local_allocas, 0, sizeof(local_allocas));
+
+        // Create __func__ string constant for this function
+        char func_name_var[64];
+        snprintf(func_name_var, sizeof(func_name_var), ".funcstr.%.*s",
+                 ctx->current_func_name_len < 63 ? ctx->current_func_name_len : 63,
+                 ctx->current_func_name);
+        LLVMValueRef func_str_gvar = LLVMGetNamedGlobal(module, func_name_var);
+        if (!func_str_gvar) {
+            // Create null-terminated function name string constant
+            int func_name_len = ctx->current_func_name_len;
+            char* func_name_data = malloc(func_name_len + 1);
+            memcpy(func_name_data, ctx->current_func_name, func_name_len);
+            func_name_data[func_name_len] = '\0';
+            LLVMValueRef func_str_const = LLVMConstStringInContext(
+                get_llvm_context(), func_name_data, func_name_len + 1, true);
+            LLVMTypeRef func_str_type = LLVMArrayType(ty_i8(), func_name_len + 1);
+            func_str_gvar = LLVMAddGlobal(module, func_str_type, func_name_var);
+            LLVMSetInitializer(func_str_gvar, func_str_const);
+            LLVMSetGlobalConstant(func_str_gvar, true);
+            LLVMSetLinkage(func_str_gvar, LLVMPrivateLinkage);
+            LLVMSetUnnamedAddr(func_str_gvar, true); // Allow merging
+            free(func_name_data);
+        }
 
         LVar* var = func_node->locals;
         while (var) {
@@ -2091,6 +2118,26 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             LLVMTypeRef str_type = LLVMGlobalGetValueType(gstr);
             return LLVMBuildInBoundsGEP2(builder, str_type, gstr, indices, 2,
                                          "str_ptr");
+        }
+        return LLVMConstPointerNull(LLVMPointerType(ty_i8(), 0));
+    }
+    case ND_FUNCSTR: {
+        // __func__ - predefined identifier for function name
+        // The __func__ string constant is created in generate_module for each function
+        if (ctx->current_func_name) {
+            char func_name_var[64];
+            snprintf(func_name_var, sizeof(func_name_var), ".funcstr.%.*s",
+                     ctx->current_func_name_len < 63 ? ctx->current_func_name_len : 63,
+                     ctx->current_func_name);
+            LLVMValueRef gstr = LLVMGetNamedGlobal(module, func_name_var);
+            if (gstr) {
+                // GEP to get pointer to first element (i8*)
+                LLVMValueRef indices[] = {LLVMConstInt(ty_i32(), 0, false),
+                                          LLVMConstInt(ty_i32(), 0, false)};
+                LLVMTypeRef str_type = LLVMGlobalGetValueType(gstr);
+                return LLVMBuildInBoundsGEP2(builder, str_type, gstr, indices, 2,
+                                             "func_ptr");
+            }
         }
         return LLVMConstPointerNull(LLVMPointerType(ty_i8(), 0));
     }
