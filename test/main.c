@@ -104,6 +104,11 @@ static char* run_all_tests() {
                 "codegen: union compound literal designator");
     mu_run_test(test_generate_sizeof_vla_expr_runtime,
                 "codegen: sizeof vla runtime");
+    mu_run_test(test_generate_long_long_basic, "codegen: long long basic");
+    mu_run_test(test_generate_long_long_arithmetic,
+                "codegen: long long arithmetic");
+    mu_run_test(test_generate_unsigned_long_long,
+                "codegen: unsigned long long");
     mu_run_test(test_generate_function_pointer_basic,
                 "codegen: function pointer basic");
     mu_run_test(test_generate_bool_basic, "codegen: bool basic");
@@ -228,6 +233,12 @@ static char* run_all_tests() {
                 "parse: union compound literal designator");
     mu_run_test(test_parse_sizeof_vla_expr_runtime,
                 "parse: sizeof vla runtime");
+    mu_run_test(test_parse_long_long_decl, "parse: long long decl");
+    mu_run_test(test_parse_unsigned_long_long_decl,
+                "parse: unsigned long long decl");
+    mu_run_test(test_parse_long_vs_long_long_distinct,
+                "parse: long vs long long distinct");
+    mu_run_test(test_parse_long_long_promotion, "parse: long long promotion");
     mu_run_test(test_parse_function_pointer_basic,
                 "parse: function pointer basic");
     mu_run_test(test_preprocess_noop, "preprocess: no-op");

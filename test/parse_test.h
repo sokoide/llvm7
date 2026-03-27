@@ -88,6 +88,10 @@ char* test_parse_struct_compound_literal_member();
 char* test_parse_array_compound_literal_subscript();
 char* test_parse_union_compound_literal_designator();
 char* test_parse_sizeof_vla_expr_runtime();
+char* test_parse_long_long_decl();
+char* test_parse_unsigned_long_long_decl();
+char* test_parse_long_vs_long_long_distinct();
+char* test_parse_long_long_promotion();
 char* test_parse_function_pointer_basic();
 
 #endif

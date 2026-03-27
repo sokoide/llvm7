@@ -1587,6 +1587,85 @@ char* test_parse_sizeof_vla_expr_runtime() {
     return NULL;
 }
 
+char* test_parse_long_long_decl() {
+    Context ctx = {0};
+    Token* tok = tokenize("long long x;");
+    ctx.current_token = tok;
+    Node* node = parse_stmt(&ctx);
+
+    mu_assert("node should be ND_DECL", node->kind == ND_DECL);
+    mu_assert("long long type should be LONGLONG", node->type->ty == LONGLONG);
+    mu_assert("long long should not be unsigned", !node->type->is_unsigned);
+
+    free_ast(node);
+    free_tokens(tok);
+    return NULL;
+}
+
+char* test_parse_unsigned_long_long_decl() {
+    Context ctx = {0};
+    Token* tok = tokenize("unsigned long long x;");
+    ctx.current_token = tok;
+    Node* node = parse_stmt(&ctx);
+
+    mu_assert("node should be ND_DECL", node->kind == ND_DECL);
+    mu_assert("unsigned long long type should be LONGLONG",
+              node->type->ty == LONGLONG);
+    mu_assert("unsigned long long should be unsigned", node->type->is_unsigned);
+
+    free_ast(node);
+    free_tokens(tok);
+    return NULL;
+}
+
+char* test_parse_long_vs_long_long_distinct() {
+    Context ctx = {0};
+    Token* tok_long = tokenize("long a;");
+    ctx.current_token = tok_long;
+    Node* decl_long = parse_stmt(&ctx);
+
+    Token* tok_ll = tokenize("long long b;");
+    ctx.current_token = tok_ll;
+    Node* decl_ll = parse_stmt(&ctx);
+
+    mu_assert("long should be LONG type", decl_long->type->ty == LONG);
+    mu_assert("long long should be LONGLONG type",
+              decl_ll->type->ty == LONGLONG);
+
+    free_ast(decl_long);
+    free_ast(decl_ll);
+    free_tokens(tok_long);
+    free_tokens(tok_ll);
+    return NULL;
+}
+
+char* test_parse_long_long_promotion() {
+    Context ctx = {0};
+    Token* tok_l = tokenize("long a;");
+    ctx.current_token = tok_l;
+    Node* decl_l = parse_stmt(&ctx);
+
+    Token* tok_ll = tokenize("long long b;");
+    ctx.current_token = tok_ll;
+    Node* decl_ll = parse_stmt(&ctx);
+
+    Token* tok_add = tokenize("a + b;");
+    ctx.current_token = tok_add;
+    Node* node_add = parse_stmt(&ctx);
+
+    mu_assert("long + long long should promote to long long",
+              node_add->type->ty == LONGLONG);
+    mu_assert("result should be signed", !node_add->type->is_unsigned);
+
+    free_ast(decl_l);
+    free_ast(decl_ll);
+    free_ast(node_add);
+    free_tokens(tok_l);
+    free_tokens(tok_ll);
+    free_tokens(tok_add);
+    return NULL;
+}
+
 char* test_parse_function_pointer_basic() {
     Context ctx = {0};
     Token* head = tokenize("int inc(int x) { return x + 1; } int main() { int "

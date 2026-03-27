@@ -106,6 +106,7 @@ static int codegen_type_size(Type* ty) {
     case FLOAT:
         return 4;
     case LONG:
+    case LONGLONG:
     case DOUBLE:
     case PTR:
         return 8;
@@ -152,6 +153,9 @@ static LLVMTypeRef to_llvm_type(Type* ty) {
         return ty_i8();
     }
     if (ty->ty == LONG) {
+        return ty_i64();
+    }
+    if (ty->ty == LONGLONG) {
         return ty_i64();
     }
     if (ty->ty == STRUCT) {

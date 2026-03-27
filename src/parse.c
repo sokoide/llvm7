@@ -217,6 +217,8 @@ static int get_type_rank(Type* ty) {
         return 100;
     if (ty->ty == FLOAT)
         return 90;
+    if (ty->ty == LONGLONG)
+        return 85;
     if (ty->ty == LONG)
         return 80;
     if (ty->ty == INT)
@@ -338,8 +340,11 @@ Type* try_parse_type(Context* ctx) {
             consume(ctx, "_Complex");
             // Treat long double as double in current backend.
             base = new_type_double();
+        } else if (consume(ctx, "long")) {
+            // 'long long' is a distinct type from 'long'
+            base = calloc(1, sizeof(Type));
+            base->ty = LONGLONG;
         } else {
-            consume(ctx, "long"); // Support 'long long'
             base = calloc(1, sizeof(Type));
             base->ty = LONG;
         }
@@ -1521,6 +1526,8 @@ static int type_align(Type* ty) {
         return 8;
     if (ty->ty == LONG)
         return 8;
+    if (ty->ty == LONGLONG)
+        return 8;
     if (ty->ty == PTR)
         return 8;
     if (ty->ty == STRUCT) {
@@ -1563,6 +1570,8 @@ static int type_size(Type* ty) {
     if (ty->ty == DOUBLE)
         return 8;
     if (ty->ty == LONG)
+        return 8;
+    if (ty->ty == LONGLONG)
         return 8;
     if (ty->ty == PTR)
         return 8;

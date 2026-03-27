@@ -2069,6 +2069,70 @@ char* test_generate_function_pointer_basic() {
     return NULL;
 }
 
+char* test_generate_long_long_basic() {
+    Context ctx = {0};
+    Token* head =
+        tokenize("int main() { long long x = 42LL; return (int)(x % 10); }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+    mu_assert("Expected 2 for long long basic", result == 2);
+    return NULL;
+}
+
+char* test_generate_long_long_arithmetic() {
+    Context ctx = {0};
+    Token* head =
+        tokenize("int main() { long long a = 100LL; long long b = 23LL; "
+                 "return (int)(a + b); }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+    mu_assert("Expected 123 for long long arithmetic", result == 123);
+    return NULL;
+}
+
+char* test_generate_unsigned_long_long() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { unsigned long long x = 55ULL; "
+                           "return (int)(x % 10); }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    free_tokens(head);
+    mu_assert("Expected 5 for unsigned long long", result == 5);
+    return NULL;
+}
+
 char* test_generate_bool_basic() {
     Context ctx = {0};
     Token* head = tokenize("int main() { _Bool b = 5; _Bool z = 0; return b + "

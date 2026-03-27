@@ -404,6 +404,12 @@ Token* tokenize(const char* p) {
                 cur->is_unsigned = true;
                 p++;
             }
+            if (!is_float) {
+                while (*p == 'l' || *p == 'L') {
+                    p++;
+                }
+            }
+            cur->len = (int)(p - start);
             continue;
         }
 
