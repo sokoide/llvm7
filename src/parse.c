@@ -6,6 +6,12 @@
 
 #define LLVM7_INT_MAX 2147483647
 
+typedef struct {
+    bool is_inline;
+    bool is_static;
+    bool is_extern;
+} StorageSpecifiers;
+
 static Node* parse_logor(Context* ctx);
 static Node* parse_conditional(Context* ctx);
 static Node* parse_logand(Context* ctx);
@@ -24,6 +30,10 @@ static Node* find_defined_function(Context* ctx, Token* tok);
 
 Node* new_node(NodeKind kind, Node* lhs, Node* rhs) {
     Node* node = calloc(1, sizeof(Node));
+    if (!node) {
+        perror("calloc");
+        exit(1);
+    }
     node->kind = kind;
     node->next = NULL;
     node->lhs = lhs;
@@ -37,6 +47,10 @@ Node* new_node(NodeKind kind, Node* lhs, Node* rhs) {
 
 Node* new_node_num(int val) {
     Node* node = calloc(1, sizeof(Node));
+    if (!node) {
+        perror("calloc");
+        exit(1);
+    }
     node->kind = ND_NUM;
     node->val = val;
     node->uval = (unsigned long long)(unsigned int)val;
@@ -51,6 +65,10 @@ Node* new_node_ident(Context* ctx, Token* tok) {
     }
 
     Node* node = calloc(1, sizeof(Node));
+    if (!node) {
+        perror("calloc");
+        exit(1);
+    }
     LVar* lvar = find_lvar(ctx, tok);
     if (lvar) {
         node->kind = ND_LVAR;
@@ -79,6 +97,7 @@ Node* new_node_ident(Context* ctx, Token* tok) {
     fprintf(stderr, "Error: undeclared variable '");
     fwrite(tok->str, 1, tok->len, stderr);
     fprintf(stderr, "'\n");
+    free(node);
     exit(1);
 }
 
@@ -111,6 +130,10 @@ static Node* clone_ast(Node* node) {
     }
 
     Node* cloned = calloc(1, sizeof(Node));
+    if (!cloned) {
+        perror("calloc");
+        exit(1);
+    }
     *cloned = *node;
     cloned->lhs = clone_ast(node->lhs);
     cloned->rhs = clone_ast(node->rhs);
@@ -150,7 +173,23 @@ Type* parse_type(Context* ctx);
 // Helper to create a new char type
 Type* new_type_char(void) {
     Type* t = calloc(1, sizeof(Type));
+    if (!t) {
+        perror("calloc");
+        exit(1);
+    }
     t->ty = CHAR;
+    t->ptr_to = NULL;
+    return t;
+}
+
+// Helper to create a new short type
+Type* new_type_short(void) {
+    Type* t = calloc(1, sizeof(Type));
+    if (!t) {
+        perror("calloc");
+        exit(1);
+    }
+    t->ty = SHORT;
     t->ptr_to = NULL;
     return t;
 }
@@ -158,6 +197,10 @@ Type* new_type_char(void) {
 // Helper to create a new bool type
 Type* new_type_bool(void) {
     Type* t = calloc(1, sizeof(Type));
+    if (!t) {
+        perror("calloc");
+        exit(1);
+    }
     t->ty = BOOL;
     t->ptr_to = NULL;
     return t;
@@ -166,6 +209,10 @@ Type* new_type_bool(void) {
 // Helper to create a new int type
 Type* new_type_int(void) {
     Type* t = calloc(1, sizeof(Type));
+    if (!t) {
+        perror("calloc");
+        exit(1);
+    }
     t->ty = INT;
     t->ptr_to = NULL;
     return t;
@@ -174,6 +221,10 @@ Type* new_type_int(void) {
 // Helper to create a pointer type
 Type* new_type_ptr(Type* base) {
     Type* t = calloc(1, sizeof(Type));
+    if (!t) {
+        perror("calloc");
+        exit(1);
+    }
     t->ty = PTR;
     t->ptr_to = base;
     return t;
@@ -182,6 +233,10 @@ Type* new_type_ptr(Type* base) {
 // Helper to create an array type
 Type* new_type_array(Type* base, size_t size) {
     Type* t = calloc(1, sizeof(Type));
+    if (!t) {
+        perror("calloc");
+        exit(1);
+    }
     t->ty = PTR;
     t->ptr_to = base;
     t->array_size = size;
@@ -191,6 +246,10 @@ Type* new_type_array(Type* base, size_t size) {
 // Helper to create a new double type
 Type* new_type_double(void) {
     Type* t = calloc(1, sizeof(Type));
+    if (!t) {
+        perror("calloc");
+        exit(1);
+    }
     t->ty = DOUBLE;
     t->ptr_to = NULL;
     return t;
@@ -199,6 +258,10 @@ Type* new_type_double(void) {
 // Helper to create a new float type
 Type* new_type_float(void) {
     Type* t = calloc(1, sizeof(Type));
+    if (!t) {
+        perror("calloc");
+        exit(1);
+    }
     t->ty = FLOAT;
     t->ptr_to = NULL;
     return t;
@@ -206,6 +269,10 @@ Type* new_type_float(void) {
 
 Node* new_node_fnum(double fval, Type* ty) {
     Node* node = calloc(1, sizeof(Node));
+    if (!node) {
+        perror("calloc");
+        exit(1);
+    }
     node->kind = ND_FNUM;
     node->fval = fval;
     node->type = ty;
@@ -223,6 +290,8 @@ static int get_type_rank(Type* ty) {
         return 80;
     if (ty->ty == INT)
         return 70;
+    if (ty->ty == SHORT)
+        return 65;
     if (ty->ty == CHAR)
         return 60;
     if (ty->ty == BOOL)
@@ -335,6 +404,9 @@ Type* try_parse_type(Context* ctx) {
     Type* base = NULL;
     if (consume(ctx, "int")) {
         base = new_type_int();
+    } else if (consume(ctx, "short")) {
+        base = new_type_short();
+        consume(ctx, "int"); // optional
     } else if (consume(ctx, "char")) {
         base = new_type_char();
     } else if (consume(ctx, "float")) {
@@ -536,7 +608,9 @@ Type* try_parse_type(Context* ctx) {
 Type* parse_type(Context* ctx) {
     Type* base = try_parse_type(ctx);
     if (!base) {
-        fprintf(stderr, "Expected type (int or void)\n");
+        fprintf(stderr, "Expected type (int or void), got %.*s at line %d\n",
+                ctx->current_token->len, ctx->current_token->str,
+                ctx->current_token->line);
         exit(1);
     }
     return base;
@@ -865,28 +939,30 @@ static Node* parse_block_stmt(Context* ctx) {
     return new_node(ND_BLOCK, head->next, NULL);
 }
 
+static StorageSpecifiers parse_storage_specifiers(Context* ctx) {
+    StorageSpecifiers spec = {false, false, false};
+    while (1) {
+        if (consume(ctx, "inline")) {
+            spec.is_inline = true;
+            continue;
+        }
+        if (consume(ctx, "static")) {
+            spec.is_static = true;
+            continue;
+        }
+        if (consume(ctx, "extern")) {
+            spec.is_extern = true;
+            continue;
+        }
+        break;
+    }
+    return spec;
+}
+
 void parse_program(Context* ctx) {
     int i = 0;
     while (!at_eof(ctx)) {
-        bool is_inline = false;
-        bool is_static = false;
-        bool is_extern = false;
-
-        while (1) {
-            if (consume(ctx, "inline")) {
-                is_inline = true;
-                continue;
-            }
-            if (consume(ctx, "static")) {
-                is_static = true;
-                continue;
-            }
-            if (consume(ctx, "extern")) {
-                is_extern = true;
-                continue;
-            }
-            break;
-        }
+        StorageSpecifiers spec = parse_storage_specifiers(ctx);
 
         if (consume(ctx, "typedef")) {
             Type* ty = parse_type(ctx);
@@ -897,6 +973,10 @@ void parse_program(Context* ctx) {
             }
             expect(ctx, ";");
             Typedef* td = calloc(1, sizeof(Typedef));
+            if (!td) {
+                perror("calloc");
+                exit(1);
+            }
             td->name = tok->str;
             td->len = tok->len;
             td->type = ty;
@@ -943,16 +1023,16 @@ void parse_program(Context* ctx) {
                 proto_node->tok = tok;
                 proto_node->type = ty;
                 proto_node->rhs = func_params;
-                proto_node->is_extern = is_extern;
+                proto_node->is_extern = spec.is_extern;
                 proto_node->is_vararg = is_vararg;
-                proto_node->is_inline = is_inline;
-                proto_node->is_static = is_static;
+                proto_node->is_inline = spec.is_inline;
+                proto_node->is_static = spec.is_static;
                 ctx->code[i++] = proto_node;
                 continue;
             }
 
             // extern function must be a prototype
-            if (is_extern) {
+            if (spec.is_extern) {
                 fprintf(stderr, "extern function must be a prototype\n");
                 exit(1);
             }
@@ -964,8 +1044,8 @@ void parse_program(Context* ctx) {
             func_node->tok = tok;
             func_node->type = ty;
             func_node->rhs = func_params;
-            func_node->is_inline = is_inline;
-            func_node->is_static = is_static;
+            func_node->is_inline = spec.is_inline;
+            func_node->is_static = spec.is_static;
 
             // Parse function body (statements)
             Node* head = NULL;
@@ -1000,6 +1080,10 @@ void parse_program(Context* ctx) {
 
             // Add to globals
             LVar* lvar = calloc(1, sizeof(LVar));
+            if (!lvar) {
+                perror("calloc");
+                exit(1);
+            }
             lvar->name = tok->str;
             lvar->len = tok->len;
             lvar->type = ty;
@@ -1010,10 +1094,10 @@ void parse_program(Context* ctx) {
             Node* gvar_node = new_node(ND_GVAR, NULL, NULL);
             gvar_node->tok = tok;
             gvar_node->type = ty;
-            gvar_node->is_extern = is_extern;
+            gvar_node->is_extern = spec.is_extern;
 
             // extern declarations cannot have initializers
-            if (!is_extern && consume(ctx, "=")) {
+            if (!spec.is_extern && consume(ctx, "=")) {
                 int array_size_before = gvar_node->type->array_size;
                 // Check if next token is '{'
                 Token* t = ctx->current_token;

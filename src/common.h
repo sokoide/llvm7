@@ -46,6 +46,7 @@ struct Type {
     enum {
         INT,
         CHAR,
+        SHORT,
         VOID,
         PTR,
         STRUCT,
@@ -57,7 +58,7 @@ struct Type {
         BOOL
     } ty;
     bool is_unsigned;
-    bool is_restrict;  // for PTR: restrict-qualified pointer
+    bool is_restrict; // for PTR: restrict-qualified pointer
     bool is_volatile;
     struct Type* ptr_to;
     size_t array_size;

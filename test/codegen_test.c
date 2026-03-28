@@ -2155,9 +2155,9 @@ char* test_generate_bool_basic() {
 
 char* test_generate_static_inline() {
     Context ctx = {0};
-    Token* head = tokenize(
-        "static inline int add(int a, int b) { return a + b; }"
-        "int main() { return add(3, 4); }");
+    Token* head =
+        tokenize("static inline int add(int a, int b) { return a + b; }"
+                 "int main() { return add(3, 4); }");
     ctx.current_token = head;
     parse_program(&ctx);
     LLVMModuleRef module = generate_module(&ctx);
@@ -2178,9 +2178,9 @@ char* test_generate_static_inline() {
 
 char* test_generate_restrict_param() {
     Context ctx = {0};
-    Token* head = tokenize(
-        "int foo(int* restrict a, int* restrict b) { return *a + *b; }"
-        "int main() { int x = 3; int y = 4; return foo(&x, &y); }");
+    Token* head =
+        tokenize("int foo(int* restrict a, int* restrict b) { return *a + *b; }"
+                 "int main() { int x = 3; int y = 4; return foo(&x, &y); }");
     ctx.current_token = head;
     parse_program(&ctx);
     LLVMModuleRef module = generate_module(&ctx);
@@ -2209,8 +2209,8 @@ char* test_generate_restrict_param() {
 
 char* test_generate_volatile_local() {
     Context ctx = {0};
-    Token* head = tokenize(
-        "int main() { volatile int x = 10; x = 20; return x; }");
+    Token* head =
+        tokenize("int main() { volatile int x = 10; x = 20; return x; }");
     ctx.current_token = head;
     parse_program(&ctx);
     LLVMModuleRef module = generate_module(&ctx);
@@ -2237,9 +2237,8 @@ char* test_generate_volatile_local() {
 
 char* test_generate_volatile_global() {
     Context ctx = {0};
-    Token* head = tokenize(
-        "volatile int g = 5;"
-        "int main() { g = 42; return g; }");
+    Token* head = tokenize("volatile int g = 5;"
+                           "int main() { g = 42; return g; }");
     ctx.current_token = head;
     parse_program(&ctx);
     LLVMModuleRef module = generate_module(&ctx);
@@ -2266,9 +2265,9 @@ char* test_generate_volatile_global() {
 
 char* test_generate_volatile_ptr() {
     Context ctx = {0};
-    Token* head = tokenize(
-        "int foo(volatile int* p) { *p = 99; return *p; }"
-        "int main() { volatile int x = 0; return foo(&x); }");
+    Token* head =
+        tokenize("int foo(volatile int* p) { *p = 99; return *p; }"
+                 "int main() { volatile int x = 0; return foo(&x); }");
     ctx.current_token = head;
     parse_program(&ctx);
     LLVMModuleRef module = generate_module(&ctx);

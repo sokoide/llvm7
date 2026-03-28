@@ -1192,11 +1192,11 @@ char* test_parse_uac() {
     // unsigned int u; int i; u + i
     Token* tok_u = tokenize("unsigned int u;");
     ctx.current_token = tok_u;
-    Node* decl_u = parse_stmt(&ctx);
+    (void)parse_stmt(&ctx);
 
     Token* tok_i = tokenize("int i;");
     ctx.current_token = tok_i;
-    Node* decl_i = parse_stmt(&ctx);
+    (void)parse_stmt(&ctx);
 
     Token* tok_add = tokenize("u + i;");
     ctx.current_token = tok_add;
@@ -1208,11 +1208,7 @@ char* test_parse_uac() {
     mu_assert("result of u + i should be INT", node_add->type->ty == INT);
 
     // long l; unsigned int u; l + u -> long (signed)
-    Token* tok_l = tokenize("long l;");
-    ctx.current_token = tok_l;
-    Node* decl_l = parse_stmt(&ctx);
-
-    Token* tok_add2 = tokenize("l + u;");
+    Token* tok_add2 = tokenize("long l; l + u;");
     ctx.current_token = tok_add2;
     Node* node_add2 = parse_stmt(&ctx);
 
@@ -1705,7 +1701,8 @@ char* test_parse_function_pointer_basic() {
 
 char* test_parse_static_inline() {
     Context ctx = {0};
-    Token* head = tokenize("static inline int add(int a, int b) { return a + b; }");
+    Token* head =
+        tokenize("static inline int add(int a, int b) { return a + b; }");
     ctx.current_token = head;
     parse_program(&ctx);
 

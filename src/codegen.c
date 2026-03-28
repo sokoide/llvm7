@@ -73,6 +73,10 @@ static LLVMTypeRef ty_i8(void) {
     return LLVMInt8TypeInContext(get_llvm_context());
 }
 
+static LLVMTypeRef ty_i16(void) {
+    return LLVMInt16TypeInContext(get_llvm_context());
+}
+
 static LLVMTypeRef ty_i32(void) {
     return LLVMInt32TypeInContext(get_llvm_context());
 }
@@ -102,6 +106,8 @@ static int codegen_type_size(Type* ty) {
     case CHAR:
     case BOOL:
         return 1;
+    case SHORT:
+        return 2;
     case INT:
     case FLOAT:
         return 4;
@@ -148,6 +154,9 @@ static LLVMTypeRef to_llvm_type(Type* ty) {
     }
     if (ty->ty == CHAR) {
         return ty_i8();
+    }
+    if (ty->ty == SHORT) {
+        return ty_i16();
     }
     if (ty->ty == BOOL) {
         return ty_i8();
@@ -754,8 +763,10 @@ LLVMModuleRef generate_module(Context* ctx) {
 
         // Apply inline semantics
         if (func_node->is_inline) {
-            unsigned attr_kind = LLVMGetEnumAttributeKindForName("alwaysinline", 12);
-            LLVMAttributeRef attr = LLVMCreateEnumAttribute(get_llvm_context(), attr_kind, 0);
+            unsigned attr_kind =
+                LLVMGetEnumAttributeKindForName("alwaysinline", 12);
+            LLVMAttributeRef attr =
+                LLVMCreateEnumAttribute(get_llvm_context(), attr_kind, 0);
             LLVMAddAttributeAtIndex(func, -1, attr);
         }
 
@@ -899,11 +910,12 @@ LLVMModuleRef generate_module(Context* ctx) {
  * @return LLVMValueRef Generated value
  */
 
-static LLVMValueRef build_volatile_load(LLVMBuilderRef builder,
-                                        LLVMTypeRef ty, LLVMValueRef ptr,
-                                        const char* name, bool is_volatile) {
+static LLVMValueRef build_volatile_load(LLVMBuilderRef builder, LLVMTypeRef ty,
+                                        LLVMValueRef ptr, const char* name,
+                                        bool is_volatile) {
     LLVMValueRef inst = LLVMBuildLoad2(builder, ty, ptr, name);
-    if (is_volatile) LLVMSetVolatile(inst, true);
+    if (is_volatile)
+        LLVMSetVolatile(inst, true);
     return inst;
 }
 
@@ -911,7 +923,8 @@ static LLVMValueRef build_volatile_store(LLVMBuilderRef builder,
                                          LLVMValueRef val, LLVMValueRef ptr,
                                          bool is_volatile) {
     LLVMValueRef inst = LLVMBuildStore(builder, val, ptr);
-    if (is_volatile) LLVMSetVolatile(inst, true);
+    if (is_volatile)
+        LLVMSetVolatile(inst, true);
     return inst;
 }
 
@@ -1029,7 +1042,7 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             if (node->lhs->val < 1024 && local_allocas[node->lhs->val]) {
                 LLVMValueRef alloca_ptr = local_allocas[node->lhs->val];
                 build_volatile_store(builder, store_val, alloca_ptr,
-                                    lhs_volatile);
+                                     lhs_volatile);
             }
         } else if (node->lhs->kind == ND_GVAR) {
             // Global variable assignment
@@ -1497,8 +1510,8 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         LLVMTypeRef val_type = to_llvm_type(node->lhs->type);
         bool inc_volatile =
             node->lhs->type ? node->lhs->type->is_volatile : false;
-        LLVMValueRef old_val = build_volatile_load(
-            builder, val_type, ptr, "incdec.old", inc_volatile);
+        LLVMValueRef old_val = build_volatile_load(builder, val_type, ptr,
+                                                   "incdec.old", inc_volatile);
         LLVMValueRef new_val;
 
         if (node->lhs->type && node->lhs->type->ty == PTR) {
@@ -1865,9 +1878,9 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         LLVMValueRef ptr =
             codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
         LLVMTypeRef loaded_type = to_llvm_type(node->type);
-        LLVMValueRef loaded = build_volatile_load(
-            builder, loaded_type, ptr, "deref",
-            node->type ? node->type->is_volatile : false);
+        LLVMValueRef loaded =
+            build_volatile_load(builder, loaded_type, ptr, "deref",
+                                node->type ? node->type->is_volatile : false);
         // Sign-extend char (i8) to int (i32) for use in expressions
         if (node->type && node->type->ty == CHAR) {
             loaded = LLVMBuildSExt(builder, loaded, ty_i32(), "sext_char");
@@ -1883,9 +1896,9 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         free(addr_node);
 
         LLVMTypeRef member_type = to_llvm_type(node->type);
-        LLVMValueRef loaded = build_volatile_load(
-            builder, member_type, ptr, "mload",
-            node->type ? node->type->is_volatile : false);
+        LLVMValueRef loaded =
+            build_volatile_load(builder, member_type, ptr, "mload",
+                                node->type ? node->type->is_volatile : false);
         // Sign-extend char (i8) to int (i32) for use in expressions
         if (node->type && node->type->ty == CHAR) {
             loaded = LLVMBuildSExt(builder, loaded, ty_i32(), "sext_char");
@@ -1899,9 +1912,9 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             codegen(ctx, addr_node, builder, local_allocas, has_return, module);
         free(addr_node);
         LLVMTypeRef lit_type = to_llvm_type(node->type);
-        return build_volatile_load(
-            builder, lit_type, ptr, "compound_load",
-            node->type ? node->type->is_volatile : false);
+        return build_volatile_load(builder, lit_type, ptr, "compound_load",
+                                   node->type ? node->type->is_volatile
+                                              : false);
     }
     case ND_ARRAY_TO_PTR:
     case ND_ADDR: {
@@ -2292,7 +2305,6 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         LLVMValueRef then_val =
             codegen(ctx, node->lhs, builder, local_allocas, &then_ret, module);
         LLVMBasicBlockRef then_end = LLVMGetInsertBlock(builder);
-        LLVMBuildBr(builder, end_bb);
 
         // Else branch
         LLVMPositionBuilderAtEnd(builder, else_bb);
@@ -2300,17 +2312,27 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         LLVMValueRef else_val =
             codegen(ctx, node->rhs, builder, local_allocas, &else_ret, module);
         LLVMBasicBlockRef else_end = LLVMGetInsertBlock(builder);
+
+        // Common type for PHI
+        Type* common = get_common_type(node->lhs->type, node->rhs->type);
+        LLVMTypeRef target_ty = to_llvm_type(common);
+
+        // Cast then_val in then_end block
+        LLVMPositionBuilderAtEnd(builder, then_end);
+        then_val =
+            cast_value(builder, then_val, node->lhs->type, target_ty, common);
+        LLVMBuildBr(builder, end_bb);
+
+        // Cast else_val in else_end block
+        LLVMPositionBuilderAtEnd(builder, else_end);
+        else_val =
+            cast_value(builder, else_val, node->rhs->type, target_ty, common);
         LLVMBuildBr(builder, end_bb);
 
         // End block (PHI node)
         LLVMPositionBuilderAtEnd(builder, end_bb);
 
-        // Match types for PHI using the same promotion rules as binary ops.
-        match_types(builder, &then_val, node->lhs->type, &else_val,
-                    node->rhs->type);
-        LLVMTypeRef then_ty = LLVMTypeOf(then_val);
-
-        LLVMValueRef phi = LLVMBuildPhi(builder, then_ty, "ternary_res");
+        LLVMValueRef phi = LLVMBuildPhi(builder, target_ty, "ternary_res");
         LLVMValueRef incoming_values[2] = {then_val, else_val};
         LLVMBasicBlockRef incoming_blocks[2] = {then_end, else_end};
         LLVMAddIncoming(phi, incoming_values, incoming_blocks, 2);

@@ -15,14 +15,38 @@ static int is_alnum(char c) {
 
 static char decode_escape_char(const char** pp) {
     const char* p = *pp;
-    if (*p == 'n') { *pp = p + 1; return '\n'; }
-    if (*p == 'r') { *pp = p + 1; return '\r'; }
-    if (*p == 't') { *pp = p + 1; return '\t'; }
-    if (*p == 'a') { *pp = p + 1; return '\a'; }
-    if (*p == 'b') { *pp = p + 1; return '\b'; }
-    if (*p == 'f') { *pp = p + 1; return '\f'; }
-    if (*p == 'v') { *pp = p + 1; return '\v'; }
-    if (*p == '\\' || *p == '"' || *p == '\'') { *pp = p + 1; return *p; }
+    if (*p == 'n') {
+        *pp = p + 1;
+        return '\n';
+    }
+    if (*p == 'r') {
+        *pp = p + 1;
+        return '\r';
+    }
+    if (*p == 't') {
+        *pp = p + 1;
+        return '\t';
+    }
+    if (*p == 'a') {
+        *pp = p + 1;
+        return '\a';
+    }
+    if (*p == 'b') {
+        *pp = p + 1;
+        return '\b';
+    }
+    if (*p == 'f') {
+        *pp = p + 1;
+        return '\f';
+    }
+    if (*p == 'v') {
+        *pp = p + 1;
+        return '\v';
+    }
+    if (*p == '\\' || *p == '"' || *p == '\'') {
+        *pp = p + 1;
+        return *p;
+    }
     if (*p == 'x') {
         // Hex escape: \xHH (1-2 hex digits)
         p++;
@@ -30,9 +54,12 @@ static char decode_escape_char(const char** pp) {
         int count = 0;
         while (count < 2 && isxdigit((unsigned char)*p)) {
             int d;
-            if ('0' <= *p && *p <= '9') d = *p - '0';
-            else if ('a' <= *p && *p <= 'f') d = *p - 'a' + 10;
-            else d = *p - 'A' + 10;
+            if ('0' <= *p && *p <= '9')
+                d = *p - '0';
+            else if ('a' <= *p && *p <= 'f')
+                d = *p - 'a' + 10;
+            else
+                d = *p - 'A' + 10;
             val = val * 16 + d;
             p++;
             count++;
@@ -60,17 +87,18 @@ static char decode_escape_char(const char** pp) {
 }
 
 // Keyword table (selfhost-compatible: no anonymous struct)
-char* kw_str[41] = {
+char* kw_str[42] = {
     "return",   "if",       "else",     "while",    "for",      "int",
     "char",     "void",     "sizeof",   "struct",   "typedef",  "enum",
     "static",   "extern",   "const",    "long",     "bool",     "size_t",
     "NULL",     "true",     "false",    "switch",   "case",     "default",
     "break",    "continue", "unsigned", "signed",   "double",   "float",
     "do",       "goto",     "union",    "inline",   "restrict", "volatile",
-    "register", "_Bool",    "_Complex", "__func__", "_Pragma"};
-int kw_len[41] = {6, 2, 4, 5, 3, 3, 4, 4, 6, 6, 7, 4, 6, 6, 5, 4, 4, 6, 4, 4, 5,
-                  6, 4, 7, 5, 8, 8, 6, 6, 5, 2, 4, 5, 6, 8, 8, 8, 5, 8, 8, 7};
-int NUM_KEYWORDS = 41;
+    "register", "_Bool",    "_Complex", "__func__", "_Pragma",  "short"};
+int kw_len[42] = {6, 2, 4, 5, 3, 3, 4, 4, 6, 6, 7, 4, 6, 6,
+                  5, 4, 4, 6, 4, 4, 5, 6, 4, 7, 5, 8, 8, 6,
+                  6, 5, 2, 4, 5, 6, 8, 8, 8, 5, 8, 8, 7, 5};
+int NUM_KEYWORDS = 42;
 
 char* three_char_ops[3] = {"...", "<<=", ">>="};
 int NUM_THREE_CHAR_OPS = 3;
@@ -124,6 +152,10 @@ static void print_token(TokenKind kind, const char* str, int len, int val) {
 
 Token* new_token(TokenKind kind, Token* cur, const char* str, int len) {
     Token* tok = calloc(1, sizeof(Token));
+    if (!tok) {
+        perror("calloc");
+        exit(1);
+    }
     tok->kind = kind;
     tok->val = 0;
     tok->uval = 0;
@@ -246,6 +278,10 @@ Token* tokenize(const char* p) {
             p++; // skip opening quote
             size_t cap = strlen(p) + 1;
             char* decoded = calloc(cap, 1);
+            if (!decoded) {
+                perror("calloc");
+                return NULL;
+            }
             size_t len = 0;
             while (*p && *p != '"') {
                 if (*p == '\\') {

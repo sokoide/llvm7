@@ -128,11 +128,12 @@ $(SELFHOST_BUILD):
 bootstrap_prepare:
 	@mkdir -p $(BOOTSTRAP_INPUT_DIR) $(BOOTSTRAP_TC1_DIR) $(BOOTSTRAP_TC2_DIR)
 	@echo "=== bootstrap: prepare inputs ==="
+	@cp src/*.h $(BOOTSTRAP_INPUT_DIR)/ || exit 1
 	@for src in $(SELFHOST_SRCS); do \
 		echo "  copy src/$$src"; \
 		cp src/$$src $(BOOTSTRAP_INPUT_DIR)/$$src || exit 1; \
 	done
-	@for src in $(wildcard demo/*.c); do \
+	@for src in $(wildcard demo/*.[ch]); do \
 		base=$$(basename $$src); \
 		echo "  copy $$src"; \
 		cp $$src $(BOOTSTRAP_INPUT_DIR)/$$base || exit 1; \

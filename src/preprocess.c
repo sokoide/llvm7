@@ -403,8 +403,7 @@ static char* expand_macros_in_text(PreprocessContext* ctx, const char* text,
             size_t id_len = (size_t)(p - id_start);
             if (id_len == 8 && strncmp(id_start, "__LINE__", 8) == 0) {
                 char line_buf[32];
-                snprintf(line_buf, sizeof(line_buf), "%d",
-                         ctx->current_line);
+                snprintf(line_buf, sizeof(line_buf), "%d", ctx->current_line);
                 sb_append_n(&out, line_buf, strlen(line_buf));
                 continue;
             }
@@ -931,12 +930,14 @@ char* preprocess(const char* input, const char* filename) {
 #ifdef __APPLE__
     add_or_replace_macro(&ctx, "__APPLE__", "1", false, false, NULL, 0);
 #endif
-    add_or_replace_macro(&ctx, "__STDC_VERSION__", "199901L", false, false, NULL, 0);
+    add_or_replace_macro(&ctx, "__STDC_VERSION__", "199901L", false, false,
+                         NULL, 0);
 
     StrBuf file_val;
     sb_init(&file_val);
     sb_append_escaped_quoted(&file_val, filename);
-    add_or_replace_macro(&ctx, "__FILE__", file_val.data, false, false, NULL, 0);
+    add_or_replace_macro(&ctx, "__FILE__", file_val.data, false, false, NULL,
+                         0);
     free(file_val.data);
 
     time_t now = time(NULL);
