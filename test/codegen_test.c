@@ -2206,3 +2206,89 @@ char* test_generate_restrict_param() {
     mu_assert("Expected 7 for restrict foo(3,4)", result == 7);
     return NULL;
 }
+
+char* test_generate_volatile_local() {
+    Context ctx = {0};
+    Token* head = tokenize(
+        "int main() { volatile int x = 10; x = 20; return x; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+
+    char* ir = LLVMPrintModuleToString(module);
+    mu_assert("IR should contain volatile for volatile local",
+              strstr(ir, "volatile") != NULL);
+    LLVMDisposeMessage(ir);
+
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 20 for volatile local", result == 20);
+    return NULL;
+}
+
+char* test_generate_volatile_global() {
+    Context ctx = {0};
+    Token* head = tokenize(
+        "volatile int g = 5;"
+        "int main() { g = 42; return g; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+
+    char* ir = LLVMPrintModuleToString(module);
+    mu_assert("IR should contain volatile for volatile global",
+              strstr(ir, "volatile") != NULL);
+    LLVMDisposeMessage(ir);
+
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 42 for volatile global", result == 42);
+    return NULL;
+}
+
+char* test_generate_volatile_ptr() {
+    Context ctx = {0};
+    Token* head = tokenize(
+        "int foo(volatile int* p) { *p = 99; return *p; }"
+        "int main() { volatile int x = 0; return foo(&x); }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+
+    char* ir = LLVMPrintModuleToString(module);
+    mu_assert("IR should contain volatile for volatile ptr deref",
+              strstr(ir, "volatile") != NULL);
+    LLVMDisposeMessage(ir);
+
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 99 for volatile ptr", result == 99);
+    return NULL;
+}

@@ -305,16 +305,21 @@ Type* try_parse_type(Context* ctx) {
     bool is_unsigned = false;
     bool has_qualifier = false;
     bool is_restrict = false;
+    bool is_volatile = false;
     while (1) {
         if (consume(ctx, "restrict")) {
             is_restrict = true;
             has_qualifier = true;
             continue;
         }
+        if (consume(ctx, "volatile")) {
+            is_volatile = true;
+            has_qualifier = true;
+            continue;
+        }
         if (consume(ctx, "const") || consume(ctx, "static") ||
             consume(ctx, "extern") || consume(ctx, "signed") ||
-            consume(ctx, "inline") ||
-            consume(ctx, "volatile") || consume(ctx, "register")) {
+            consume(ctx, "inline") || consume(ctx, "register")) {
             has_qualifier = true;
             continue;
         }
@@ -500,6 +505,9 @@ Type* try_parse_type(Context* ctx) {
     if (is_unsigned) {
         base->is_unsigned = true;
     }
+    if (is_volatile) {
+        base->is_volatile = true;
+    }
 
     // Parse pointers
     while (consume(ctx, "*")) {
@@ -510,9 +518,16 @@ Type* try_parse_type(Context* ctx) {
     if (!is_restrict && consume(ctx, "restrict")) {
         is_restrict = true;
     }
+    // Check for volatile after pointer(s): int * volatile p
+    if (!is_volatile && consume(ctx, "volatile")) {
+        is_volatile = true;
+    }
 
     if (is_restrict && base->ty == PTR) {
         base->is_restrict = true;
+    }
+    if (is_volatile) {
+        base->is_volatile = true;
     }
 
     return base;

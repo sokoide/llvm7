@@ -89,5 +89,8 @@ char* test_generate_unsigned_long_long();
 char* test_generate_bool_basic();
 char* test_generate_static_inline();
 char* test_generate_restrict_param();
+char* test_generate_volatile_local();
+char* test_generate_volatile_global();
+char* test_generate_volatile_ptr();
 
 #endif

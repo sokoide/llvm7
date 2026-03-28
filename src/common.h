@@ -58,6 +58,7 @@ struct Type {
     } ty;
     bool is_unsigned;
     bool is_restrict;  // for PTR: restrict-qualified pointer
+    bool is_volatile;
     struct Type* ptr_to;
     size_t array_size;
     struct Member* members; // For STRUCT

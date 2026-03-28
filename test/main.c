@@ -111,6 +111,9 @@ static char* run_all_tests() {
                 "codegen: unsigned long long");
     mu_run_test(test_generate_static_inline, "codegen: static inline");
     mu_run_test(test_generate_restrict_param, "codegen: restrict param");
+    mu_run_test(test_generate_volatile_local, "codegen: volatile local");
+    mu_run_test(test_generate_volatile_global, "codegen: volatile global");
+    mu_run_test(test_generate_volatile_ptr, "codegen: volatile ptr");
     mu_run_test(test_generate_function_pointer_basic,
                 "codegen: function pointer basic");
     mu_run_test(test_generate_bool_basic, "codegen: bool basic");

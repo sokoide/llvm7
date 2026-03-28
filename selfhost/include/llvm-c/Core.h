@@ -304,6 +304,7 @@ LLVMAttributeRef LLVMCreateEnumAttribute(LLVMContextRef C, unsigned KindID,
                                          uint64_t Val);
 void LLVMSetLinkage(LLVMValueRef Global, LLVMLinkage Linkage);
 void LLVMSetOperand(LLVMValueRef Val, unsigned Index, LLVMValueRef Operand);
+void LLVMSetVolatile(LLVMValueRef MemoryAccessInst, LLVMBool IsVolatile);
 
 #ifdef __cplusplus
 }

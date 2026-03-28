@@ -898,6 +898,23 @@ LLVMModuleRef generate_module(Context* ctx) {
  * @param[out] has_return Set to true if return statement was encountered
  * @return LLVMValueRef Generated value
  */
+
+static LLVMValueRef build_volatile_load(LLVMBuilderRef builder,
+                                        LLVMTypeRef ty, LLVMValueRef ptr,
+                                        const char* name, bool is_volatile) {
+    LLVMValueRef inst = LLVMBuildLoad2(builder, ty, ptr, name);
+    if (is_volatile) LLVMSetVolatile(inst, true);
+    return inst;
+}
+
+static LLVMValueRef build_volatile_store(LLVMBuilderRef builder,
+                                         LLVMValueRef val, LLVMValueRef ptr,
+                                         bool is_volatile) {
+    LLVMValueRef inst = LLVMBuildStore(builder, val, ptr);
+    if (is_volatile) LLVMSetVolatile(inst, true);
+    return inst;
+}
+
 static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
                             LLVMValueRef* local_allocas, bool* has_return,
                             LLVMModuleRef module) {
@@ -922,8 +939,9 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
                 return alloca_ptr;
             }
             LLVMTypeRef var_type = to_llvm_type(node->type);
-            LLVMValueRef loaded =
-                LLVMBuildLoad2(builder, var_type, alloca_ptr, "loadtmp");
+            LLVMValueRef loaded = build_volatile_load(
+                builder, var_type, alloca_ptr, "loadtmp",
+                node->type ? node->type->is_volatile : false);
             // Extend char (i8) to int (i32) for use in expressions
             if (node->type && node->type->ty == CHAR) {
                 if (node->type->is_unsigned) {
@@ -951,8 +969,9 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
                 return gvar;
             }
             LLVMTypeRef var_type = to_llvm_type(node->type);
-            LLVMValueRef loaded =
-                LLVMBuildLoad2(builder, var_type, gvar, "gload");
+            LLVMValueRef loaded = build_volatile_load(
+                builder, var_type, gvar, "gload",
+                node->type ? node->type->is_volatile : false);
             // Extend char (i8) to int (i32) for use in expressions
             if (node->type && node->type->ty == CHAR) {
                 if (node->type->is_unsigned) {
@@ -988,11 +1007,14 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             cast_value(builder, rhs, node->rhs->type,
                        to_llvm_type(node->lhs->type), node->lhs->type);
 
+        bool lhs_volatile =
+            node->lhs->type ? node->lhs->type->is_volatile : false;
+
         if (node->lhs->kind == ND_DEREF) {
             // *ptr = value - store through pointer
             LLVMValueRef ptr = codegen(ctx, node->lhs->lhs, builder,
                                        local_allocas, has_return, module);
-            LLVMBuildStore(builder, store_val, ptr);
+            build_volatile_store(builder, store_val, ptr, lhs_volatile);
         } else if (node->lhs->kind == ND_MEMBER) {
             // member access: s.a = value
             Node* addr_node = new_node(ND_ADDR, node->lhs, NULL);
@@ -1001,12 +1023,13 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
                                        has_return, module);
             free(addr_node);
 
-            LLVMBuildStore(builder, store_val, ptr);
+            build_volatile_store(builder, store_val, ptr, lhs_volatile);
         } else if (node->lhs->kind == ND_LVAR) {
             // Regular variable assignment
             if (node->lhs->val < 1024 && local_allocas[node->lhs->val]) {
                 LLVMValueRef alloca_ptr = local_allocas[node->lhs->val];
-                LLVMBuildStore(builder, store_val, alloca_ptr);
+                build_volatile_store(builder, store_val, alloca_ptr,
+                                    lhs_volatile);
             }
         } else if (node->lhs->kind == ND_GVAR) {
             // Global variable assignment
@@ -1017,7 +1040,7 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
 
             LLVMValueRef gvar = LLVMGetNamedGlobal(module, var_name);
             if (gvar) {
-                LLVMBuildStore(builder, store_val, gvar);
+                build_volatile_store(builder, store_val, gvar, lhs_volatile);
             }
         }
         return rhs; // assignment returns the assigned value (as i32)
@@ -1472,8 +1495,10 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
 
         // Load current value
         LLVMTypeRef val_type = to_llvm_type(node->lhs->type);
-        LLVMValueRef old_val =
-            LLVMBuildLoad2(builder, val_type, ptr, "incdec.old");
+        bool inc_volatile =
+            node->lhs->type ? node->lhs->type->is_volatile : false;
+        LLVMValueRef old_val = build_volatile_load(
+            builder, val_type, ptr, "incdec.old", inc_volatile);
         LLVMValueRef new_val;
 
         if (node->lhs->type && node->lhs->type->ty == PTR) {
@@ -1497,7 +1522,7 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         }
 
         // Store back
-        LLVMBuildStore(builder, new_val, ptr);
+        build_volatile_store(builder, new_val, ptr, inc_volatile);
 
         // Return old or new value
         if (node->kind == ND_PRE_INC || node->kind == ND_PRE_DEC) {
@@ -1840,8 +1865,9 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         LLVMValueRef ptr =
             codegen(ctx, node->lhs, builder, local_allocas, has_return, module);
         LLVMTypeRef loaded_type = to_llvm_type(node->type);
-        LLVMValueRef loaded =
-            LLVMBuildLoad2(builder, loaded_type, ptr, "deref");
+        LLVMValueRef loaded = build_volatile_load(
+            builder, loaded_type, ptr, "deref",
+            node->type ? node->type->is_volatile : false);
         // Sign-extend char (i8) to int (i32) for use in expressions
         if (node->type && node->type->ty == CHAR) {
             loaded = LLVMBuildSExt(builder, loaded, ty_i32(), "sext_char");
@@ -1857,8 +1883,9 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         free(addr_node);
 
         LLVMTypeRef member_type = to_llvm_type(node->type);
-        LLVMValueRef loaded =
-            LLVMBuildLoad2(builder, member_type, ptr, "mload");
+        LLVMValueRef loaded = build_volatile_load(
+            builder, member_type, ptr, "mload",
+            node->type ? node->type->is_volatile : false);
         // Sign-extend char (i8) to int (i32) for use in expressions
         if (node->type && node->type->ty == CHAR) {
             loaded = LLVMBuildSExt(builder, loaded, ty_i32(), "sext_char");
@@ -1872,7 +1899,9 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             codegen(ctx, addr_node, builder, local_allocas, has_return, module);
         free(addr_node);
         LLVMTypeRef lit_type = to_llvm_type(node->type);
-        return LLVMBuildLoad2(builder, lit_type, ptr, "compound_load");
+        return build_volatile_load(
+            builder, lit_type, ptr, "compound_load",
+            node->type ? node->type->is_volatile : false);
     }
     case ND_ARRAY_TO_PTR:
     case ND_ADDR: {
