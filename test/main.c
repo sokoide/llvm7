@@ -109,6 +109,7 @@ static char* run_all_tests() {
                 "codegen: long long arithmetic");
     mu_run_test(test_generate_unsigned_long_long,
                 "codegen: unsigned long long");
+    mu_run_test(test_generate_static_inline, "codegen: static inline");
     mu_run_test(test_generate_function_pointer_basic,
                 "codegen: function pointer basic");
     mu_run_test(test_generate_bool_basic, "codegen: bool basic");
@@ -241,6 +242,8 @@ static char* run_all_tests() {
     mu_run_test(test_parse_long_long_promotion, "parse: long long promotion");
     mu_run_test(test_parse_function_pointer_basic,
                 "parse: function pointer basic");
+    mu_run_test(test_parse_static_inline, "parse: static inline");
+    mu_run_test(test_parse_inline_function, "parse: inline function");
     mu_run_test(test_preprocess_noop, "preprocess: no-op");
     mu_run_test(test_preprocess_include, "preprocess: include");
     mu_run_test(test_preprocess_define, "preprocess: define");

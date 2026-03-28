@@ -1702,3 +1702,37 @@ char* test_parse_function_pointer_basic() {
     free_tokens(head);
     return NULL;
 }
+
+char* test_parse_static_inline() {
+    Context ctx = {0};
+    Token* head = tokenize("static inline int add(int a, int b) { return a + b; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    mu_assert("should have one function", ctx.node_count == 1);
+    Node* fn = ctx.code[0];
+    mu_assert("should be function", fn->kind == ND_FUNCTION);
+    mu_assert("should be inline", fn->is_inline);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    return NULL;
+}
+
+char* test_parse_inline_function() {
+    Context ctx = {0};
+    Token* head = tokenize("inline int double_val(int x) { return x * 2; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+
+    mu_assert("should have one function", ctx.node_count == 1);
+    Node* fn = ctx.code[0];
+    mu_assert("should be function", fn->kind == ND_FUNCTION);
+    mu_assert("should be inline", fn->is_inline);
+
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    return NULL;
+}

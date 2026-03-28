@@ -2152,3 +2152,26 @@ char* test_generate_bool_basic() {
     mu_assert("Expected 2 (1 + 0 + 1)", result == 2);
     return NULL;
 }
+
+char* test_generate_static_inline() {
+    Context ctx = {0};
+    Token* head = tokenize(
+        "static inline int add(int a, int b) { return a + b; }"
+        "int main() { return add(3, 4); }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 7 for static inline add(3,4)", result == 7);
+    return NULL;
+}

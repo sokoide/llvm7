@@ -92,6 +92,8 @@ char* test_parse_long_long_decl();
 char* test_parse_unsigned_long_long_decl();
 char* test_parse_long_vs_long_long_distinct();
 char* test_parse_long_long_promotion();
+char* test_parse_static_inline();
+char* test_parse_inline_function();
 char* test_parse_function_pointer_basic();
 
 #endif

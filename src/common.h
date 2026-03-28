@@ -173,6 +173,8 @@ struct Node {
     bool is_extern;   // for extern global var
     bool is_vla;      // for ND_DECL: variable-length array declaration
     bool is_variadic; // for ND_FUNCTION: variadic function
+    bool is_inline;   // for ND_FUNCTION: inline function
+    bool is_static;   // for ND_FUNCTION: static function
     bool is_vararg;   // Variadic function default: false
     void* llvm_label; // LLVMBasicBlockRef for ND_CASE/ND_BREAK/etc.
 };

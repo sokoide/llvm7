@@ -752,6 +752,18 @@ LLVMModuleRef generate_module(Context* ctx) {
             func = LLVMAddFunction(module, func_name, func_type);
         }
 
+        // Apply inline semantics
+        if (func_node->is_inline) {
+            unsigned attr_kind = LLVMGetEnumAttributeKindForName("alwaysinline", 12);
+            LLVMAttributeRef attr = LLVMCreateEnumAttribute(get_llvm_context(), attr_kind, 0);
+            LLVMAddAttributeAtIndex(func, -1, attr);
+        }
+
+        // Apply static linkage
+        if (func_node->is_static) {
+            LLVMSetLinkage(func, LLVMPrivateLinkage);
+        }
+
         // If it's a prototype (no body), skip building the body
         if (func_node->lhs == NULL) {
             if (param_types)

@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #include <stddef.h>
+#include <stdint.h>
 
 typedef unsigned char LLVMBool;
 
@@ -15,6 +16,7 @@ typedef struct LLVMOpaqueType *LLVMTypeRef;
 typedef struct LLVMOpaqueValue *LLVMValueRef;
 typedef struct LLVMOpaqueBuilder *LLVMBuilderRef;
 typedef struct LLVMOpaqueBasicBlock *LLVMBasicBlockRef;
+typedef struct LLVMOpaqueAttributeRef *LLVMAttributeRef;
 
 typedef enum {
   LLVMVoidTypeKind = 0,
@@ -295,6 +297,11 @@ int LLVMPrintModuleToFile(LLVMModuleRef M, const char *Filename,
                           char **ErrorMessage);
 void LLVMSetGlobalConstant(LLVMValueRef Global, LLVMBool Value);
 void LLVMSetInitializer(LLVMValueRef Global, LLVMValueRef ConstantVal);
+void LLVMAddAttributeAtIndex(LLVMValueRef F, unsigned Idx,
+                             LLVMAttributeRef A);
+unsigned LLVMGetEnumAttributeKindForName(const char *Name, size_t SLen);
+LLVMAttributeRef LLVMCreateEnumAttribute(LLVMContextRef C, unsigned KindID,
+                                         uint64_t Val);
 void LLVMSetLinkage(LLVMValueRef Global, LLVMLinkage Linkage);
 void LLVMSetOperand(LLVMValueRef Val, unsigned Index, LLVMValueRef Operand);
 

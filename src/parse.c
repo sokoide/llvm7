@@ -838,8 +838,25 @@ static Node* parse_block_stmt(Context* ctx) {
 void parse_program(Context* ctx) {
     int i = 0;
     while (!at_eof(ctx)) {
-        // Check for extern declaration
-        bool is_extern = consume(ctx, "extern");
+        bool is_inline = false;
+        bool is_static = false;
+        bool is_extern = false;
+
+        while (1) {
+            if (consume(ctx, "inline")) {
+                is_inline = true;
+                continue;
+            }
+            if (consume(ctx, "static")) {
+                is_static = true;
+                continue;
+            }
+            if (consume(ctx, "extern")) {
+                is_extern = true;
+                continue;
+            }
+            break;
+        }
 
         if (consume(ctx, "typedef")) {
             Type* ty = parse_type(ctx);
@@ -898,6 +915,8 @@ void parse_program(Context* ctx) {
                 proto_node->rhs = func_params;
                 proto_node->is_extern = is_extern;
                 proto_node->is_vararg = is_vararg;
+                proto_node->is_inline = is_inline;
+                proto_node->is_static = is_static;
                 ctx->code[i++] = proto_node;
                 continue;
             }
@@ -915,6 +934,8 @@ void parse_program(Context* ctx) {
             func_node->tok = tok;
             func_node->type = ty;
             func_node->rhs = func_params;
+            func_node->is_inline = is_inline;
+            func_node->is_static = is_static;
 
             // Parse function body (statements)
             Node* head = NULL;
