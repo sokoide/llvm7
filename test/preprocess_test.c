@@ -259,3 +259,83 @@ char* test_preprocess_variadic_macro_gnu_comma_suppression() {
     free(output);
     return NULL;
 }
+
+char* test_preprocess_stdc_version() {
+    const char* input = "long v = __STDC_VERSION__;\n";
+    char* output = preprocess(input, "test.c");
+    mu_assert("__STDC_VERSION__ should expand to 199901L",
+              strstr(output, "long v = 199901L;") != NULL);
+    free(output);
+    return NULL;
+}
+
+char* test_preprocess_file_macro() {
+    const char* input = "char* f = __FILE__;\n";
+    char* output = preprocess(input, "mytest.c");
+    mu_assert("__FILE__ should expand to quoted filename",
+              strstr(output, "char* f = \"mytest.c\";") != NULL);
+    free(output);
+    return NULL;
+}
+
+char* test_preprocess_date_macro() {
+    const char* input = "char* d = __DATE__;\n";
+    char* output = preprocess(input, "test.c");
+    mu_assert("__DATE__ should expand to a quoted date string",
+              strstr(output, "char* d = \"") != NULL);
+    free(output);
+    return NULL;
+}
+
+char* test_preprocess_time_macro() {
+    const char* input = "char* t = __TIME__;\n";
+    char* output = preprocess(input, "test.c");
+    mu_assert("__TIME__ should expand to a quoted time string",
+              strstr(output, "char* t = \"") != NULL);
+    free(output);
+    return NULL;
+}
+
+char* test_preprocess_line_macro() {
+    const char* input =
+        "int a = __LINE__;\nint b = __LINE__;\nint c = __LINE__;\n";
+    char* output = preprocess(input, "test.c");
+    mu_assert("first __LINE__ should be 1",
+              strstr(output, "int a = 1;") != NULL);
+    mu_assert("second __LINE__ should be 2",
+              strstr(output, "int b = 2;") != NULL);
+    mu_assert("third __LINE__ should be 3",
+              strstr(output, "int c = 3;") != NULL);
+    free(output);
+    return NULL;
+}
+
+char* test_preprocess_line_in_if_directive() {
+    const char* input = "#if __LINE__ == 1\nint x = 1;\n#endif\n";
+    char* output = preprocess(input, "test.c");
+    mu_assert("__LINE__ in #if should work",
+              strstr(output, "int x = 1;") != NULL);
+    free(output);
+    return NULL;
+}
+
+char* test_preprocess_line_via_define() {
+    const char* input =
+        "#define MYLINE __LINE__\nint a = MYLINE;\nint b = MYLINE;\n";
+    char* output = preprocess(input, "test.c");
+    mu_assert("MYLINE on line 2 should expand to 2",
+              strstr(output, "int a = 2;") != NULL);
+    mu_assert("MYLINE on line 3 should expand to 3",
+              strstr(output, "int b = 3;") != NULL);
+    free(output);
+    return NULL;
+}
+
+char* test_preprocess_file_not_expand_in_string() {
+    const char* input = "char* s = \"__FILE__\";\n";
+    char* output = preprocess(input, "test.c");
+    mu_assert("__FILE__ in string literal should NOT expand",
+              strstr(output, "char* s = \"__FILE__\";") != NULL);
+    free(output);
+    return NULL;
+}

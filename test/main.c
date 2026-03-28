@@ -274,6 +274,17 @@ static char* run_all_tests() {
                 "preprocess: variadic macro stringify __VA_ARGS__");
     mu_run_test(test_preprocess_variadic_macro_gnu_comma_suppression,
                 "preprocess: variadic macro gnu comma suppression");
+    mu_run_test(test_preprocess_stdc_version, "preprocess: __STDC_VERSION__");
+    mu_run_test(test_preprocess_file_macro, "preprocess: __FILE__");
+    mu_run_test(test_preprocess_date_macro, "preprocess: __DATE__");
+    mu_run_test(test_preprocess_time_macro, "preprocess: __TIME__");
+    mu_run_test(test_preprocess_line_macro, "preprocess: __LINE__");
+    mu_run_test(test_preprocess_line_in_if_directive,
+                "preprocess: __LINE__ in #if");
+    mu_run_test(test_preprocess_line_via_define,
+                "preprocess: __LINE__ via #define");
+    mu_run_test(test_preprocess_file_not_expand_in_string,
+                "preprocess: __FILE__ not expand in string");
     return NULL;
 }
 

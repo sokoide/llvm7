@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 typedef struct Macro Macro;
 struct Macro {
@@ -20,6 +21,7 @@ struct Macro {
 
 typedef struct {
     Macro* macros;
+    int current_line;
 } PreprocessContext;
 
 typedef struct CondStack CondStack;
@@ -399,6 +401,13 @@ static char* expand_macros_in_text(PreprocessContext* ctx, const char* text,
             while (is_ident_char(*p))
                 p++;
             size_t id_len = (size_t)(p - id_start);
+            if (id_len == 8 && strncmp(id_start, "__LINE__", 8) == 0) {
+                char line_buf[32];
+                snprintf(line_buf, sizeof(line_buf), "%d",
+                         ctx->current_line);
+                sb_append_n(&out, line_buf, strlen(line_buf));
+                continue;
+            }
             Macro* m = find_macro(ctx, id_start, id_len);
             if (m && !m->is_function) {
                 char* ex = expand_macros_in_text(ctx, m->value, depth + 1);
@@ -494,6 +503,8 @@ static char* preprocess_internal(const char* input, const char* filename,
     StrBuf out;
     sb_init(&out);
 
+    ctx->current_line = 1;
+
     CondStack* cond_stack = NULL;
     bool in_block_comment = false;
 
@@ -547,11 +558,16 @@ static char* preprocess_internal(const char* input, const char* filename,
                     while (e < line_end && is_ident_char(*e))
                         e++;
                     size_t name_len = (size_t)(e - name_start);
-                    Macro* m = find_macro(ctx, name_start, name_len);
-                    if (m)
-                        expr_val = (int)strtol(m->value, NULL, 10);
-                    else
-                        expr_val = 0;
+                    if (name_len == 8 &&
+                        strncmp(name_start, "__LINE__", 8) == 0) {
+                        expr_val = ctx->current_line;
+                    } else {
+                        Macro* m = find_macro(ctx, name_start, name_len);
+                        if (m)
+                            expr_val = (int)strtol(m->value, NULL, 10);
+                        else
+                            expr_val = 0;
+                    }
                 } else {
                     expr_val = (int)strtol(e, NULL, 10);
                 }
@@ -834,6 +850,13 @@ static char* preprocess_internal(const char* input, const char* filename,
                     while (s < line_end && is_ident_char(*s))
                         s++;
                     size_t id_len = (size_t)(s - id_start);
+                    if (id_len == 8 && strncmp(id_start, "__LINE__", 8) == 0) {
+                        char line_buf[32];
+                        snprintf(line_buf, sizeof(line_buf), "%d",
+                                 ctx->current_line);
+                        sb_append_n(&out, line_buf, strlen(line_buf));
+                        continue;
+                    }
                     Macro* m = find_macro(ctx, id_start, id_len);
                     if (m) {
                         if (m->is_function) {
@@ -887,6 +910,7 @@ static char* preprocess_internal(const char* input, const char* filename,
             if (!is_directive && (!cond_stack || cond_stack->active))
                 sb_append_c(&out, '\n');
             p = line_end + 1;
+            ctx->current_line++;
         } else {
             p = line_end;
         }
@@ -907,6 +931,23 @@ char* preprocess(const char* input, const char* filename) {
 #ifdef __APPLE__
     add_or_replace_macro(&ctx, "__APPLE__", "1", false, false, NULL, 0);
 #endif
+    add_or_replace_macro(&ctx, "__STDC_VERSION__", "199901L", false, false, NULL, 0);
+
+    StrBuf file_val;
+    sb_init(&file_val);
+    sb_append_escaped_quoted(&file_val, filename);
+    add_or_replace_macro(&ctx, "__FILE__", file_val.data, false, false, NULL, 0);
+    free(file_val.data);
+
+    time_t now = time(NULL);
+    struct tm* tm_info = localtime(&now);
+    char date_buf[32];
+    strftime(date_buf, sizeof(date_buf), "\"%b %d %Y\"", tm_info);
+    add_or_replace_macro(&ctx, "__DATE__", date_buf, false, false, NULL, 0);
+    char time_buf[32];
+    strftime(time_buf, sizeof(time_buf), "\"%H:%M:%S\"", tm_info);
+    add_or_replace_macro(&ctx, "__TIME__", time_buf, false, false, NULL, 0);
+
     char* out = preprocess_internal(input, filename, &ctx);
     free_macros(ctx.macros);
     return out;

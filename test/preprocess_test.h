@@ -21,5 +21,13 @@ char* test_preprocess_variadic_macro_in_stringify();
 char* test_preprocess_variadic_macro_zero_fixed_params();
 char* test_preprocess_variadic_macro_stringify_va_args();
 char* test_preprocess_variadic_macro_gnu_comma_suppression();
+char* test_preprocess_stdc_version();
+char* test_preprocess_file_macro();
+char* test_preprocess_date_macro();
+char* test_preprocess_time_macro();
+char* test_preprocess_line_macro();
+char* test_preprocess_line_in_if_directive();
+char* test_preprocess_line_via_define();
+char* test_preprocess_file_not_expand_in_string();
 
 #endif
