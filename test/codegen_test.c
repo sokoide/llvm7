@@ -2175,3 +2175,34 @@ char* test_generate_static_inline() {
     mu_assert("Expected 7 for static inline add(3,4)", result == 7);
     return NULL;
 }
+
+char* test_generate_restrict_param() {
+    Context ctx = {0};
+    Token* head = tokenize(
+        "int foo(int* restrict a, int* restrict b) { return *a + *b; }"
+        "int main() { int x = 3; int y = 4; return foo(&x, &y); }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+
+    // Verify noalias attribute in IR
+    char* ir = LLVMPrintModuleToString(module);
+    mu_assert("IR should contain noalias for restrict params",
+              strstr(ir, "noalias") != NULL);
+    LLVMDisposeMessage(ir);
+
+    // Verify execution
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 7 for restrict foo(3,4)", result == 7);
+    return NULL;
+}

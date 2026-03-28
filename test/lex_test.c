@@ -329,6 +329,47 @@ char* test_lex_hex_float_uppercase() {
     return NULL;
 }
 
+char* test_lex_hex_escape() {
+    // '\x41' should be 65 (ASCII 'A')
+    Token* head = tokenize("'\\x41'");
+    Token* curr = head;
+    mu_assert("should be TK_NUM", curr->kind == TK_NUM);
+    mu_assert("'\\x41' should be 65", curr->val == 65);
+    free_tokens(head);
+    return NULL;
+}
+
+char* test_lex_hex_escape_two_digit() {
+    // '\xff' as signed char is -1
+    Token* head = tokenize("'\\xff'");
+    Token* curr = head;
+    mu_assert("should be TK_NUM", curr->kind == TK_NUM);
+    mu_assert("'\\xff' signed char should be -1", curr->val == -1);
+    free_tokens(head);
+    return NULL;
+}
+
+char* test_lex_octal_escape() {
+    // '\101' should be 65 (octal 101 = 65 = 'A')
+    // '\0' should still be 0 (backward compat)
+    Token* head = tokenize("'\\101'");
+    Token* curr = head;
+    mu_assert("should be TK_NUM", curr->kind == TK_NUM);
+    mu_assert("'\\101' should be 65", curr->val == 65);
+    free_tokens(head);
+    return NULL;
+}
+
+char* test_lex_octal_escape_zero() {
+    // '\0' backward compatibility
+    Token* head = tokenize("'\\0'");
+    Token* curr = head;
+    mu_assert("should be TK_NUM", curr->kind == TK_NUM);
+    mu_assert("'\\0' should be 0", curr->val == 0);
+    free_tokens(head);
+    return NULL;
+}
+
 char* test_lex_hex_int() {
     // Test hexadecimal integer: 0x123 = 291
     Token* head = tokenize("0x123");

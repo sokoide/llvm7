@@ -15,25 +15,42 @@ static int is_alnum(char c) {
 
 static char decode_escape_char(const char** pp) {
     const char* p = *pp;
-    if (*p == 'n') {
-        *pp = p + 1;
-        return '\n';
+    if (*p == 'n') { *pp = p + 1; return '\n'; }
+    if (*p == 'r') { *pp = p + 1; return '\r'; }
+    if (*p == 't') { *pp = p + 1; return '\t'; }
+    if (*p == 'a') { *pp = p + 1; return '\a'; }
+    if (*p == 'b') { *pp = p + 1; return '\b'; }
+    if (*p == 'f') { *pp = p + 1; return '\f'; }
+    if (*p == 'v') { *pp = p + 1; return '\v'; }
+    if (*p == '\\' || *p == '"' || *p == '\'') { *pp = p + 1; return *p; }
+    if (*p == 'x') {
+        // Hex escape: \xHH (1-2 hex digits)
+        p++;
+        int val = 0;
+        int count = 0;
+        while (count < 2 && isxdigit((unsigned char)*p)) {
+            int d;
+            if ('0' <= *p && *p <= '9') d = *p - '0';
+            else if ('a' <= *p && *p <= 'f') d = *p - 'a' + 10;
+            else d = *p - 'A' + 10;
+            val = val * 16 + d;
+            p++;
+            count++;
+        }
+        *pp = p;
+        return (char)(val & 0xFF);
     }
-    if (*p == 'r') {
-        *pp = p + 1;
-        return '\r';
-    }
-    if (*p == 't') {
-        *pp = p + 1;
-        return '\t';
-    }
-    if (*p == '0') {
-        *pp = p + 1;
-        return '\0';
-    }
-    if (*p == '\\' || *p == '"' || *p == '\'') {
-        *pp = p + 1;
-        return *p;
+    if ('0' <= *p && *p <= '7') {
+        // Octal escape: \OOO (1-3 octal digits)
+        int val = 0;
+        int count = 0;
+        while (count < 3 && '0' <= *p && *p <= '7') {
+            val = val * 8 + (*p - '0');
+            p++;
+            count++;
+        }
+        *pp = p;
+        return (char)(val & 0xFF);
     }
     if (*p == '\0') {
         return '\0';

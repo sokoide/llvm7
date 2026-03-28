@@ -21,5 +21,9 @@ char* test_lex_hex_float_with_fraction();
 char* test_lex_hex_float_negative_exp();
 char* test_lex_hex_float_uppercase();
 char* test_lex_hex_int();
+char* test_lex_hex_escape();
+char* test_lex_hex_escape_two_digit();
+char* test_lex_octal_escape();
+char* test_lex_octal_escape_zero();
 
 #endif

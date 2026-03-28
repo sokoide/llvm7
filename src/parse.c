@@ -304,10 +304,16 @@ Type* try_parse_type(Context* ctx) {
     // Skip common qualifiers
     bool is_unsigned = false;
     bool has_qualifier = false;
+    bool is_restrict = false;
     while (1) {
+        if (consume(ctx, "restrict")) {
+            is_restrict = true;
+            has_qualifier = true;
+            continue;
+        }
         if (consume(ctx, "const") || consume(ctx, "static") ||
             consume(ctx, "extern") || consume(ctx, "signed") ||
-            consume(ctx, "inline") || consume(ctx, "restrict") ||
+            consume(ctx, "inline") ||
             consume(ctx, "volatile") || consume(ctx, "register")) {
             has_qualifier = true;
             continue;
@@ -498,6 +504,15 @@ Type* try_parse_type(Context* ctx) {
     // Parse pointers
     while (consume(ctx, "*")) {
         base = new_type_ptr(base);
+    }
+
+    // Check for restrict after pointer(s): int * restrict p
+    if (!is_restrict && consume(ctx, "restrict")) {
+        is_restrict = true;
+    }
+
+    if (is_restrict && base->ty == PTR) {
+        base->is_restrict = true;
     }
 
     return base;

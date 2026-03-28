@@ -110,6 +110,7 @@ static char* run_all_tests() {
     mu_run_test(test_generate_unsigned_long_long,
                 "codegen: unsigned long long");
     mu_run_test(test_generate_static_inline, "codegen: static inline");
+    mu_run_test(test_generate_restrict_param, "codegen: restrict param");
     mu_run_test(test_generate_function_pointer_basic,
                 "codegen: function pointer basic");
     mu_run_test(test_generate_bool_basic, "codegen: bool basic");
@@ -136,6 +137,10 @@ static char* run_all_tests() {
     mu_run_test(test_lex_hex_float_negative_exp, "lex: hex float negative exp");
     mu_run_test(test_lex_hex_float_uppercase, "lex: hex float uppercase");
     mu_run_test(test_lex_hex_int, "lex: hex int");
+    mu_run_test(test_lex_hex_escape, "lex: hex escape \\x");
+    mu_run_test(test_lex_hex_escape_two_digit, "lex: hex escape two digit");
+    mu_run_test(test_lex_octal_escape, "lex: octal escape");
+    mu_run_test(test_lex_octal_escape_zero, "lex: octal escape \\0");
     mu_run_test(test_new_node_num, "parse: new_node_num");
     mu_run_test(test_new_node, "parse: new_node");
     mu_run_test(test_unary_num, "parse: unary num");

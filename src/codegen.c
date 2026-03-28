@@ -764,6 +764,21 @@ LLVMModuleRef generate_module(Context* ctx) {
             LLVMSetLinkage(func, LLVMPrivateLinkage);
         }
 
+        // Apply noalias for restrict-qualified pointer parameters
+        if (param_count > 0) {
+            param = func_node->rhs;
+            for (int i = 0; i < param_count; i++) {
+                if (param->type->ty == PTR && param->type->is_restrict) {
+                    unsigned attr_kind =
+                        LLVMGetEnumAttributeKindForName("noalias", 7);
+                    LLVMAttributeRef attr = LLVMCreateEnumAttribute(
+                        get_llvm_context(), attr_kind, 0);
+                    LLVMAddAttributeAtIndex(func, i + 1, attr);
+                }
+                param = param->next;
+            }
+        }
+
         // If it's a prototype (no body), skip building the body
         if (func_node->lhs == NULL) {
             if (param_types)
