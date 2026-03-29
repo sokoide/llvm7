@@ -2450,3 +2450,474 @@ char* test_generate_funcstr() {
     mu_assert("Expected 1 for __func__ string comparison", result == 1);
     return NULL;
 }
+
+// --- New tests for README-listed features missing coverage ---
+
+char* test_generate_continue() {
+    Context ctx = {0};
+    // sum odd numbers 1..5: 1+3+5 = 9
+    Token* head = tokenize(
+        "int main() { int s = 0; int i = 0; for (i = 1; i <= 5; i = i + 1) { "
+        "  if (i % 2 == 0) continue; s = s + i; } return s; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 9 for continue (sum odds 1..5)", result == 9);
+    return NULL;
+}
+
+char* test_generate_variadic_call() {
+    Context ctx = {0};
+    // Declare variadic function, call it (linker provides libc printf)
+    Token* head = tokenize("int printf(const char* fmt, ...); "
+                           "int main() { printf(\"%d\", 42); return 0; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 0 for variadic call", result == 0);
+    return NULL;
+}
+
+char* test_generate_array_init() {
+    Context ctx = {0};
+    Token* head = tokenize(
+        "int main() { int a[3] = {10, 20, 30}; return a[0] + a[1] + a[2]; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 60 for array init {10,20,30}", result == 60);
+    return NULL;
+}
+
+char* test_generate_struct_init() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { struct { int a; int b; } s = {3, 4}; "
+                           "return s.a + s.b; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 7 for struct init {3,4}", result == 7);
+    return NULL;
+}
+
+char* test_generate_void_function() {
+    Context ctx = {0};
+    Token* head = tokenize("void set(int* p, int v) { *p = v; } "
+                           "int main() { int x = 0; set(&x, 99); return x; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 99 for void function call", result == 99);
+    return NULL;
+}
+
+char* test_generate_ternary_int() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { return 1 ? 10 : 20; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 10 for ternary int (true)", result == 10);
+    return NULL;
+}
+
+char* test_generate_ternary_int_false() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { return 0 ? 10 : 20; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 20 for ternary int (false)", result == 20);
+    return NULL;
+}
+
+char* test_generate_modulo() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { return 17 % 5; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 2 for 17 %% 5", result == 2);
+    return NULL;
+}
+
+char* test_generate_nested_struct() {
+    Context ctx = {0};
+    Token* head = tokenize(
+        "int main() { struct { struct { int a; int b; } inner; int c; } s; "
+        "s.inner.a = 1; s.inner.b = 2; s.c = 3; "
+        "return s.inner.a + s.inner.b + s.c; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 6 for nested struct", result == 6);
+    return NULL;
+}
+
+char* test_generate_escape_sequences() {
+    Context ctx = {0};
+    // Test \a(7) \b(8) \f(12) \v(11) \r(13) via string literal chars
+    Token* head = tokenize("int main() { char* s = \"\\a\\b\\f\\v\\r\"; "
+                           "return s[0] + s[1] + s[2] + s[3] + s[4]; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    // \a=7, \b=8, \f=12, \v=11, \r=13 -> 7+8+12+11+13 = 51
+    mu_assert("Expected 51 for escape sequences", result == 51);
+    return NULL;
+}
+
+char* test_generate_char_init() {
+    Context ctx = {0};
+    Token* head = tokenize(
+        "int main() { char a[3] = {'A', 'B', 0}; return a[0] + a[1]; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 131 for char array init", result == 131);
+    return NULL;
+}
+
+char* test_generate_negative_div() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { return -10 / 3; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected -3 for -10 / 3", result == -3);
+    return NULL;
+}
+
+char* test_generate_negative_mod() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { return -10 % 3; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected -1 for -10 %% 3", result == -1);
+    return NULL;
+}
+
+char* test_generate_global_struct() {
+    Context ctx = {0};
+    Token* head =
+        tokenize("struct { int a; int b; } gs; "
+                 "int main() { gs.a = 10; gs.b = 20; return gs.a + gs.b; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 30 for global struct", result == 30);
+    return NULL;
+}
+
+char* test_generate_multiple_returns() {
+    Context ctx = {0};
+    Token* head =
+        tokenize("int abs_val(int x) { if (x < 0) return -x; return x; } "
+                 "int main() { return abs_val(-7) + abs_val(3); }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 10 for multiple returns", result == 10);
+    return NULL;
+}
+
+char* test_generate_long_basic() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { long x = 100; return (int)(x % 7); }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 2 for long basic (100%7)", result == 2);
+    return NULL;
+}
+
+char* test_generate_unsigned_char() {
+    Context ctx = {0};
+    Token* head =
+        tokenize("int main() { unsigned char c = 200; return (int)c; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 200 for unsigned char", result == 200);
+    return NULL;
+}
+
+char* test_generate_for_break() {
+    Context ctx = {0};
+    // sum 1..5 but break at 3: 1+2+3 = 6
+    Token* head = tokenize(
+        "int main() { int s = 0; int i; for (i = 1; i <= 5; i = i + 1) { "
+        "  s = s + i; if (i == 3) break; } return s; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 6 for for-break (1+2+3)", result == 6);
+    return NULL;
+}
+
+char* test_generate_while_continue() {
+    Context ctx = {0};
+    // sum 1..5, skip even: 1+3+5 = 9
+    Token* head = tokenize(
+        "int main() { int s = 0; int i = 0; while (i < 5) { "
+        "  i = i + 1; if (i % 2 == 0) continue; s = s + i; } return s; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 9 for while-continue", result == 9);
+    return NULL;
+}
+
+char* test_generate_pointer_deref_assign() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { int x = 1; int y = 2; int *p; "
+                           "p = &x; *p = 10; p = &y; *p = 20; return x + y; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 30 for pointer deref assign", result == 30);
+    return NULL;
+}
+
+char* test_generate_cast_int_ptr() {
+    Context ctx = {0};
+    Token* head = tokenize(
+        "int main() { int x = 65; char *p = (char*)&x; return (int)*p; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 65 for cast int to char ptr", result == 65);
+    return NULL;
+}

@@ -125,6 +125,29 @@ static char* run_all_tests() {
     mu_run_test(test_generate_flexible_array_member,
                 "codegen: flexible array member");
     mu_run_test(test_generate_funcstr, "codegen: __func__");
+    mu_run_test(test_generate_continue, "codegen: continue");
+    mu_run_test(test_generate_variadic_call, "codegen: variadic call");
+    mu_run_test(test_generate_array_init, "codegen: array init");
+    mu_run_test(test_generate_struct_init, "codegen: struct init");
+    mu_run_test(test_generate_void_function, "codegen: void function");
+    mu_run_test(test_generate_ternary_int, "codegen: ternary int (true)");
+    mu_run_test(test_generate_ternary_int_false,
+                "codegen: ternary int (false)");
+    mu_run_test(test_generate_modulo, "codegen: modulo");
+    mu_run_test(test_generate_nested_struct, "codegen: nested struct");
+    mu_run_test(test_generate_escape_sequences, "codegen: escape sequences");
+    mu_run_test(test_generate_char_init, "codegen: char array init");
+    mu_run_test(test_generate_negative_div, "codegen: negative div");
+    mu_run_test(test_generate_negative_mod, "codegen: negative mod");
+    mu_run_test(test_generate_global_struct, "codegen: global struct");
+    mu_run_test(test_generate_multiple_returns, "codegen: multiple returns");
+    mu_run_test(test_generate_long_basic, "codegen: long basic");
+    mu_run_test(test_generate_unsigned_char, "codegen: unsigned char");
+    mu_run_test(test_generate_for_break, "codegen: for-break");
+    mu_run_test(test_generate_while_continue, "codegen: while-continue");
+    mu_run_test(test_generate_pointer_deref_assign,
+                "codegen: pointer deref assign");
+    mu_run_test(test_generate_cast_int_ptr, "codegen: cast int to char ptr");
     mu_run_test(test_read_file_success, "file: read_file success");
     mu_run_test(test_read_file_not_found, "file: read_file not found");
     mu_run_test(test_lex_tokenize, "lex: tokenize");

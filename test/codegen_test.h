@@ -99,5 +99,26 @@ char* test_generate_const_param();
 char* test_generate_enum_values();
 char* test_generate_flexible_array_member();
 char* test_generate_funcstr();
+char* test_generate_continue();
+char* test_generate_variadic_call();
+char* test_generate_array_init();
+char* test_generate_struct_init();
+char* test_generate_void_function();
+char* test_generate_ternary_int();
+char* test_generate_ternary_int_false();
+char* test_generate_modulo();
+char* test_generate_nested_struct();
+char* test_generate_escape_sequences();
+char* test_generate_char_init();
+char* test_generate_negative_div();
+char* test_generate_negative_mod();
+char* test_generate_global_struct();
+char* test_generate_multiple_returns();
+char* test_generate_long_basic();
+char* test_generate_unsigned_char();
+char* test_generate_for_break();
+char* test_generate_while_continue();
+char* test_generate_pointer_deref_assign();
+char* test_generate_cast_int_ptr();
 
 #endif
