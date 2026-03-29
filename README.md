@@ -79,7 +79,7 @@ clang demo/example01.s -o demo/example01
 echo $?
 ```
 
-`example01`〜`example09` には期待される終了コードがあるため、`make selfhost_demo_check` を使えばセルフホストバイナリで IR 生成から実行→コード一致まで自動的に確認できます。
+`example01`〜`example09` には期待される終了コードがあるため、`make selfhost_test` を使えばセルフホストバイナリで IR 生成から実行→コード一致まで自動的に確認できます。
 
 ### 注意：外部プリプロセッサは不要
 

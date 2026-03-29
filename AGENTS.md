@@ -10,8 +10,10 @@
 ## Build, Test, and Development Commands
 - `make` – stage-1 build using system `clang`; produces `build/llvm7`.
 - `make selfhost` – uses `build/llvm7` to preprocess `src/*.c`, emit IR, and build `build/llvm7_selfhost`.
-- `make bootstrap_compare` – runs the full bootstrap pipeline (tc1 vs tc2 IR) and diffs outputs.
-- `make selfhost_demo_check` – preprocesses `demo/*.c`, compiles via the self-hosted compiler, links, and verifies exit codes for known demos.
+- `make selfhost_verify` – quick comparison of IR output between Stage 1 and Stage 2 for a single file.
+- `make selfhost_test` – preprocesses `demo/*.c`, compiles via the self-hosted compiler, links, and verifies exit codes for known demos.
+- `make bootstrap_compare` – runs the full bootstrap pipeline (tc1 vs tc2 IR) for all source files and diffs outputs.
+- `make bootstrap_check` – comprehensive integrity check; runs unit tests followed by `bootstrap_compare`.
 - `make test` – runs `test/Makefile`, building the `test_runner` that executes all lexer/parse/codegen unit tests.
 
 ## Coding Style & Naming Conventions

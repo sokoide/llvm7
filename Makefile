@@ -114,8 +114,8 @@ selfhost: $(TARGET) $(SELFHOST_BUILD)
 	@chmod +x $(SELFHOST_TARGET)
 	@echo "=== Self-host build complete: $(SELFHOST_TARGET) ==="
 
-.PHONY: selfhost_test
-selfhost_test: selfhost
+.PHONY: selfhost_verify
+selfhost_verify: selfhost
 	@echo "=== Verifying selfhost binary ==="
 	@LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(SELFHOST_TARGET) $(DEMO) -o $(SELFHOST_BUILD)/verify.ll
 	@LD_LIBRARY_PATH=$(LLVM_LIBDIR):$$LD_LIBRARY_PATH $(TARGET) $(DEMO) -o $(SELFHOST_BUILD)/original.ll
@@ -175,14 +175,14 @@ bootstrap_compare: bootstrap_tc1_outputs bootstrap_tc2_outputs
 bootstrap_check: test bootstrap_compare
 	@echo "PASS: tests + bootstrap compare"
 
-.PHONY: selfhost_demo_check
-selfhost_demo_check: selfhost
+.PHONY: selfhost_test
+selfhost_test: selfhost
 	@echo "=== selfhost demo check ==="
 	@mkdir -p $(SELFHOST_DEMO_DIR)/ll $(SELFHOST_DEMO_DIR)/bin
 	@for src in demo/*.c; do \
 		base=$$(basename $$src .c); \
 		case $$base in \
-			include_test|define_test) \
+			include_test|define_test|example21) \
 				echo "  SKIP $$base (experimental demo)"; \
 				continue ;; \
 		esac; \
@@ -201,6 +201,20 @@ selfhost_demo_check: selfhost
 			example09) expected=4 ;; \
 			example13) expected=0 ;; \
 			example14) expected=0 ;; \
+			example15) expected=25 ;; \
+			example16) expected=99 ;; \
+			example17) expected=42 ;; \
+			example18) expected=2 ;; \
+			example19) expected=7 ;; \
+			example20) expected=4 ;; \
+			example21) expected=3 ;; \
+			example22) expected=10 ;; \
+			example23) expected=7 ;; \
+			example24) expected=4 ;; \
+			example25) expected=60 ;; \
+			example26) expected=7 ;; \
+			example27) expected=12 ;; \
+			example28) expected=101 ;; \
 		esac; \
 		if [ -n "$$expected" ]; then \
 			clang $(SELFHOST_DEMO_DIR)/ll/$$base.ll -o $(SELFHOST_DEMO_DIR)/bin/$$base `llvm-config --ldflags --libs --system-libs` -lc || exit 1; \

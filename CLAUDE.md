@@ -14,8 +14,10 @@ make run              # build/llvm7 で demo/example02.c をコンパイル
 make run DEMO=path    # 任意のデモファイルを指定
 make test             # test/ 下のユニットテスト全実行
 make selfhost         # Stage 2: 自分自身でソースをコンパイル → build/llvm7_selfhost
-make bootstrap_compare  # tc1 と tc2 の IR 出力を比較（ブートストラップ検証）
-make selfhost_demo_check  # セルフホストバイナリで demo/*.c をコンパイル＆実行検証
+make selfhost_verify  # Stage 1 と Stage 2 の出力 IR をクイック比較（1ファイル）
+make selfhost_test    # セルフホストバイナリで demo/*.c をコンパイル＆実行検証
+make bootstrap_compare  # 全ソースコードの IR 出力を比較（Stage 1 vs Stage 2）
+make bootstrap_check    # ユニットテスト全実行 + 全ソースの IR 比較（完全性検証）
 make format           # clang-format 実行
 make clean            # ビルド成果物を削除
 ```
