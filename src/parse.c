@@ -2201,9 +2201,13 @@ Node* parse_primary(Context* ctx) {
                                      num_tok->str[num_tok->len - 1] == 'F')) {
                 is_single = true;
             }
-            num_node =
-                new_node_fnum(num_tok->fval,
-                              is_single ? new_type_float() : new_type_double());
+            Type* fty;
+            if (is_single) {
+                fty = new_type_float();
+            } else {
+                fty = new_type_double();
+            }
+            num_node = new_node_fnum(num_tok->fval, fty);
             ctx->current_token = ctx->current_token->next;
         } else {
             int ival = (num_tok->uval <= (unsigned long long)LLVM7_INT_MAX)

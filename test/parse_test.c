@@ -1733,3 +1733,137 @@ char* test_parse_inline_function() {
     free_tokens(head);
     return NULL;
 }
+
+char* test_parse_short_decl() {
+    Context ctx = {0};
+
+    // short x;
+    Token* tok = tokenize("short x;");
+    ctx.current_token = tok;
+    Node* node = parse_stmt(&ctx);
+
+    if (!node) {
+        free_tokens(tok);
+        return "short decl parse returned NULL";
+    }
+    mu_assert("node should be ND_DECL", node->kind == ND_DECL);
+    mu_assert("type should be SHORT", node->type->ty == SHORT);
+    mu_assert("should not be unsigned", !node->type->is_unsigned);
+
+    free_tokens(tok);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    return NULL;
+}
+
+char* test_parse_const_qualifier() {
+    Context ctx = {0};
+
+    // const int x;
+    Token* tok = tokenize("const int x;");
+    ctx.current_token = tok;
+    Node* node = parse_stmt(&ctx);
+
+    if (!node) {
+        free_tokens(tok);
+        return "const qualifier parse returned NULL";
+    }
+    mu_assert("node should be ND_DECL", node->kind == ND_DECL);
+    mu_assert("type should be INT", node->type->ty == INT);
+
+    free_tokens(tok);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    return NULL;
+}
+
+char* test_parse_register_qualifier() {
+    Context ctx = {0};
+
+    // register int x;
+    Token* tok = tokenize("register int x;");
+    ctx.current_token = tok;
+    Node* node = parse_stmt(&ctx);
+
+    if (!node) {
+        free_tokens(tok);
+        return "register qualifier parse returned NULL";
+    }
+    mu_assert("node should be ND_DECL", node->kind == ND_DECL);
+    mu_assert("type should be INT", node->type->ty == INT);
+
+    free_tokens(tok);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    return NULL;
+}
+
+char* test_parse_signed_qualifier() {
+    Context ctx = {0};
+
+    // signed int x;
+    Token* tok = tokenize("signed int x;");
+    ctx.current_token = tok;
+    Node* node = parse_stmt(&ctx);
+
+    if (!node) {
+        free_tokens(tok);
+        return "signed qualifier parse returned NULL";
+    }
+    mu_assert("node should be ND_DECL", node->kind == ND_DECL);
+    mu_assert("type should be INT", node->type->ty == INT);
+    mu_assert("should not be unsigned", !node->type->is_unsigned);
+
+    free_tokens(tok);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    return NULL;
+}
+
+char* test_parse_enum_values() {
+    Context ctx = {0};
+
+    // enum { RED = 1, GREEN = 2, BLUE = 4 };
+    Token* tok = tokenize("enum { RED = 1, GREEN = 2, BLUE = 4 };");
+    ctx.current_token = tok;
+    parse_program(&ctx);
+
+    mu_assert("should parse enum values", ctx.node_count == 0);
+
+    free_tokens(tok);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    return NULL;
+}
+
+char* test_parse_flexible_array_member() {
+    Context ctx = {0};
+
+    // struct { int x; int a[]; };
+    Token* tok = tokenize("struct { int x; int a[]; };");
+    ctx.current_token = tok;
+    parse_program(&ctx);
+
+    mu_assert("should parse flexible array member", ctx.node_count == 0);
+
+    free_tokens(tok);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    return NULL;
+}
+
+char* test_parse_funcstr() {
+    Context ctx = {0};
+
+    // int main() { const char* s = __func__; return 0; }
+    Token* tok = tokenize("int main() { const char* s = __func__; return 0; }");
+    ctx.current_token = tok;
+    parse_program(&ctx);
+
+    mu_assert("should have one function", ctx.node_count == 1);
+
+    free_tokens(tok);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    return NULL;
+}

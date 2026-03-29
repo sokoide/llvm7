@@ -92,5 +92,12 @@ char* test_generate_restrict_param();
 char* test_generate_volatile_local();
 char* test_generate_volatile_global();
 char* test_generate_volatile_ptr();
+char* test_generate_short_basic();
+char* test_generate_short_arithmetic();
+char* test_generate_const_local();
+char* test_generate_const_param();
+char* test_generate_enum_values();
+char* test_generate_flexible_array_member();
+char* test_generate_funcstr();
 
 #endif

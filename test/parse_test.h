@@ -95,5 +95,12 @@ char* test_parse_long_long_promotion();
 char* test_parse_static_inline();
 char* test_parse_inline_function();
 char* test_parse_function_pointer_basic();
+char* test_parse_short_decl();
+char* test_parse_const_qualifier();
+char* test_parse_register_qualifier();
+char* test_parse_signed_qualifier();
+char* test_parse_enum_values();
+char* test_parse_flexible_array_member();
+char* test_parse_funcstr();
 
 #endif

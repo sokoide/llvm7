@@ -117,6 +117,14 @@ static char* run_all_tests() {
     mu_run_test(test_generate_function_pointer_basic,
                 "codegen: function pointer basic");
     mu_run_test(test_generate_bool_basic, "codegen: bool basic");
+    mu_run_test(test_generate_short_basic, "codegen: short basic");
+    mu_run_test(test_generate_short_arithmetic, "codegen: short arithmetic");
+    mu_run_test(test_generate_const_local, "codegen: const local");
+    mu_run_test(test_generate_const_param, "codegen: const param");
+    mu_run_test(test_generate_enum_values, "codegen: enum values");
+    mu_run_test(test_generate_flexible_array_member,
+                "codegen: flexible array member");
+    mu_run_test(test_generate_funcstr, "codegen: __func__");
     mu_run_test(test_read_file_success, "file: read_file success");
     mu_run_test(test_read_file_not_found, "file: read_file not found");
     mu_run_test(test_lex_tokenize, "lex: tokenize");
@@ -252,6 +260,14 @@ static char* run_all_tests() {
                 "parse: function pointer basic");
     mu_run_test(test_parse_static_inline, "parse: static inline");
     mu_run_test(test_parse_inline_function, "parse: inline function");
+    mu_run_test(test_parse_short_decl, "parse: short decl");
+    mu_run_test(test_parse_const_qualifier, "parse: const qualifier");
+    mu_run_test(test_parse_register_qualifier, "parse: register qualifier");
+    mu_run_test(test_parse_signed_qualifier, "parse: signed qualifier");
+    mu_run_test(test_parse_enum_values, "parse: enum values");
+    mu_run_test(test_parse_flexible_array_member,
+                "parse: flexible array member");
+    mu_run_test(test_parse_funcstr, "parse: __func__");
     mu_run_test(test_preprocess_noop, "preprocess: no-op");
     mu_run_test(test_preprocess_include, "preprocess: include");
     mu_run_test(test_preprocess_define, "preprocess: define");
