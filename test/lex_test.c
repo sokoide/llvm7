@@ -4,6 +4,7 @@
 #include "test_common.h"
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 
 char* test_lex_tokenize() {
     Token* head = tokenize("1 + 2 - 3");
@@ -344,7 +345,12 @@ char* test_lex_hex_escape_two_digit() {
     Token* head = tokenize("'\\xff'");
     Token* curr = head;
     mu_assert("should be TK_NUM", curr->kind == TK_NUM);
-    mu_assert("'\\xff' signed char should be -1", curr->val == -1);
+    // Check if char is signed (CHAR_MAX == 127) or unsigned (CHAR_MAX == 255)
+    if (CHAR_MAX == 127) {
+        mu_assert("'\\xff' signed char should be -1", curr->val == -1);
+    } else {
+        mu_assert("'\\xff' unsigned char should be 255", curr->val == 255);
+    }
     free_tokens(head);
     return NULL;
 }
