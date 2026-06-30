@@ -5,6 +5,7 @@
 #include <stddef.h>
 
 #define MAX_NODES 1024
+#define MAX_LOCALS 1024
 
 typedef enum {
     TK_RESERVED,
@@ -175,10 +176,9 @@ struct Node {
     bool is_do_while; // for ND_WHILE: distinguish do-while from while
     bool is_extern;   // for extern global var
     bool is_vla;      // for ND_DECL: variable-length array declaration
-    bool is_variadic; // for ND_FUNCTION: variadic function
     bool is_inline;   // for ND_FUNCTION: inline function
     bool is_static;   // for ND_FUNCTION: static function
-    bool is_vararg;   // Variadic function default: false
+    bool is_vararg;   // for ND_FUNCTION: variadic function (...)
     void* llvm_label; // LLVMBasicBlockRef for ND_CASE/ND_BREAK/etc.
 };
 
@@ -219,7 +219,7 @@ struct Context {
     Type* current_func_type; // Return type of current function being generated
     FuncType* func_types;    // Function types for opaque pointers support
     int scope_depth; // lexical scope depth for local variable visibility
-    Node* vla_size_exprs[MAX_NODES]; // local slot -> VLA element count expr
+    Node* vla_size_exprs[MAX_LOCALS]; // local slot -> VLA element count expr
     const char* current_func_name;   // Name of current function being generated
     int current_func_name_len;       // Length of current function name
 };

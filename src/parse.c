@@ -153,7 +153,7 @@ static Node* parse_sizeof_expr_node(Context* ctx, Node* node) {
 
     if (node->kind == ND_LVAR && node->type && node->type->ty == PTR &&
         node->type->array_size == 0 && node->type->ptr_to && node->val >= 0 &&
-        node->val < MAX_NODES && ctx->vla_size_exprs[node->val]) {
+        node->val < MAX_LOCALS && ctx->vla_size_exprs[node->val]) {
         Node* count = clone_ast(ctx->vla_size_exprs[node->val]);
         Node* elem_size = new_node_num(type_size(node->type->ptr_to));
         Node* mul = new_node(ND_MUL, count, elem_size);
@@ -689,39 +689,23 @@ Node* parse_params(Context* ctx, bool* is_vararg) {
     return head;
 }
 
-// function = ty ident "(" params? ")" "{" stmt* "}"
-Node* parse_function(Context* ctx) {
-    Type* return_ty = parse_type(ctx);
-    Token* tok = consume_ident(ctx);
-    if (!tok) {
-        fprintf(stderr, "Expected function name\n");
-        exit(1);
-    }
-
-    // Reset locals for each function
-    ctx->locals = NULL;
-    reset_scope(ctx);
-
-    expect(ctx, "(");
-
-    // Parse parameters
-    Node* func_params = NULL;
-    bool is_vararg = false;
-    if (!consume(ctx, ")")) {
-        func_params = parse_params(ctx, &is_vararg);
-        expect(ctx, ")");
-    }
-
+// Internal helper to build an ND_FUNCTION node after the parameter list
+// has been parsed. Caller must have reset ctx->locals / scope before
+// parsing parameters. The '{' is consumed here.
+static Node* build_function_definition(Context* ctx, Type* return_ty,
+                                       Token* name_tok, Node* func_params,
+                                       bool is_vararg, bool is_inline,
+                                       bool is_static) {
     expect(ctx, "{");
 
-    // Create function node with return type
     Node* node = new_node(ND_FUNCTION, NULL, NULL);
-    node->tok = tok;
-    node->type = return_ty;  // Store return type
-    node->rhs = func_params; // Store parameters in rhs
+    node->tok = name_tok;
+    node->type = return_ty;
+    node->rhs = func_params;
     node->is_vararg = is_vararg;
+    node->is_inline = is_inline;
+    node->is_static = is_static;
 
-    // Parse function body (statements)
     Node* head = NULL;
     Node* tail = NULL;
     while (!consume(ctx, "}")) {
@@ -735,9 +719,34 @@ Node* parse_function(Context* ctx) {
         }
     }
     node->lhs = head;
-    node->locals = ctx->locals; // Store local variables
-
+    node->locals = ctx->locals;
     return node;
+}
+
+// parse_function: test-only helper to parse a function definition.
+// The main compilation path is parse_program().
+// function = ty ident "(" params? ")" "{" stmt* "}"
+Node* parse_function(Context* ctx) {
+    Type* return_ty = parse_type(ctx);
+    Token* tok = consume_ident(ctx);
+    if (!tok) {
+        fprintf(stderr, "Expected function name\n");
+        exit(1);
+    }
+
+    ctx->locals = NULL;
+    reset_scope(ctx);
+
+    expect(ctx, "(");
+    Node* func_params = NULL;
+    bool is_vararg = false;
+    if (!consume(ctx, ")")) {
+        func_params = parse_params(ctx, &is_vararg);
+        expect(ctx, ")");
+    }
+
+    return build_function_definition(ctx, return_ty, tok, func_params, is_vararg,
+                                     false, false);
 }
 
 // global_var = ty ident ("[" num "]")? ";"
@@ -925,8 +934,8 @@ static Node* parse_initializer(Context* ctx, Type* target_type) {
 
 static Node* parse_block_stmt(Context* ctx) {
     enter_scope(ctx);
-    Node* head = calloc(1, sizeof(Node));
-    Node* cur = head;
+    Node head = {0};
+    Node* cur = &head;
     while (!consume(ctx, "}")) {
         if (at_eof(ctx)) {
             fprintf(stderr, "Unexpected EOF while parsing block\n");
@@ -936,7 +945,7 @@ static Node* parse_block_stmt(Context* ctx) {
         cur = cur->next;
     }
     leave_scope(ctx);
-    return new_node(ND_BLOCK, head->next, NULL);
+    return new_node(ND_BLOCK, head.next, NULL);
 }
 
 static StorageSpecifiers parse_storage_specifiers(Context* ctx) {
@@ -1005,7 +1014,6 @@ void parse_program(Context* ctx) {
 
         // Check if this is a function definition (followed by "(")
         if (consume(ctx, "(")) {
-            // Reconstruct the parse state for parse_function
             ctx->locals = NULL;
             reset_scope(ctx);
 
@@ -1037,33 +1045,9 @@ void parse_program(Context* ctx) {
                 exit(1);
             }
 
-            expect(ctx, "{");
-
-            // Create function node with return type
-            Node* func_node = new_node(ND_FUNCTION, NULL, NULL);
-            func_node->tok = tok;
-            func_node->type = ty;
-            func_node->rhs = func_params;
-            func_node->is_inline = spec.is_inline;
-            func_node->is_static = spec.is_static;
-
-            // Parse function body (statements)
-            Node* head = NULL;
-            Node* tail = NULL;
-            while (!consume(ctx, "}")) {
-                Node* stmt_node = parse_stmt(ctx);
-                if (head == NULL) {
-                    head = stmt_node;
-                    tail = stmt_node;
-                } else {
-                    tail->next = stmt_node;
-                    tail = stmt_node;
-                }
-            }
-            func_node->lhs = head;
-            func_node->locals = ctx->locals;
-
-            ctx->code[i++] = func_node;
+            ctx->code[i++] = build_function_definition(ctx, ty, tok, func_params,
+                                                       is_vararg, spec.is_inline,
+                                                       spec.is_static);
         } else {
             // This is a global variable
             // Put back the "[" or ";" token
@@ -1195,7 +1179,7 @@ Node* parse_declaration(Context* ctx, Type* ty) {
     if (vla_size) {
         node->is_vla = true;
         node->rhs = vla_size;
-        if (lvar->offset >= 0 && lvar->offset < MAX_NODES) {
+        if (lvar->offset >= 0 && lvar->offset < MAX_LOCALS) {
             ctx->vla_size_exprs[lvar->offset] = clone_ast(vla_size);
         }
     }
@@ -2136,8 +2120,6 @@ Node* parse_primary(Context* ctx) {
 
     // function call or ident
     Token* tok = consume_ident(ctx);
-    if (!tok && !at_eof(ctx)) {
-    }
 
     if (tok) {
         bool has_lvar = find_lvar(ctx, tok) != NULL;

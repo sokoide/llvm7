@@ -2500,6 +2500,31 @@ char* test_generate_variadic_call() {
     return NULL;
 }
 
+char* test_generate_variadic_definition() {
+    Context ctx = {0};
+    // Define a variadic function and call it with extra arguments.
+    // If the function type is not marked variadic, LLVM will reject the call.
+    Token* head = tokenize(
+        "int foo(int x, ...) { return x; } "
+        "int main() { return foo(7, 1, 2, 3); }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 7 for variadic definition", result == 7);
+    return NULL;
+}
+
 char* test_generate_array_init() {
     Context ctx = {0};
     Token* head = tokenize(
@@ -2827,6 +2852,31 @@ char* test_generate_unsigned_char() {
         free_ast(ctx.code[i]);
     free_tokens(head);
     mu_assert("Expected 200 for unsigned char", result == 200);
+    return NULL;
+}
+
+char* test_generate_unsigned_global_cast() {
+    Context ctx = {0};
+    // 0xFFFFFFFFU (unsigned int) assigned to unsigned long long must be
+    // zero-extended. A sign-extension bug would make the value all 1s.
+    Token* head = tokenize(
+        "unsigned long long x = 0xFFFFFFFFU; "
+        "int main() { return (x == 0xFFFFFFFFULL) ? 0 : 1; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Expected 0 for unsigned global zero-extend", result == 0);
     return NULL;
 }
 

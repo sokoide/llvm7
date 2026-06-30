@@ -6,7 +6,7 @@ C言語で書かれた、LLVM IR を出力する C コンパイラです。
 ## 特徴
 
 - **C Compiler Frontend**: C言語のサブセットをサポートし、LLVM IR (.ll) を生成します。
-- **Self-Hosting**: `llvm7` コンパイラ自身を用いて、`llvm7` のソースコードをコンパイル可能です (Stage 2)。
+- **Self-Hosting**: `llvm7` コンパイラ自身を用いて、`llvm7` のソースコードをコンパイル可能です (Stage 2)。`make bootstrap_check` により Stage 1 (clang ビルド) と Stage 2 (セルフホストビルド) が全ソースファイルで**同一の LLVM IR を出力すること**を検証済みです。
 - **LLVM Backend**: 生成された LLVM IR は `llc` や `clang` を用いてネイティブバイナリに変換・リンクされます。
 
 ## 必要要件
@@ -120,6 +120,7 @@ clang demo/stdio.s -o demo/stdio -lc
 ## サポートされている C の機能
 
 - `int`/`char`/`float`/`double`/`long`/`long long`/`void`/`_Bool` と、`unsigned`/`signed`、`const`/`volatile`/`restrict`/`inline`/`register` などの型・修飾子のサポート（`_Bool` は 1 バイトで 0/1 への正規化変換に対応）。
+- **符号属性を尊重した定数キャスト**: グローバル/ローカル初期化子の定数畳み込みで、`unsigned` リテラルはゼロ拡張、`signed` は符号拡張して変換します（例: `unsigned long long x = 0xFFFFFFFFU;` は `0xFFFFFFFF` にゼロ拡張）。異なるビット幅間の定数 trunc/zext も正しく処理します。
 - `<stdbool.h>` による `bool`, `true`, `false` の提供。
 - ポインタ・配列・構造体・`union`・列挙型の定義・代入・読み出し。
 - グローバル変数とローカル変数。ローカルはスタックに `alloca` し、初期化式は `=` または配列リテラルで記述可。

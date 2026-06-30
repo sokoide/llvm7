@@ -376,7 +376,11 @@ static bool eval_const_int(Node* node, long long* out) {
     long long rhs = 0;
     switch (node->kind) {
     case ND_NUM:
-        *out = node->val;
+        // Honor the literal's signedness: an unsigned literal such as
+        // 0xFFFFFFFFU keeps its bit pattern in node->uval, while node->val
+        // is a clamped signed int and would lose the high bit.
+        *out = (node->type && node->type->is_unsigned) ? (long long)node->uval
+                                                       : node->val;
         return true;
     case ND_CAST:
         return eval_const_int(node->lhs, out);
@@ -475,7 +479,8 @@ static bool eval_const_int(Node* node, long long* out) {
     }
 }
 
-static LLVMValueRef cast_constant_value(LLVMValueRef val, LLVMTypeRef dest_ty) {
+static LLVMValueRef cast_constant_value(Node* src_node, LLVMValueRef val,
+                                         LLVMTypeRef dest_ty) {
     LLVMTypeRef src_ty = LLVMTypeOf(val);
     if (src_ty == dest_ty) {
         return val;
@@ -490,12 +495,25 @@ static LLVMValueRef cast_constant_value(LLVMValueRef val, LLVMTypeRef dest_ty) {
     if (dest_kind == LLVMIntegerTypeKind && src_kind == LLVMPointerTypeKind) {
         return LLVMConstPtrToInt(val, dest_ty);
     }
-    if (dest_kind == LLVMIntegerTypeKind && src_kind == LLVMIntegerTypeKind) {
-        long long iv = LLVMConstIntGetSExtValue(val);
-        return LLVMConstInt(dest_ty, (unsigned long long)iv, true);
-    }
     if (dest_kind == LLVMPointerTypeKind && src_kind == LLVMPointerTypeKind) {
         return LLVMConstBitCast(val, dest_ty);
+    }
+    if (dest_kind == LLVMIntegerTypeKind && src_kind == LLVMIntegerTypeKind) {
+        unsigned src_w = LLVMGetIntTypeWidth(src_ty);
+        unsigned dest_w = LLVMGetIntTypeWidth(dest_ty);
+        if (src_w < dest_w) {
+            Type* src_type_c = src_node ? src_node->type : NULL;
+            if (src_type_c && src_type_c->is_unsigned) {
+                unsigned long long uv = LLVMConstIntGetZExtValue(val);
+                return LLVMConstInt(dest_ty, uv, false);
+            }
+            long long sv = LLVMConstIntGetSExtValue(val);
+            return LLVMConstInt(dest_ty, (unsigned long long)sv, true);
+        }
+        if (src_w > dest_w) {
+            return LLVMConstTrunc(val, dest_ty);
+        }
+        return val;
     }
 
     return val;
@@ -510,8 +528,9 @@ static LLVMValueRef cast_constant_value(LLVMValueRef val, LLVMTypeRef dest_ty) {
 static LLVMValueRef codegen_constant(Node* node, LLVMModuleRef module) {
     long long const_val = 0;
     if (eval_const_int(node, &const_val)) {
+        bool is_unsigned = node->type && node->type->is_unsigned;
         return LLVMConstInt(to_llvm_type(node->type),
-                            (unsigned long long)const_val, true);
+                            (unsigned long long)const_val, !is_unsigned);
     }
 
     if (node->kind == ND_NUM) {
@@ -623,7 +642,7 @@ LLVMModuleRef generate_module(Context* ctx) {
     LLVMTypeRef strtol_args[] = {i8_ptr_type, LLVMPointerType(i8_ptr_type, 0),
                                  i32_type};
     LLVMAddFunction(module, "strtol",
-                    LLVMFunctionType(i32_type, strtol_args, 3, false));
+                    LLVMFunctionType(i64_type, strtol_args, 3, false));
 
     // size_t strlen(const char*)
     LLVMTypeRef strlen_args[] = {i8_ptr_type};
@@ -688,7 +707,7 @@ LLVMModuleRef generate_module(Context* ctx) {
             LLVMValueRef gvar = LLVMAddGlobal(module, var_type, var_name);
             if (node->init) {
                 LLVMValueRef init_val = codegen_constant(node->init, module);
-                init_val = cast_constant_value(init_val, var_type);
+                init_val = cast_constant_value(node->init, init_val, var_type);
                 LLVMSetInitializer(gvar, init_val);
             } else if (!node->is_extern) {
                 // Non-extern globals without initializer get null init
@@ -804,7 +823,7 @@ LLVMModuleRef generate_module(Context* ctx) {
         ctx->current_label_map = NULL;
 
         // Local variable space per function
-        LLVMValueRef local_allocas[1024]; // Max 100 locals for now
+        LLVMValueRef local_allocas[MAX_LOCALS];
         memset(local_allocas, 0, sizeof(local_allocas));
 
         // Create __func__ string constant for this function
@@ -834,7 +853,7 @@ LLVMModuleRef generate_module(Context* ctx) {
 
         LVar* var = func_node->locals;
         while (var) {
-            if (var->offset < 1024) {
+            if (var->offset < MAX_LOCALS) {
                 char var_name[64];
                 int len = var->len < 63 ? var->len : 63;
                 strncpy(var_name, var->name, len);
@@ -850,7 +869,7 @@ LLVMModuleRef generate_module(Context* ctx) {
         param = func_node->rhs;
         for (int i = 0; i < param_count; i++) {
             LLVMValueRef arg = LLVMGetParam(func, i);
-            if (param->val < 1024 && local_allocas[param->val]) {
+            if (param->val < MAX_LOCALS && local_allocas[param->val]) {
                 LLVMBuildStore(builder, arg, local_allocas[param->val]);
             }
             param = param->next;
@@ -890,7 +909,7 @@ LLVMModuleRef generate_module(Context* ctx) {
         free_label_map(ctx);
     }
 
-    // Removed mandatory main check to allow library compilation
+    // Verify generated module
     char* error = NULL;
     if (LLVMVerifyModule(module, LLVMReturnStatusAction, &error)) {
         fprintf(stderr, "LLVM IR verification failed: %s\n", error);
@@ -946,7 +965,7 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         return LLVMConstReal(to_llvm_type(node->type), node->fval);
     }
     case ND_LVAR: {
-        if (node->val < 1024 && local_allocas[node->val]) {
+        if (node->val < MAX_LOCALS && local_allocas[node->val]) {
             LLVMValueRef alloca_ptr = local_allocas[node->val];
             if (node->type && node->type->array_size > 0) {
                 return alloca_ptr;
@@ -1039,7 +1058,7 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             build_volatile_store(builder, store_val, ptr, lhs_volatile);
         } else if (node->lhs->kind == ND_LVAR) {
             // Regular variable assignment
-            if (node->lhs->val < 1024 && local_allocas[node->lhs->val]) {
+            if (node->lhs->val < MAX_LOCALS && local_allocas[node->lhs->val]) {
                 LLVMValueRef alloca_ptr = local_allocas[node->lhs->val];
                 build_volatile_store(builder, store_val, alloca_ptr,
                                      lhs_volatile);
@@ -1435,12 +1454,6 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
                     // But printf should be declared in main.i
                 }
             }
-
-            // Debug
-            // fprintf(stderr, "DEBUG: call %s type=%d vararg=%d\n", func_name,
-            // LLVMGetTypeKind(func_type), (func_type &&
-            // LLVMGetTypeKind(func_type)==LLVMFunctionTypeKind) ?
-            // LLVMIsFunctionVarArg(func_type) : -1);
 
             dest_param_count = LLVMCountParamTypes(func_type);
             if (dest_param_count > 0) {
@@ -1920,7 +1933,7 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
     case ND_ADDR: {
         // &expr - get address of variable
         if (node->lhs->kind == ND_LVAR) {
-            if (node->lhs->val < 1024 && local_allocas[node->lhs->val]) {
+            if (node->lhs->val < MAX_LOCALS && local_allocas[node->lhs->val]) {
                 LLVMValueRef ptr = local_allocas[node->lhs->val];
                 if (node->lhs->type->array_size > 0) {
                     // Implicit conversion or &a
@@ -2073,7 +2086,7 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
     }
     case ND_DECL: {
         if (node->is_vla) {
-            if (node->val < 0 || node->val >= 1024) {
+            if (node->val < 0 || node->val >= MAX_LOCALS) {
                 fprintf(stderr, "ND_DECL(VLA): node->val %d out of bounds\n",
                         node->val);
                 exit(1);
@@ -2101,7 +2114,7 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
         }
 
         if (node->init) {
-            if (node->val < 0 || node->val >= 1024) {
+            if (node->val < 0 || node->val >= MAX_LOCALS) {
                 fprintf(stderr, "ND_DECL: node->val %d out of bounds\n",
                         node->val);
                 fflush(stderr);

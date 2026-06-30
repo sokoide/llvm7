@@ -306,6 +306,45 @@ void LLVMSetLinkage(LLVMValueRef Global, LLVMLinkage Linkage);
 void LLVMSetOperand(LLVMValueRef Val, unsigned Index, LLVMValueRef Operand);
 void LLVMSetVolatile(LLVMValueRef MemoryAccessInst, LLVMBool IsVolatile);
 
+// Constant folding / casts. These return pointers or 64-bit values, so a
+// missing prototype would silently truncate the result under the implicit
+// "returns int" rule and corrupt generated IR. Keep in sync with the real
+// llvm-c/Core.h.
+LLVMValueRef LLVMConstBitCast(LLVMValueRef ConstantVal, LLVMTypeRef ToType);
+LLVMValueRef LLVMConstIntToPtr(LLVMValueRef ConstantVal, LLVMTypeRef ToType);
+LLVMValueRef LLVMConstPtrToInt(LLVMValueRef ConstantVal, LLVMTypeRef ToType);
+LLVMValueRef LLVMConstTrunc(LLVMValueRef ConstantVal, LLVMTypeRef ToType);
+long long LLVMConstIntGetSExtValue(LLVMValueRef ConstantVal);
+unsigned long long LLVMConstIntGetZExtValue(LLVMValueRef ConstantVal);
+
+// Integer arithmetic / shift builders.
+LLVMValueRef LLVMBuildAnd(LLVMBuilderRef, LLVMValueRef LHS, LLVMValueRef RHS,
+                          const char *Name);
+LLVMValueRef LLVMBuildOr(LLVMBuilderRef, LLVMValueRef LHS, LLVMValueRef RHS,
+                         const char *Name);
+LLVMValueRef LLVMBuildXor(LLVMBuilderRef, LLVMValueRef LHS, LLVMValueRef RHS,
+                          const char *Name);
+LLVMValueRef LLVMBuildShl(LLVMBuilderRef, LLVMValueRef LHS, LLVMValueRef RHS,
+                          const char *Name);
+LLVMValueRef LLVMBuildAShr(LLVMBuilderRef, LLVMValueRef LHS, LLVMValueRef RHS,
+                           const char *Name);
+LLVMValueRef LLVMBuildLShr(LLVMBuilderRef, LLVMValueRef LHS, LLVMValueRef RHS,
+                           const char *Name);
+LLVMValueRef LLVMBuildUDiv(LLVMBuilderRef, LLVMValueRef LHS, LLVMValueRef RHS,
+                           const char *Name);
+LLVMValueRef LLVMBuildURem(LLVMBuilderRef, LLVMValueRef LHS, LLVMValueRef RHS,
+                           const char *Name);
+LLVMValueRef LLVMBuildArrayAlloca(LLVMBuilderRef, LLVMTypeRef Ty,
+                                  LLVMValueRef Val, const char *Name);
+LLVMValueRef LLVMBuildUIToFP(LLVMBuilderRef, LLVMValueRef Val,
+                             LLVMTypeRef DestTy, const char *Name);
+
+// Type / module helpers.
+LLVMTypeRef LLVMInt16TypeInContext(LLVMContextRef C);
+LLVMTypeRef LLVMGetElementType(LLVMTypeRef Ty);
+void LLVMSetTarget(LLVMModuleRef M, const char *Triple);
+void LLVMSetUnnamedAddr(LLVMValueRef Global, LLVMBool HasUnnamedAddr);
+
 #ifdef __cplusplus
 }
 #endif

@@ -127,6 +127,8 @@ static char* run_all_tests() {
     mu_run_test(test_generate_funcstr, "codegen: __func__");
     mu_run_test(test_generate_continue, "codegen: continue");
     mu_run_test(test_generate_variadic_call, "codegen: variadic call");
+    mu_run_test(test_generate_variadic_definition,
+                "codegen: variadic definition");
     mu_run_test(test_generate_array_init, "codegen: array init");
     mu_run_test(test_generate_struct_init, "codegen: struct init");
     mu_run_test(test_generate_void_function, "codegen: void function");
@@ -143,6 +145,8 @@ static char* run_all_tests() {
     mu_run_test(test_generate_multiple_returns, "codegen: multiple returns");
     mu_run_test(test_generate_long_basic, "codegen: long basic");
     mu_run_test(test_generate_unsigned_char, "codegen: unsigned char");
+    mu_run_test(test_generate_unsigned_global_cast,
+                "codegen: unsigned global cast");
     mu_run_test(test_generate_for_break, "codegen: for-break");
     mu_run_test(test_generate_while_continue, "codegen: while-continue");
     mu_run_test(test_generate_pointer_deref_assign,

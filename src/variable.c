@@ -44,6 +44,10 @@ LVar* add_lvar(Context* ctx, Token* tok, Type* type) {
             next_offset = var->offset + 1;
         }
     }
+    if (next_offset >= MAX_LOCALS) {
+        fprintf(stderr, "Too many local variables (max %d)\n", MAX_LOCALS);
+        exit(1);
+    }
     new_var->offset = next_offset;
 
     // Push front so name lookup finds the most recent declaration first.
