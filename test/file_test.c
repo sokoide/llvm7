@@ -7,9 +7,10 @@
 #include <unistd.h>
 
 char* test_read_file_success() {
-    char path[] = "/tmp/llvm7_file_test_XXXXXX";
+    char path[] = "test_file_XXXXXX";
     int fd = mkstemp(path);
     if (fd < 0) {
+        perror("mkstemp error");
         return "mkstemp failed";
     }
 
