@@ -9,6 +9,7 @@ build/
 .claude/
 .serena/
 conductor/
+.omc/
 
 # Executables
 playground_exe

@@ -2014,6 +2014,14 @@ static LLVMValueRef codegen(Context* ctx, Node* node, LLVMBuilderRef builder,
             // Get base address
             LLVMValueRef base_addr;
             if (node->lhs->lhs->kind == ND_LVAR) {
+                if (node->lhs->lhs->val < 0 ||
+                    node->lhs->lhs->val >= MAX_LOCALS) {
+                    fprintf(stderr,
+                            "codegen error: local variable slot out of range "
+                            "(%d)\n",
+                            node->lhs->lhs->val);
+                    exit(1);
+                }
                 base_addr = local_allocas[node->lhs->lhs->val];
             } else if (node->lhs->lhs->kind == ND_GVAR) {
                 char var_name[64];

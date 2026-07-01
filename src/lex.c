@@ -86,8 +86,10 @@ static char decode_escape_char(const char** pp) {
     return *p;
 }
 
-// Keyword table (selfhost-compatible: no anonymous struct)
-char* kw_str[42] = {
+// Keyword table (selfhost-compatible: no anonymous struct).
+// Note: kept as non-const `char*` because the compiler's own parser does not
+// accept `const`-qualified pointer element types in global array declarations.
+static char* kw_str[] = {
     "return",   "if",       "else",     "while",    "for",      "int",
     "char",     "void",     "sizeof",   "struct",   "typedef",  "enum",
     "static",   "extern",   "const",    "long",     "bool",     "size_t",
@@ -95,19 +97,21 @@ char* kw_str[42] = {
     "break",    "continue", "unsigned", "signed",   "double",   "float",
     "do",       "goto",     "union",    "inline",   "restrict", "volatile",
     "register", "_Bool",    "_Complex", "__func__", "_Pragma",  "short"};
-int kw_len[42] = {6, 2, 4, 5, 3, 3, 4, 4, 6, 6, 7, 4, 6, 6,
-                  5, 4, 4, 6, 4, 4, 5, 6, 4, 7, 5, 8, 8, 6,
-                  6, 5, 2, 4, 5, 6, 8, 8, 8, 5, 8, 8, 7, 5};
-int NUM_KEYWORDS = 42;
+static int kw_len[] = {6, 2, 4, 5, 3, 3, 4, 4, 6, 6, 7, 4, 6, 6,
+                       5, 4, 4, 6, 4, 4, 5, 6, 4, 7, 5, 8, 8, 6,
+                       6, 5, 2, 4, 5, 6, 8, 8, 8, 5, 8, 8, 7, 5};
+static int NUM_KEYWORDS = (int)(sizeof(kw_str) / sizeof(kw_str[0]));
 
-char* three_char_ops[3] = {"...", "<<=", ">>="};
-int NUM_THREE_CHAR_OPS = 3;
+static char* three_char_ops[] = {"...", "<<=", ">>="};
+static int NUM_THREE_CHAR_OPS =
+    (int)(sizeof(three_char_ops) / sizeof(three_char_ops[0]));
 
 static char* two_char_ops[] = {
     "==", "!=", "<=", ">=", "&&", "||", "->", "++", "--",
     "+=", "-=", "*=", "/=", "<<", ">>", "&=", "|=", "^="};
 
-static int NUM_TWO_CHAR_OPS = sizeof(two_char_ops) / sizeof(two_char_ops[0]);
+static int NUM_TWO_CHAR_OPS =
+    (int)(sizeof(two_char_ops) / sizeof(two_char_ops[0]));
 
 static bool lex_debug = false;
 
@@ -194,7 +198,7 @@ Token* tokenize(const char* p) {
 
     // Iterate through the input string until null terminator
     while (*p) {
-        if (isspace(*p)) {
+        if (isspace((unsigned char)*p)) {
             p++;
             continue;
         }
@@ -266,8 +270,8 @@ Token* tokenize(const char* p) {
         }
 
         // Check for single-character operators and delimiters
-        char* single_char_ops = "+-*/()<>;={},&|[].!:=?%^~\0";
-        if (strchr(single_char_ops, *p)) {
+        const char* single_char_ops = "+-*/()<>;={},&|[].!:=?%^~";
+        if (strchr(single_char_ops, (unsigned char)*p)) {
             cur = new_token_at(TK_RESERVED, cur, p, 1, source, p);
             p++;
             continue;
@@ -346,12 +350,12 @@ Token* tokenize(const char* p) {
             p += 2;
 
             bool has_dot = false;
-            while (isxdigit(*p))
+            while (isxdigit((unsigned char)*p))
                 p++;
             if (*p == '.') {
                 has_dot = true;
                 p++;
-                while (isxdigit(*p))
+                while (isxdigit((unsigned char)*p))
                     p++;
             }
 
@@ -360,7 +364,7 @@ Token* tokenize(const char* p) {
                 p++;
                 if (*p == '+' || *p == '-')
                     p++;
-                while (isdigit(*p))
+                while (isdigit((unsigned char)*p))
                     p++;
 
                 // Optional suffix
@@ -379,7 +383,7 @@ Token* tokenize(const char* p) {
             // to treat it as a hex integer followed by a dot.
             if (has_dot) {
                 p = start + 2;
-                while (isxdigit(*p))
+                while (isxdigit((unsigned char)*p))
                     p++;
             }
 
@@ -405,23 +409,24 @@ Token* tokenize(const char* p) {
         }
 
         // Number
-        if (isdigit(*p) || (*p == '.' && isdigit(p[1]))) {
+        if (isdigit((unsigned char)*p) ||
+            (*p == '.' && isdigit((unsigned char)p[1]))) {
             const char* start = p;
             bool is_float = false;
             if (*p == '.') {
                 is_float = true;
                 p++;
-                while (isdigit(*p)) {
+                while (isdigit((unsigned char)*p)) {
                     p++;
                 }
             } else {
-                while (isdigit(*p)) {
+                while (isdigit((unsigned char)*p)) {
                     p++;
                 }
                 if (*p == '.') {
                     is_float = true;
                     p++;
-                    while (isdigit(*p)) {
+                    while (isdigit((unsigned char)*p)) {
                         p++;
                     }
                 }
@@ -432,7 +437,7 @@ Token* tokenize(const char* p) {
                 if (*p == '+' || *p == '-') {
                     p++;
                 }
-                while (isdigit(*p)) {
+                while (isdigit((unsigned char)*p)) {
                     p++;
                 }
             }

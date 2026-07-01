@@ -971,6 +971,12 @@ static StorageSpecifiers parse_storage_specifiers(Context* ctx) {
 void parse_program(Context* ctx) {
     int i = 0;
     while (!at_eof(ctx)) {
+        if (i >= MAX_NODES) {
+            fprintf(stderr,
+                    "parse error: too many top-level declarations (max %d)\n",
+                    MAX_NODES);
+            exit(1);
+        }
         StorageSpecifiers spec = parse_storage_specifiers(ctx);
 
         if (consume(ctx, "typedef")) {
@@ -2106,6 +2112,12 @@ Node* parse_primary(Context* ctx) {
         }
 
         // Add string to context's string vector
+        if (ctx->string_count >= MAX_NODES) {
+            fprintf(stderr,
+                    "parse error: too many string literals (max %d)\n",
+                    MAX_NODES);
+            exit(1);
+        }
         int idx = ctx->string_count++;
         ctx->strings[idx] = merged;
         ctx->string_lens[idx] = total_len;

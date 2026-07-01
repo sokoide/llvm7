@@ -943,10 +943,21 @@ char* preprocess(const char* input, const char* filename) {
     time_t now = time(NULL);
     struct tm* tm_info = localtime(&now);
     char date_buf[32];
-    strftime(date_buf, sizeof(date_buf), "\"%b %d %Y\"", tm_info);
-    add_or_replace_macro(&ctx, "__DATE__", date_buf, false, false, NULL, 0);
     char time_buf[32];
-    strftime(time_buf, sizeof(time_buf), "\"%H:%M:%S\"", tm_info);
+    if (!tm_info) {
+        // localtime may fail; fall back to empty strings to avoid UB in
+        // strftime(NULL, ...).
+        date_buf[0] = '"';
+        date_buf[1] = '"';
+        date_buf[2] = '\0';
+        time_buf[0] = '"';
+        time_buf[1] = '"';
+        time_buf[2] = '\0';
+    } else {
+        strftime(date_buf, sizeof(date_buf), "\"%b %d %Y\"", tm_info);
+        strftime(time_buf, sizeof(time_buf), "\"%H:%M:%S\"", tm_info);
+    }
+    add_or_replace_macro(&ctx, "__DATE__", date_buf, false, false, NULL, 0);
     add_or_replace_macro(&ctx, "__TIME__", time_buf, false, false, NULL, 0);
 
     char* out = preprocess_internal(input, filename, &ctx);
