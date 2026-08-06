@@ -37,18 +37,12 @@ LVar* add_lvar(Context* ctx, Token* tok, Type* type) {
     new_var->type = type;
     scoped->scope_depth = ctx->scope_depth;
 
-    // Assign unique slot id for codegen local_allocas[] indexing.
-    int next_offset = 0;
-    for (LVar* var = ctx->locals; var != NULL; var = var->next) {
-        if (var->offset >= next_offset) {
-            next_offset = var->offset + 1;
-        }
-    }
-    if (next_offset >= MAX_LOCALS) {
+    // Assign a unique slot id for codegen local_allocas[] indexing.
+    if (ctx->next_local_offset >= MAX_LOCALS) {
         fprintf(stderr, "Too many local variables (max %d)\n", MAX_LOCALS);
         exit(1);
     }
-    new_var->offset = next_offset;
+    new_var->offset = ctx->next_local_offset++;
 
     // Push front so name lookup finds the most recent declaration first.
     new_var->next = ctx->locals;
@@ -57,7 +51,10 @@ LVar* add_lvar(Context* ctx, Token* tok, Type* type) {
     return new_var;
 }
 
-void reset_scope(Context* ctx) { ctx->scope_depth = 0; }
+void reset_scope(Context* ctx) {
+    ctx->scope_depth = 0;
+    ctx->next_local_offset = 0;
+}
 
 void enter_scope(Context* ctx) { ctx->scope_depth++; }
 

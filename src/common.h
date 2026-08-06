@@ -37,6 +37,7 @@ struct Token {
     double fval;
     bool is_float;
     bool is_unsigned;
+    bool owns_str;
     const char* str;
     int len;
     int line;
@@ -218,7 +219,8 @@ struct Context {
     int string_count;               // number of string literals
     Type* current_func_type; // Return type of current function being generated
     FuncType* func_types;    // Function types for opaque pointers support
-    int scope_depth; // lexical scope depth for local variable visibility
+    int scope_depth;          // lexical scope depth for local variable visibility
+    int next_local_offset;    // next unique slot id for a local variable
     Node* vla_size_exprs[MAX_LOCALS]; // local slot -> VLA element count expr
     const char* current_func_name;   // Name of current function being generated
     int current_func_name_len;       // Length of current function name

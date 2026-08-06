@@ -46,7 +46,14 @@ int main(int argc, const char** argv) {
     // Create context and tokenize
     Context ctx;
     memset(&ctx, 0, sizeof(ctx));
-    ctx.current_token = tokenize(preprocessed);
+    Token* tokens = tokenize(preprocessed);
+    if (!tokens) {
+        fprintf(stderr, "Error: failed to tokenize %s\n", input_file);
+        free((void*)source);
+        free(preprocessed);
+        return 1;
+    }
+    ctx.current_token = tokens;
 
     // Parse AST
     parse_program(&ctx);
@@ -55,9 +62,8 @@ int main(int argc, const char** argv) {
     if (generate_code_to_file(&ctx, output_file) != 0) {
         fprintf(stderr, "Error: failed to generate LLVM IR\n");
         free((void*)source);
-        if (ctx.current_token) {
-            free_tokens(ctx.current_token);
-        }
+        free(preprocessed);
+        free_tokens(tokens);
         return 1;
     }
 
@@ -69,9 +75,7 @@ int main(int argc, const char** argv) {
     for (int i = 0; i < ctx.node_count; i++) {
         free_ast(ctx.code[i]);
     }
-    if (ctx.current_token) {
-        free_tokens(ctx.current_token);
-    }
+    free_tokens(tokens);
 
     return 0;
 }

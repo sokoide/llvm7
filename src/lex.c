@@ -176,9 +176,10 @@ Token* new_token(TokenKind kind, Token* cur, const char* str, int len) {
 }
 
 static Token* new_token_at(TokenKind kind, Token* cur, const char* str, int len,
-                           const char* source, const char* pos) {
+                           int line, int col) {
     Token* tok = new_token(kind, cur, str, len);
-    lex_get_line_col(source, pos, &tok->line, &tok->col);
+    tok->line = line;
+    tok->col = col;
     return tok;
 }
 
@@ -190,6 +191,8 @@ static Token* new_token_at(TokenKind kind, Token* cur, const char* str, int len,
  */
 Token* tokenize(const char* p) {
     const char* source = p;
+    const char* line_start = p;
+    int line = 1;
     // Initialize head and tail pointers for the token linked list
     Token head;
     head.next = NULL;
@@ -199,6 +202,10 @@ Token* tokenize(const char* p) {
     // Iterate through the input string until null terminator
     while (*p) {
         if (isspace((unsigned char)*p)) {
+            if (*p == '\n') {
+                line++;
+                line_start = p + 1;
+            }
             p++;
             continue;
         }
@@ -220,18 +227,28 @@ Token* tokenize(const char* p) {
                 lex_get_line_col(source, p, &line, &col);
                 fprintf(stderr, "lex error:%d:%d: unterminated block comment\n",
                         line, col);
+                free_tokens(head.next);
                 return NULL;
+            }
+            for (const char* s = p; s < q + 2; s++) {
+                if (*s == '\n') {
+                    line++;
+                    line_start = s + 1;
+                }
             }
             p = q + 2;
             continue;
         }
+
+        int token_col = (int)(p - line_start) + 1;
 
         // Check for keywords
         bool keyword_matched = false;
         for (int i = 0; i < NUM_KEYWORDS; i++) {
             if (strncmp(p, kw_str[i], kw_len[i]) == 0 &&
                 !is_alnum(p[kw_len[i]])) {
-                cur = new_token_at(TK_RESERVED, cur, p, kw_len[i], source, p);
+                cur = new_token_at(TK_RESERVED, cur, p, kw_len[i], line,
+                                   token_col);
                 p += kw_len[i];
                 keyword_matched = true;
                 break;
@@ -245,7 +262,7 @@ Token* tokenize(const char* p) {
         bool three_char_matched = false;
         for (int i = 0; i < NUM_THREE_CHAR_OPS; i++) {
             if (strncmp(p, three_char_ops[i], 3) == 0) {
-                cur = new_token_at(TK_RESERVED, cur, p, 3, source, p);
+                cur = new_token_at(TK_RESERVED, cur, p, 3, line, token_col);
                 p += 3;
                 three_char_matched = true;
                 break;
@@ -259,7 +276,7 @@ Token* tokenize(const char* p) {
         bool two_char_matched = false;
         for (int i = 0; i < NUM_TWO_CHAR_OPS; i++) {
             if (strncmp(p, two_char_ops[i], 2) == 0) {
-                cur = new_token_at(TK_RESERVED, cur, p, 2, source, p);
+                cur = new_token_at(TK_RESERVED, cur, p, 2, line, token_col);
                 p += 2;
                 two_char_matched = true;
                 break;
@@ -272,29 +289,51 @@ Token* tokenize(const char* p) {
         // Check for single-character operators and delimiters
         const char* single_char_ops = "+-*/()<>;={},&|[].!:=?%^~";
         if (strchr(single_char_ops, (unsigned char)*p)) {
-            cur = new_token_at(TK_RESERVED, cur, p, 1, source, p);
+            cur = new_token_at(TK_RESERVED, cur, p, 1, line, token_col);
             p++;
             continue;
         }
 
         // String literal
         if (*p == '"') {
+            int token_line = line;
             p++; // skip opening quote
-            size_t cap = strlen(p) + 1;
+            size_t cap = 16;
             char* decoded = calloc(cap, 1);
             if (!decoded) {
                 perror("calloc");
+                free_tokens(head.next);
                 return NULL;
             }
             size_t len = 0;
             while (*p && *p != '"') {
+                char decoded_char;
                 if (*p == '\\') {
                     p++;
-                    decoded[len++] = decode_escape_char(&p);
-                    continue;
+                    if (*p == '\n') {
+                        line++;
+                        line_start = p + 1;
+                    }
+                    decoded_char = decode_escape_char(&p);
+                } else {
+                    if (*p == '\n') {
+                        line++;
+                        line_start = p + 1;
+                    }
+                    decoded_char = *p++;
                 }
-                decoded[len++] = *p;
-                p++;
+                if (len + 1 >= cap) {
+                    cap *= 2;
+                    char* grown = realloc(decoded, cap);
+                    if (!grown) {
+                        perror("realloc");
+                        free(decoded);
+                        free_tokens(head.next);
+                        return NULL;
+                    }
+                    decoded = grown;
+                }
+                decoded[len++] = decoded_char;
             }
             if (*p != '"') {
                 int line = 0;
@@ -303,9 +342,14 @@ Token* tokenize(const char* p) {
                 fprintf(stderr,
                         "lex error:%d:%d: unterminated string literal\n", line,
                         col);
+                free(decoded);
+                free_tokens(head.next);
                 return NULL;
             }
-            cur = new_token_at(TK_STR, cur, decoded, (int)len, source, p);
+            decoded[len] = '\0';
+            cur = new_token_at(TK_STR, cur, decoded, (int)len, token_line,
+                               token_col);
+            cur->owns_str = true;
             p++; // skip closing quote
             continue;
         }
@@ -328,10 +372,11 @@ Token* tokenize(const char* p) {
                 fprintf(stderr,
                         "lex error:%d:%d: unterminated character literal\n",
                         line, col);
+                free_tokens(head.next);
                 return NULL;
             }
             p++; // skip closing '
-            cur = new_token_at(TK_NUM, cur, p - 2, 1, source, p - 2);
+            cur = new_token_at(TK_NUM, cur, p - 2, 1, line, token_col);
             cur->val = val;
             cur->uval = (unsigned long long)(unsigned int)val;
             cur->len =
@@ -372,8 +417,8 @@ Token* tokenize(const char* p) {
                     p++;
                 }
 
-                cur =
-                    new_token_at(TK_NUM, cur, start, p - start, source, start);
+                cur = new_token_at(TK_NUM, cur, start, p - start, line,
+                                   token_col);
                 cur->is_float = true;
                 cur->fval = strtod(start, NULL);
                 continue;
@@ -388,7 +433,7 @@ Token* tokenize(const char* p) {
             }
 
             // Hex integer
-            cur = new_token_at(TK_NUM, cur, start, p - start, source, start);
+            cur = new_token_at(TK_NUM, cur, start, p - start, line, token_col);
             cur->is_float = false;
             cur->uval = strtoull(start, NULL, 16);
             cur->fval = (double)cur->uval;
@@ -445,7 +490,7 @@ Token* tokenize(const char* p) {
                 is_float = true;
                 p++;
             }
-            cur = new_token_at(TK_NUM, cur, start, p - start, source, start);
+            cur = new_token_at(TK_NUM, cur, start, p - start, line, token_col);
             cur->is_float = is_float;
             if (is_float) {
                 cur->fval = strtod(start, NULL);
@@ -478,7 +523,8 @@ Token* tokenize(const char* p) {
                    ('0' <= *p && *p <= '9') || *p == '_') {
                 p++;
             }
-            cur = new_token_at(TK_IDENT, cur, start, p - start, source, start);
+            cur =
+                new_token_at(TK_IDENT, cur, start, p - start, line, token_col);
             continue;
         }
 
@@ -488,10 +534,11 @@ Token* tokenize(const char* p) {
         lex_get_line_col(source, p, &line, &col);
         fprintf(stderr, "lex error:%d:%d: invalid character '%c'\n", line, col,
                 *p);
+        free_tokens(head.next);
         return NULL;
     }
 
-    new_token_at(TK_EOF, cur, p, 0, source, p);
+    new_token_at(TK_EOF, cur, p, 0, line, (int)(p - line_start) + 1);
     return head.next;
 }
 
@@ -504,6 +551,9 @@ void free_tokens(Token* head) {
     Token* curr = head;
     while (curr != NULL) {
         Token* next = curr->next;
+        if (curr->owns_str) {
+            free((void*)curr->str);
+        }
         free(curr);
         curr = next;
     }

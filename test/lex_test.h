@@ -11,6 +11,7 @@ char* test_expect_number();
 char* test_lex_comments();
 char* test_lex_get_line_col();
 char* test_lex_token_positions();
+char* test_lex_error_returns_null();
 char* test_lex_double();
 char* test_lex_float();
 char* test_lex_bitwise();

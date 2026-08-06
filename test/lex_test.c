@@ -134,18 +134,29 @@ char* test_lex_get_line_col() {
 }
 
 char* test_lex_token_positions() {
-    Token* head = tokenize("a\n  + 12");
+    Token* head = tokenize("a\n/* one\n two */  + 12");
     Token* t = head;
 
     mu_assert("first token line/col should be 1:1",
               t->line == 1 && t->col == 1);
     t = t->next;
-    mu_assert("plus token line/col should be 2:3", t->line == 2 && t->col == 3);
+    mu_assert("plus token line/col should be 3:10",
+              t->line == 3 && t->col == 10);
     t = t->next;
-    mu_assert("number token line/col should be 2:5",
-              t->line == 2 && t->col == 5);
+    mu_assert("number token line/col should be 3:12",
+              t->line == 3 && t->col == 12);
 
     free_tokens(head);
+    return NULL;
+}
+
+char* test_lex_error_returns_null() {
+    mu_assert("invalid character should fail tokenization",
+              tokenize("int x; @") == NULL);
+    mu_assert("unterminated string should fail tokenization",
+              tokenize("int x = \"missing") == NULL);
+    mu_assert("unterminated comment should fail tokenization",
+              tokenize("int x; /* missing") == NULL);
     return NULL;
 }
 

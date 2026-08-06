@@ -162,6 +162,7 @@ static char* run_all_tests() {
     mu_run_test(test_lex_comments, "lex: comments");
     mu_run_test(test_lex_get_line_col, "lex: get line col");
     mu_run_test(test_lex_token_positions, "lex: token positions");
+    mu_run_test(test_lex_error_returns_null, "lex: errors return null");
     mu_run_test(test_lex_double, "lex: double and floats");
     mu_run_test(test_lex_float, "lex: float with suffix");
     mu_run_test(test_lex_bitwise, "lex: bitwise operators");
