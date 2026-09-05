@@ -123,4 +123,7 @@ char* test_generate_while_continue();
 char* test_generate_pointer_deref_assign();
 char* test_generate_cast_int_ptr();
 
+char* test_generate_scope_siblings();
+char* test_generate_leading_dot_float();
+
 #endif

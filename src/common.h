@@ -203,7 +203,8 @@ typedef struct Context Context;
 struct Context {
     Token* current_token;           // Current token being processed
     Node* code[MAX_NODES];          // Generated AST nodes (statements)
-    LVar* locals;                   // local variables
+    LVar* locals;                   // All function locals, retained for codegen
+    LVar* active_locals;            // Locals visible in the current scope
     LVar* globals;                  // global variables
     Typedef* typedefs;              // typedefs
     EnumConst* enum_consts;         // enum constants

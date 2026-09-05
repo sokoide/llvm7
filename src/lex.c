@@ -242,19 +242,21 @@ Token* tokenize(const char* p) {
 
         int token_col = (int)(p - line_start) + 1;
 
-        // Check for keywords
-        bool keyword_matched = false;
-        for (int i = 0; i < NUM_KEYWORDS; i++) {
-            if (strncmp(p, kw_str[i], kw_len[i]) == 0 &&
-                !is_alnum(p[kw_len[i]])) {
-                cur = new_token_at(TK_RESERVED, cur, p, kw_len[i], line,
-                                   token_col);
-                p += kw_len[i];
-                keyword_matched = true;
-                break;
+        // Scan identifiers once; punctuation and literals need no keyword lookup.
+        if (('a' <= *p && *p <= 'z') || ('A' <= *p && *p <= 'Z') || *p == '_') {
+            const char* start = p;
+            while (is_alnum(*p)) {
+                p++;
             }
-        }
-        if (keyword_matched) {
+            int len = (int)(p - start);
+            TokenKind kind = TK_IDENT;
+            for (int i = 0; i < NUM_KEYWORDS; i++) {
+                if (len == kw_len[i] && memcmp(start, kw_str[i], len) == 0) {
+                    kind = TK_RESERVED;
+                    break;
+                }
+            }
+            cur = new_token_at(kind, cur, start, len, line, token_col);
             continue;
         }
 
@@ -288,7 +290,8 @@ Token* tokenize(const char* p) {
 
         // Check for single-character operators and delimiters
         const char* single_char_ops = "+-*/()<>;={},&|[].!:=?%^~";
-        if (strchr(single_char_ops, (unsigned char)*p)) {
+        if (strchr(single_char_ops, (unsigned char)*p) &&
+            !(*p == '.' && isdigit((unsigned char)p[1]))) {
             cur = new_token_at(TK_RESERVED, cur, p, 1, line, token_col);
             p++;
             continue;
@@ -356,7 +359,15 @@ Token* tokenize(const char* p) {
 
         // Character literal
         if (*p == '\'') {
-            p++; // skip '
+            const char* start = p;
+            p++; // skip opening quote
+            if (!*p || *p == '\'' || *p == '\n') {
+                fprintf(stderr,
+                        "lex error:%d:%d: empty or unterminated character literal\n",
+                        line, token_col);
+                free_tokens(head.next);
+                return NULL;
+            }
             int val;
             if (*p == '\\') {
                 p++;
@@ -376,16 +387,10 @@ Token* tokenize(const char* p) {
                 return NULL;
             }
             p++; // skip closing '
-            cur = new_token_at(TK_NUM, cur, p - 2, 1, line, token_col);
+            cur = new_token_at(TK_NUM, cur, start, (int)(p - start), line,
+                               token_col);
             cur->val = val;
             cur->uval = (unsigned long long)(unsigned int)val;
-            cur->len =
-                0; // Still use 0 to avoid consume() matching, but wait...
-            // Let's use actual length 1 and pointed at the char but it's
-            // complex. Actually, the best way is to not use len=0 if it's a
-            // valid token. For TK_NUM, expect_number() uses cur->val. So
-            // kind=TK_NUM, len=0 is fine IF nobody uses len to match it. Wait,
-            // the previous logic was creating a SECOND token!
             continue;
         }
 
@@ -513,18 +518,6 @@ Token* tokenize(const char* p) {
                 }
             }
             cur->len = (int)(p - start);
-            continue;
-        }
-
-        // Identifier
-        if (('a' <= *p && *p <= 'z') || ('A' <= *p && *p <= 'Z') || *p == '_') {
-            const char* start = p;
-            while (('a' <= *p && *p <= 'z') || ('A' <= *p && *p <= 'Z') ||
-                   ('0' <= *p && *p <= '9') || *p == '_') {
-                p++;
-            }
-            cur =
-                new_token_at(TK_IDENT, cur, start, p - start, line, token_col);
             continue;
         }
 

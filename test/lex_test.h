@@ -27,4 +27,8 @@ char* test_lex_hex_escape_two_digit();
 char* test_lex_octal_escape();
 char* test_lex_octal_escape_zero();
 
+char* test_lex_leading_dot_float();
+char* test_lex_identifier_keyword_boundaries();
+char* test_lex_incomplete_character_literal();
+
 #endif

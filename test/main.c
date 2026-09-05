@@ -337,6 +337,12 @@ static char* run_all_tests() {
                 "preprocess: __LINE__ via #define");
     mu_run_test(test_preprocess_file_not_expand_in_string,
                 "preprocess: __FILE__ not expand in string");
+    mu_run_test(test_lex_leading_dot_float, "test_lex_leading_dot_float");
+    mu_run_test(test_lex_identifier_keyword_boundaries, "test_lex_identifier_keyword_boundaries");
+    mu_run_test(test_lex_incomplete_character_literal, "test_lex_incomplete_character_literal");
+    mu_run_test(test_scope_sibling_visibility, "test_scope_sibling_visibility");
+    mu_run_test(test_generate_scope_siblings, "codegen: sibling scopes");
+    mu_run_test(test_generate_leading_dot_float, "codegen: leading dot float");
     return NULL;
 }
 

@@ -64,7 +64,7 @@ format:
 	$(MAKE) -C test format
 
 # TARGET
-$(TARGET): $(BUILD_DIR) $(C_OBJS)
+$(TARGET): $(C_OBJS) | $(BUILD_DIR)
 	@echo "Linking $(TARGET)..."
 	@echo "C_OBJS: $(C_OBJS)"
 	$(CC) $(CFLAGS) -o $(TARGET) $(C_OBJS) $(LDFLAGS)

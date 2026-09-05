@@ -1867,3 +1867,33 @@ char* test_parse_funcstr() {
         free_ast(ctx.code[i]);
     return NULL;
 }
+
+char* test_scope_sibling_visibility() {
+    Context ctx = {0};
+    Token* tok = tokenize("x");
+    Type* ty = new_type_int();
+    LVar* outer = add_lvar(&ctx, tok, ty);
+    enter_scope(&ctx);
+    LVar* inner = add_lvar(&ctx, tok, ty);
+    mu_assert("inner declaration shadows outer",
+              find_lvar(&ctx, tok) == inner);
+    leave_scope(&ctx);
+    mu_assert("leaving block restores outer",
+              find_lvar(&ctx, tok) == outer);
+    enter_scope(&ctx);
+    mu_assert("sibling block must not see expired declaration",
+              find_lvar(&ctx, tok) == outer);
+    enter_scope(&ctx);
+    mu_assert("deeper block must not revive expired declaration",
+              find_lvar(&ctx, tok) == outer);
+    leave_scope(&ctx);
+    leave_scope(&ctx);
+    mu_assert("all declarations retained for codegen",
+              ctx.locals == inner && inner->next == outer);
+    mu_assert("local slots stay unique", inner->offset != outer->offset);
+    free(inner);
+    free(outer);
+    free(ty);
+    free_tokens(tok);
+    return NULL;
+}

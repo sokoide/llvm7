@@ -103,4 +103,6 @@ char* test_parse_enum_values();
 char* test_parse_flexible_array_member();
 char* test_parse_funcstr();
 
+char* test_scope_sibling_visibility();
+
 #endif

@@ -399,3 +399,59 @@ char* test_lex_hex_int() {
     free_tokens(head);
     return NULL;
 }
+
+char* test_lex_leading_dot_float() {
+    Token* tokens = tokenize(".5 .25e+2 .125f . ... a.b");
+    Token* tok = tokens;
+    double values[] = {0.5, 25.0, 0.125};
+    int lengths[] = {2, 6, 5};
+    for (int i = 0; i < 3; i++) {
+        mu_assert("leading dot literal must be a number",
+                  tok && tok->kind == TK_NUM);
+        mu_assert("leading dot literal must be floating point",
+                  tok->is_float);
+        mu_assert("floating value must match", tok->fval == values[i]);
+        mu_assert("entire literal must be consumed", tok->len == lengths[i]);
+        tok = tok->next;
+    }
+    mu_assert("standalone dot must remain punctuation",
+              tok->kind == TK_RESERVED && tok->len == 1);
+    tok = tok->next;
+    mu_assert("ellipsis must remain one token",
+              tok->kind == TK_RESERVED && tok->len == 3);
+    tok = tok->next;
+    mu_assert("member base must be an identifier", tok->kind == TK_IDENT);
+    tok = tok->next;
+    mu_assert("member dot must remain punctuation",
+              tok->kind == TK_RESERVED && tok->len == 1);
+    free_tokens(tokens);
+    return NULL;
+}
+
+char* test_lex_identifier_keyword_boundaries() {
+    Token* tokens = tokenize(
+        "int integer int_ int1 _int return return_value short shortfall");
+    Token* tok = tokens;
+    TokenKind kinds[] = {TK_RESERVED, TK_IDENT, TK_IDENT, TK_IDENT, TK_IDENT,
+                         TK_RESERVED, TK_IDENT, TK_RESERVED, TK_IDENT};
+    for (int i = 0; i < 9; i++) {
+        mu_assert("keyword must match the entire identifier",
+                  tok && tok->kind == kinds[i]);
+        tok = tok->next;
+    }
+    mu_assert("all identifiers consumed", tok->kind == TK_EOF);
+    free_tokens(tokens);
+    return NULL;
+}
+
+char* test_lex_incomplete_character_literal() {
+    // Heap buffers let AddressSanitizer catch reads past the terminator.
+    const char* inputs[] = {"'", "''", "'a", "'\\"};
+    for (int i = 0; i < 4; i++) {
+        char* input = strdup(inputs[i]);
+        Token* tokens = tokenize(input);
+        free(input);
+        mu_assert("incomplete character literal must fail", tokens == NULL);
+    }
+    return NULL;
+}

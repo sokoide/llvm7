@@ -40,6 +40,21 @@ make selfhost
 1. `src/*.c` を `build/llvm7` でコンパイルし、LLVM IR (`selfhost/build/*.ll`) を生成
 2. 生成された IR をリンクして `build/llvm7_selfhost` を生成
 
+## 開発と検証
+
+処理は `main.c` を起点に、`preprocess.c`（マクロ・include 展開）、
+`lex.c`（トークン化）、`parse.c`（AST 構築）、`codegen.c`（LLVM IR 生成）の順に進みます。
+`variable.c` はローカル変数の可視性を管理します。現在有効な変数の検索リストと、
+コード生成に必要な関数内の全変数リストを分け、ブロック終了後も割当スロットを保持します。
+
+- `make test`: 単体テストと、生成した LLVM IR の検証・JIT 実行テスト。
+- `make bootstrap_check`: テストと、コンパイラ本体・デモの Stage 1 / Stage 2 IR 一致検証。
+- `make selfhost_test`: Stage 2 でデモをコンパイルし、期待値が定義されたデモの終了コードを検証。
+
+通常ビルドのオブジェクトは `build/`、テスト用は `build/test/` に保存します。
+依存ファイルの相対パスとビルドフラグが異なるため、両者のオブジェクトは共有しません。
+テスト実行ファイルは `build/test_runner` です。
+
 ## 実行方法
 
 ```bash

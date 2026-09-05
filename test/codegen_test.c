@@ -2971,3 +2971,50 @@ char* test_generate_cast_int_ptr() {
     mu_assert("Expected 65 for cast int to char ptr", result == 65);
     return NULL;
 }
+
+char* test_generate_scope_siblings() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { int x = 7; int sum = 0; "
+        "{ int x = 11; sum = sum + x; } "
+        "{ sum = sum + x; { sum = sum + x; } } "
+        "for (int x = 0; x < 2; x++) { sum = sum + x; } "
+        "for (int i = 0; i < 1; i++) { sum = sum + x; } "
+        "return sum; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Sibling blocks and loops must restore outer x", result == 33);
+    return NULL;
+}
+
+char* test_generate_leading_dot_float() {
+    Context ctx = {0};
+    Token* head = tokenize("int main() { double x = .5; return x * 10; }");
+    ctx.current_token = head;
+    parse_program(&ctx);
+    LLVMModuleRef module = generate_module(&ctx);
+    LLVMTestContext llvm_ctx = {0};
+    if (init_llvm_context(&llvm_ctx, module) != 0) {
+        LLVMDisposeModule(module);
+        free_tokens(head);
+        return "Failed to initialize LLVM context";
+    }
+    int result = execute_module(&llvm_ctx, "main");
+    cleanup_llvm_context(&llvm_ctx);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    free_tokens(head);
+    mu_assert("Leading dot floating literal must evaluate to 0.5", result == 5);
+    return NULL;
+}
