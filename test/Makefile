@@ -57,6 +57,7 @@ $(BUILD_DIR):
 # Clean
 clean:
 	rm -rf $(BUILD_DIR) $(TEST_TARGET)
+	rm -f ../build/test_*.o ../build/test_*.d
 
 # Format
 format:

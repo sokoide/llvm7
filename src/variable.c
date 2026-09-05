@@ -9,6 +9,12 @@ struct ScopedLVar {
     LVar* scope_next;
 };
 
+// Invariant: active_locals is a stack ordered innermost-scope-first. Every
+// declaration of the current scope sits above all declarations of enclosing
+// scopes, so find_lvar's first name match is the innermost one and
+// leave_scope can pop the current scope's declarations as a contiguous run
+// at the front. This requires enter_scope/leave_scope to stay balanced on
+// every parse path.
 LVar* find_lvar(Context* ctx, Token* tok) {
     for (LVar* var = ctx->active_locals; var != NULL;) {
         ScopedLVar* scoped = (ScopedLVar*)var;
@@ -32,6 +38,25 @@ LVar* find_gvar(Context* ctx, Token* tok) {
 }
 
 LVar* add_lvar(Context* ctx, Token* tok, Type* type) {
+    // C11 6.7p3: an identifier with no linkage may be declared only once per
+    // scope. The current scope's declarations are contiguous at the front of
+    // active_locals, so the scan stops at the first enclosing-scope entry.
+    // Parameters share depth 0 with the function body top level, so this
+    // also rejects redeclaring a parameter there.
+    for (LVar* var = ctx->active_locals; var != NULL;) {
+        ScopedLVar* scoped = (ScopedLVar*)var;
+        if (scoped->scope_depth < ctx->scope_depth) {
+            break;
+        }
+        if (tok->len > 0 && var->len == tok->len &&
+            memcmp(var->name, tok->str, tok->len) == 0) {
+            fprintf(stderr, "parse error:%d:%d: redeclaration of '%.*s'\n",
+                    tok->line, tok->col, tok->len, tok->str);
+            exit(1);
+        }
+        var = scoped->scope_next;
+    }
+
     ScopedLVar* scoped = calloc(1, sizeof(ScopedLVar));
     if (!scoped) {
         perror("calloc");

@@ -341,6 +341,8 @@ static char* run_all_tests() {
     mu_run_test(test_lex_identifier_keyword_boundaries, "test_lex_identifier_keyword_boundaries");
     mu_run_test(test_lex_incomplete_character_literal, "test_lex_incomplete_character_literal");
     mu_run_test(test_scope_sibling_visibility, "test_scope_sibling_visibility");
+    mu_run_test(test_parse_prototype_retains_params, "parse: prototype retains params");
+    mu_run_test(test_parse_sequential_for_same_var, "parse: sequential for same var");
     mu_run_test(test_generate_scope_siblings, "codegen: sibling scopes");
     mu_run_test(test_generate_leading_dot_float, "codegen: leading dot float");
     return NULL;

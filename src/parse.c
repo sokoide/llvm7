@@ -121,6 +121,14 @@ void free_ast(Node* ast) {
     free_ast(ast->next);
     free_ast(ast->cond);
     free_ast(ast->init);
+    // Only function nodes own a locals chain and each declaration belongs to
+    // exactly one chain, so freeing here cannot double-free.
+    LVar* var = ast->locals;
+    while (var != NULL) {
+        LVar* next = var->next;
+        free(var);
+        var = next;
+    }
     free(ast);
 }
 
@@ -616,6 +624,15 @@ Type* parse_type(Context* ctx) {
     return base;
 }
 
+static Token unnamed_parameter_token;
+
+static Token* new_unnamed_parameter_token(void) {
+    unnamed_parameter_token.kind = TK_IDENT;
+    unnamed_parameter_token.str = "";
+    unnamed_parameter_token.len = 0;
+    return &unnamed_parameter_token;
+}
+
 // params = ty ident ("," ty ident)*
 Node* parse_params(Context* ctx, bool* is_vararg) {
     *is_vararg = false;
@@ -632,10 +649,7 @@ Node* parse_params(Context* ctx, bool* is_vararg) {
             }
         }
         // Arguments without name (prototype)
-        tok = calloc(1, sizeof(Token));
-        tok->kind = TK_IDENT;
-        tok->str = "";
-        tok->len = 0;
+        tok = new_unnamed_parameter_token();
     }
 
     if (consume(ctx, "[")) {
@@ -664,10 +678,7 @@ Node* parse_params(Context* ctx, bool* is_vararg) {
         tok = consume_ident(ctx);
         if (!tok) {
             // Arguments without name
-            tok = calloc(1, sizeof(Token));
-            tok->kind = TK_IDENT;
-            tok->str = "";
-            tok->len = 0;
+            tok = new_unnamed_parameter_token();
         }
 
         if (consume(ctx, "[")) {
@@ -1041,6 +1052,8 @@ void parse_program(Context* ctx) {
                 proto_node->is_vararg = is_vararg;
                 proto_node->is_inline = spec.is_inline;
                 proto_node->is_static = spec.is_static;
+                // Own the parameter locals so free_ast can release them.
+                proto_node->locals = ctx->locals;
                 ctx->code[i++] = proto_node;
                 continue;
             }

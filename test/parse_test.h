@@ -104,5 +104,7 @@ char* test_parse_flexible_array_member();
 char* test_parse_funcstr();
 
 char* test_scope_sibling_visibility();
+char* test_parse_prototype_retains_params();
+char* test_parse_sequential_for_same_var();
 
 #endif

@@ -1897,3 +1897,40 @@ char* test_scope_sibling_visibility() {
     free_tokens(tok);
     return NULL;
 }
+
+char* test_parse_prototype_retains_params() {
+    Context ctx = {0};
+    Token* tok = tokenize("int add(int, int);");
+    ctx.current_token = tok;
+    parse_program(&ctx);
+
+    mu_assert("should have one prototype", ctx.node_count == 1);
+    mu_assert("prototype must own its parameter locals",
+              ctx.code[0]->locals != NULL && ctx.code[0]->locals->next != NULL);
+    mu_assert("unnamed parameters must remain distinct declarations",
+              ctx.code[0]->locals->len == 0 &&
+                  ctx.code[0]->locals->next->len == 0);
+
+    free_tokens(tok);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    return NULL;
+}
+
+char* test_parse_sequential_for_same_var() {
+    Context ctx = {0};
+    Token* tok = tokenize("int main() { "
+        "for (int i = 0; i < 2; i++) { i = i + 1; } "
+        "for (int i = 0; i < 2; i++) { i = i + 1; } "
+        "return 0; }");
+    ctx.current_token = tok;
+    parse_program(&ctx);
+
+    mu_assert("sequential for loops may reuse the loop variable name",
+              ctx.node_count == 1);
+
+    free_tokens(tok);
+    for (int i = 0; i < ctx.node_count; i++)
+        free_ast(ctx.code[i]);
+    return NULL;
+}
